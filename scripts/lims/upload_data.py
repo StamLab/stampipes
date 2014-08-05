@@ -400,6 +400,8 @@ class UploadLIMS(object):
             print result.json()
        
     def upload_fastqc_counts(self, alignment_id):
+
+        self.get_alignment_counts(alignment_id)
         
         total = 0
         filtered = 0
