@@ -1,5 +1,5 @@
 ###################
-# This creates BigWig files from a BAM file for loading into a GCSC browser.
+# This creates BigWig files from a BAM file for loading into a UCSC browser.
 # 
 ###################
 # SAMPLE_NAME=Example_NoIndex_L007
@@ -46,7 +46,7 @@ $(TMPDIR)/$(SAMPLE_NAME).m$(READLENGTH).uniques.$(BINI).bed : $(BAMFILE)
     | sort-bed - \
     > $@
 
-$(SAMPLE_NAME).$(WIN).$(BINI).uniques-density.$(READLENGTH).$(GENOME).bed.starch : $(TMPDIR)/$(CHROM_BUCKET) $(SAMPLE_NAME).m$(READLENGTH).uniques.$(BINI).bed   
+$(SAMPLE_NAME).$(WIN).$(BINI).uniques-density.$(READLENGTH).$(GENOME).bed.starch : $(CHROM_BUCKET) $(SAMPLE_NAME).m$(READLENGTH).uniques.$(BINI).bed   
 	unstarch $(CHROM_BUCKET) \
     | bedmap --faster --range $(WIN) --echo --count --delim "\t" - $(SAMPLE_NAME).m$(READLENGTH).uniques.$(BINI).bed \
     | starch - \
