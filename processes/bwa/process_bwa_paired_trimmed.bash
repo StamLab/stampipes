@@ -16,7 +16,7 @@ FASTQ_PAIR_BAMS=""
 
 for filenum in $(seq -f "%03g" 1 $NUMBER_FASTQ_FILES)
 do
-  NAME="aln${SAMPLE_NAME}_${filenum}"
+  NAME=".aln${SAMPLE_NAME}_${filenum}_${FLOWCELL}"
   BAMFILE="${SAMPLE_NAME}_${filenum}.sorted.bam"
   
 if [ ! -e $BAMFILE -a ! -e ${FINAL_BAM} ]; then
@@ -49,9 +49,9 @@ fi
 
 if [ ! -e ${FINAL_BAM} -o ! -e ${UNIQUES_BAM} ]; then
 
-PROCESS_HOLD="-hold_jid pb${SAMPLE_NAME}"
+PROCESS_HOLD="-hold_jid .pb${SAMPLE_NAME}_${FLOWCELL}"
     
-qsub ${HOLD} -N "pb${SAMPLE_NAME}" -V -cwd -S /bin/bash > /dev/stderr << __SCRIPT__
+qsub ${HOLD} -N ".pb${SAMPLE_NAME}_${FLOWCELL}" -V -cwd -S /bin/bash > /dev/stderr << __SCRIPT__
   set -x -e -o pipefail
   echo "Hostname: " `hostname`
   
@@ -83,7 +83,7 @@ fi
 
 if [ ! -e ${SAMPLE_NAME}.tagcounts.txt ]; then
     
-qsub $PROCESS_HOLD -N "ct${SAMPLE_NAME}" -V -cwd -S /bin/bash > /dev/stderr << __SCRIPT__
+qsub $PROCESS_HOLD -N ".ct${SAMPLE_NAME}_${FLOWCELL}" -V -cwd -S /bin/bash > /dev/stderr << __SCRIPT__
   set -x -e -o pipefail
   echo "Hostname: " `hostname`
 
@@ -94,7 +94,7 @@ qsub $PROCESS_HOLD -N "ct${SAMPLE_NAME}" -V -cwd -S /bin/bash > /dev/stderr << _
       -f ${FLOWCELL} \
       --alignment_id ${ALIGNMENT_ID} \
       --flowcell_lane_id ${FLOWCELL_LANE_ID} \
-      --countsfile ${SAMPLE_NAME}.tagcounts.txt \
+      --countsfile ${SAMPLE_NAME}.tagcounts.txt
       
 __SCRIPT__
 
@@ -102,7 +102,7 @@ fi
 
 if [ ! -e ${SAMPLE_NAME}.R1.rand.uniques.sorted.spot.out -o ! -e ${SAMPLE_NAME}.R1.rand.uniques.sorted.spotdups.txt ]; then
     
-qsub $PROCESS_HOLD -N "sp${SAMPLE_NAME}" -V -cwd -S /bin/bash > /dev/stderr << __SCRIPT__
+qsub $PROCESS_HOLD -N ".sp${SAMPLE_NAME}_${FLOWCELL}" -V -cwd -S /bin/bash > /dev/stderr << __SCRIPT__
   set -x -e -o pipefail
   echo "Hostname: " `hostname`
 
@@ -124,7 +124,7 @@ fi
 
 if [ ! -e ${SAMPLE_NAME}.${GENOME}.bw ]; then
 
-qsub $PROCESS_HOLD -N "den${SAMPLE_NAME}" -V -cwd -S /bin/bash > /dev/stderr << __SCRIPT__
+qsub $PROCESS_HOLD -N ".den${SAMPLE_NAME}_${FLOWCELL}" -V -cwd -S /bin/bash > /dev/stderr << __SCRIPT__
   set -x -e -o pipefail
   echo "Hostname: " `hostname`
 
