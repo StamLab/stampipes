@@ -75,7 +75,7 @@ class ProcessSetUp(object):
             outfile.write("# Priority %s\n" % str(priority))
             for samplesheet_name, script_file in self.processing_scripts[priority]:
                 outfile.write("cd %s && " % os.path.dirname(script_file))
-                outfile.write("qsub -N proc%s -cwd -V -S /bin/bash %s\n\n" % (samplesheet_name, self.qsub_scriptname))
+                outfile.write("qsub -N .proc%s -cwd -V -S /bin/bash %s\n\n" % (samplesheet_name, self.qsub_scriptname))
 
         outfile.close()
 
