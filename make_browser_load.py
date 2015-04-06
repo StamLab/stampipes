@@ -209,13 +209,15 @@ class MakeBrowserload(object):
             project = track["SampleProject"]
 
             if self.link_dir:
-                track["sampleDir"] = os.path.join("Project_%s" % project, "Sample_%s" % track["SampleID"])
+                track["sampleDir"] = os.path.join("Project_%s" % project, 
+                                                  "Sample_%s" % track["SampleID"],
+                                                  track["AlignDir"] if poptions.post_aggregation else "")
                 track["pathPrefix"] = "%s/%s" % (self.link_dir, track["sampleDir"])
             else:
-                track["sampleDir"] = os.path.join(self.basedir, self.project_dir[project], "Sample_%s" % track["SampleID"])
+                track["sampleDir"] = os.path.join(self.basedir, self.project_dir[project],
+                                                  "Sample_%s" % track["SampleID"],
+                                                  track["AlignDir"] if poptions.post_aggregation else "")
                 track["pathPrefix"] = track["sampleDir"]
-            if poptions.post_aggregation: 
-                track["sampleDir"] = os.path.join(track["sampleDir"], track['AlignDir'])
 
             if lane["aligner"] == "bwa":
                 track["wigfilename"]    = "%s.75_20.%s.wig"       % (track["SampleName"], hgdb)
