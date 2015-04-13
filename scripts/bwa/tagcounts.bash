@@ -7,20 +7,27 @@ if [ -e $OUTPUT ]; then
     rm $OUTPUT
 fi
 
+echo "Calculating total/pf/qc counts"
+if [ -e ${SAMPLE_NAME}_R1_001.fastq.gz ]; then
+zcat ${SAMPLE_NAME}_R?_???.fastq.gz \
+     | awk 'BEGIN{
+     filter = 0;
+   }{ \
+   if ( FNR % 4 == 1 && substr($2, 3, 1) == "Y" ) \
+     { filter+=1 }
+   }\
+   END { \
+     TOTAL = NR / 4; \
+     print "total", TOTAL ; \
+     print "pf", TOTAL - filter ; \
+     print "qc", filter ; \
+   }' >> $OUTPUT
+fi
+
+echo "Calculate tags trimmed"
+# count is in read pairs, double for accuracy in LIMS display % wise
+TRIMMED=`find . -maxdepth 1 -name "$SAMPLE_NAME*trimstats.txt" | xargs awk 'BEGIN { total=0 } { match($0, /Total read-pairs trimmed: ([0-9]+)/, a); total=total+a[1];} END{ print total * 2 }'`
+echo -e "adapter-trimmed\t$TRIMMED" >> $OUTPUT
+
+echo "Creating bam counts"
 python $STAMPIPES/scripts/bwa/bamcounts.py $INBAM $OUTPUT
-
-# Add in total/PF/QC counts
-# TODO: Can probably achieve TOTAL/PF/QC in a single pass of awk
-echo "Calculating total count"
-TOTAL=`zcat ${SAMPLE_NAME}_R?_???.fastq.gz | wc -l | awk '{print $1 / 4; }'`
-echo -e "total\t$TOTAL" >> $OUTPUT
-
-echo "Calculating pf count"
-PF=`zcat ${SAMPLE_NAME}_R?_???.fastq.gz | \
-  awk '{if (substr($2, 3, 1) == "N") {f=0;print $1} else if (substr($2, 3, 1) == "Y") {f=1} else if ( f == 0) {print $1 } }' | \
-  wc -l | awk '{print $1 / 4; }'`
-echo -e "pf\t$PF" >> $OUTPUT
-
-echo "Calculating qc count"
-QC=`awk -v TOTAL=$TOTAL -v PF=$PF 'BEGIN{ print TOTAL - PF; }'`
-echo -e "qc\t$QC" >> $OUTPUT

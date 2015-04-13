@@ -44,7 +44,7 @@ calcspot : $(SPOT_OUT)
 calcdup : $(DUP_OUT)
 
 $(RANDOM_SAMPLE_BAM) : $(BAMFILE)
-	samtools view -F 12 -f 3 $^ | awk '{if($$3 != "chrM" && $$3 != "chrC" && $$3 != "random"){print}}' | sort -k 1,1 | awk -f $(STAMPIPES)/awk/matchreadpairs.awk > $(TMPDIR)/linematch.sam
+	samtools view -F 12 -f 3 $^ | awk '{if( ! index($$3, "chrM") && $$3 != "chrC" && $$3 != "random"){print}}' | sort -k 1,1 | awk -f $(STAMPIPES)/awk/matchreadpairs.awk > $(TMPDIR)/linematch.sam
 	bash -e $(STAMPIPES)/scripts/SPOT/pairedrandomsample.bash $(SAMPLE_SIZE) $(FAI) $(TMPDIR)/linematch.sam $(TMPDIR)/randsample.bam
 	samtools sort $(TMPDIR)/randsample.bam $(basename $@)
 

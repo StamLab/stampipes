@@ -14,7 +14,7 @@ unless (-d $readsDir) {
 }
 
 my $sum = 0;
-foreach my $file (glob("$readsDir/${name}_R?_???_*fastq.gz")) {
+foreach my $file (glob("$readsDir/${name}_R?_???.fastq.gz")) {
     chomp( my $lines = `zcat $file | wc -l` );
     $sum += ($lines / 4);
 }

@@ -8,8 +8,8 @@
 # OPTIONAL VARIABLES
 # Note: SAMPLE_NAME is not necessary if BAMFILE and DUP_OUT are specified.
 ###################
-# BAMFILE : The input BAM files (default $(SAMPLE_NAME).uniques.sorted.bam)
-# DUP_OUT : The output file (default $(SAMPLE_NAME).uniques.sorted.bam.picard.dup)
+# BAMFILE : The input BAM files (default $(SAMPLE_NAME).sorted.bam)
+# DUP_OUT : The output file (default $(SAMPLE_NAME).sorted.bam.picard.dup)
 # OUTBAM : The output bam (default: /dev/null)
 ###################
 # REQUIRED MODULES
@@ -17,7 +17,7 @@
 # module load java
 ###################
 
-BAMFILE ?= $(SAMPLE_NAME).uniques.sorted.bam
+BAMFILE ?= $(SAMPLE_NAME).sorted.bam
 DUP_OUT ?= $(SAMPLE_NAME).MarkDuplicates.picard
 OUTBAM ?= /dev/null
 

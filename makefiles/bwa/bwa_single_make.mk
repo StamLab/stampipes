@@ -23,13 +23,6 @@
 
 SHELL = bash
 
-# NSLOTS is the default sge environment variable letting the process know
-# how many threads it has reserved
-# We can use that for the default number of threads to use for the bwa
-# aln process
-NSLOTS ?= 1
-THREADS ?= $(NSLOTS)
-
 # Use the default PATH version of each of these programs unless overridden
 SAMTOOLS ?= samtools
 BWA ?= bwa
@@ -41,10 +34,6 @@ READ_LENGTH ?= 36
 # Ideally this will be set in the environment or on the command line to an actual temp directory
 TMPDIR ?= $(shell pwd)
 
-ADAPTER_P7_NAME ?= P7
-ADAPTER_P5_NAME ?= P5
-ADAPTER_FILE ?= $(SAMPLE_NAME).adapters.txt
-
 # Discard reads failing chastity filter, use 32 bases as a seed
 # and set the mismatch level appropriate to the read length
 # NOTE: THESE ARE NOT WORKING FOR CHANGING IN QMAKE SCRIPT
@@ -55,11 +44,11 @@ BWA_ALN_OPTIONS ?= -Y -l 32 -n 0.04
 BWA_SAMPE_OPTIONS ?= -n 10 -a 750
 
 # List the intermediate files that can be deleted when we finish up
-.INTERMEDIATE :
+.INTERMEDIATE : 
 
-all : info align
+all : info align 
 
-info :
+info : 
 	@echo "------"
 	@echo "PROGRAM VERSIONS"
 	@echo "------"
@@ -67,8 +56,6 @@ info :
 	@$(BWA) 2>&1 | grep "Version"
 	@echo "samtools:"
 	@$(SAMTOOLS) 2>&1 | grep "Version"
-	@echo "trim-adapters-illumina:"
-	@trim-adapters-illumina -v
 	@echo "------"
 	@echo "METADATA"
 	@echo "------"
@@ -76,9 +63,6 @@ info :
 	@echo "BWAINDEX: " $(BWAINDEX)
 	@echo "FAI: " $(FAI)
 	@echo "READ LENGTH: " $(READ_LENGTH)
-	@echo "ADAPTER_P7: " $(ADAPTER_P7)
-	@echo "ADAPTER_P5: " $(ADAPTER_P5)
-	@echo "ADAPTERFILE: " $(ADAPTERFILE)
 	@echo "------"
 	@echo "PROGRAM OPTIONS"
 	@echo "------"
@@ -95,18 +79,12 @@ $(OUTBAM) : $(TMPDIR)/align.sorted.bam
 # Create sorted BAM files
 # Note: samtools expects the output name without a .bam suffix and will
 # add it, so take it away to prevent .bam.bam
-$(TMPDIR)/align.sorted.bam : $(TMPDIR)/align.filtered.bam
+$(TMPDIR)/align.sorted.bam : $(TMPDIR)/align.unsorted.bam
 	time $(SAMTOOLS) sort $^ $(basename $@) && echo made $(TMPDIR)/align.sorted.bam >&2
-
-# Create unsorted filtered BAM files
-$(TMPDIR)/align.filtered.bam : $(TMPDIR)/align.unsorted.bam
-	time $(STAMPIPES)/scripts/bwa/filter_reads.py $(TMPDIR)/align.unsorted.bam $(TMPDIR)/align.filtered.bam
 
 # Create unsorted raw BAM files
 $(TMPDIR)/align.unsorted.bam : $(TMPDIR)/align.sam
-	time $(SAMTOOLS) view -bS -t $(FAI) $^ \
-		| python $(STAMPIPES)/scripts/bwa/fix_bam_pairing.py - $@ \
-		&& echo made $(TMPDIR)/align.unsorted.bam >&2
+	time $(SAMTOOLS) view -bT $(FAI) $^ > $@ && echo made $(TMPDIR)/align.unsorted.bam >&2
 
 # Create the SAM files from each pair of SAI and FASTQ files
 $(TMPDIR)/align.sam : $(TMPDIR)/R1.sai $(TMPDIR)/R2.sai $(TMPDIR)/trimmed.R1.fastq.gz $(TMPDIR)/trimmed.R2.fastq.gz
@@ -114,15 +92,9 @@ $(TMPDIR)/align.sam : $(TMPDIR)/R1.sai $(TMPDIR)/R2.sai $(TMPDIR)/trimmed.R1.fas
 
 # Make SAI alignments for each FASTQ file
 $(TMPDIR)/%.sai : $(TMPDIR)/trimmed.%.fastq.gz
-	time $(BWA) aln -t $(THREADS) $(BWA_ALN_OPTIONS) $(BWAINDEX) $(TMPDIR)/trimmed.$*.fastq.gz > $(TMPDIR)/$*.sai && echo made $(TMPDIR)/$*.sai >&2
+	time $(BWA) aln $(BWA_ALN_OPTIONS) $(BWAINDEX) $(TMPDIR)/trimmed.$*.fastq.gz > $(TMPDIR)/$*.sai && echo made $(TMPDIR)/$*.sai >&2
 
 # Trim each FASTQ file pair
 # Keep track of the output by passing it to a file, so we can know how many pairs were trimmed
-$(TMPDIR)/trimmed.R1.fastq.gz $(TMPDIR)/trimmed.R2.fastq.gz : $(FASTQ1_FILE) $(FASTQ2_FILE) $(ADAPTER_FILE)
-	time trim-adapters-illumina \
-		-f $(ADAPTER_FILE) \
-		-1 $(ADAPTER_P5_NAME) -2 $(ADAPTER_P7_NAME) \
-		$(FASTQ1_FILE) $(FASTQ2_FILE) \
-		$(TMPDIR)/trimmed.R1.fastq.gz $(TMPDIR)/trimmed.R2.fastq.gz \
-		&> $(TRIMSTATS) \
-		&& echo trimmed $(SAMPLE_NAME) >&2
+$(TMPDIR)/trimmed.R1.fastq.gz $(TMPDIR)/trimmed.R2.fastq.gz : $(FASTQ1_FILE) $(FASTQ2_FILE)
+	time trim-adapters-illumina -f $(ADAPTERFILE) --length=$(READ_LENGTH) $(FASTQ1_FILE) $(FASTQ2_FILE) $(TMPDIR)/trimmed.R1.fastq.gz $(TMPDIR)/trimmed.R2.fastq.gz &> $(TRIMSTATS) && echo trimmed $(SAMPLE_NAME) >&2

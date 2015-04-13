@@ -25,7 +25,7 @@ MIN_MAP_QUALITY ?= 30
 
 # Filter to a minimum mapping quality, where both pairs
 # are properly paired in the mapping
-SAMTOOL_OPTIONS ?= -F 12 -f 3 -q $(MIN_MAP_QUALITY)
+SAMTOOL_OPTIONS ?= -F 512
 
 # Ideally this will be set to something else set in the environment or on the command line
 TMPDIR ?= $(shell pwd)
@@ -59,7 +59,7 @@ uniques : $(INBAM).bai $(OUTBAM).bai
 
 # Sometimes this will report errors about a read not mapping that should have a mapq of 0
 # See this for more info: http://seqanswers.com/forums/showthread.php?t=4246
-$(INSERTMETRICS) : $(OUTBAM) 
+$(INSERTMETRICS) : $(INBAM) 
 	time java -Xmx1000m -jar `which CollectInsertSizeMetrics.jar` INPUT=$^ OUTPUT=$@ \
                 HISTOGRAM_FILE=$(INSERTMETRICS).pdf \
                 VALIDATION_STRINGENCY=LENIENT \
