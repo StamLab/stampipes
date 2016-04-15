@@ -30,9 +30,4 @@ cd "$flowcell_dir"
 
 python "$STAMPIPES/scripts/lims/get_processing.py" -f "$flowcell_name" --quiet
 
-python "$STAMPIPES/scripts/browser/make_browser_load.py" -p "$priority" --quiet
-
-for makedoc in browser-*/make.*.doc ; do
-  bash "$makedoc"
-done
-
+python "$STAMPIPES/scripts/browser/make_trackhubs.py" -p "$priority" --quiet
