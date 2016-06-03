@@ -65,8 +65,10 @@ def parser_setup():
 class MakeBrowserload(object):
     genome_organisms = {
       "hg19": "human",
+      "hg38": "human",
       "rn5": "rat",
       "mm9": "mouse",
+      "mm10": "mouse",
       "TAIR9": "arabidopsis",
       "sacCer2": "sacCer",
       "sacCer3": "sacCer",
@@ -88,7 +90,7 @@ class MakeBrowserload(object):
         #maintrackname = None, bigwig = True, date = None):
     def __init__(self, group_data, browserconfig, basedir, outdir, mersize, priority, paired_end, project, label, date):
 
-		# anishida: URL for directory with flowcell data
+        # anishida: web URL
         self.trackhubURL = "http://stampipe0.altiusinstitute.org/flowcells/"
 
         self.basedir = basedir
@@ -170,10 +172,8 @@ class MakeBrowserload(object):
         self.create_hubtxt()		# anishida: calls function to create hub.txt file describing trackhub
         self.create_genomestxt()	# anishida: calls function to create genomes.txt file describing genomes used
         self.create_htmls()
-#        self.create_commands()		# anishida: not necessary for trackhubs
-#        self.create_excludes()		# anishida: not necessary for trackhubs
 
-	# anishida: added function for creating hub.txt
+	# anishida: added function for creating hub.txt for just the flowcell specifically
     def create_hubtxt(self):
         hubfile = os.path.join(self.outdir, "hub.txt")
         logging.info("Creating hub.txt file: %s" % hubfile)
@@ -186,7 +186,7 @@ class MakeBrowserload(object):
         hub.write("descriptionUrl description.html\n")
         hub.close()
 
-    # anishida: added function for creating genomes.txt
+    # anishida: added function for creating genomes.txt for just the flowcell specifically
     def create_genomestxt(self):
         genomefile = os.path.join(self.outdir, "genomes.txt")
         logging.info("Creating genome.txt file: %s" % genomefile)
@@ -326,7 +326,7 @@ class MakeBrowserload(object):
             file.write("</tr>\n")
         file.write("</tbody>\n")
         file.write("</table>\n")
-
+        
     def create_ras(self):
         self.ra_files = {}
 
@@ -626,9 +626,7 @@ def main(args = sys.argv):
 
         logging.info("Reading browser configuration from %s" % browserconfig)
 
-#        outdir = os.path.join( basedir, "browser-load-%s-%s" % (project, browser))
-# anishida: ALTERNATE PATH FOR TESTING DUE TO WRITE PERMISSIONS
-        outdir = os.path.join( "/home/anishida/public_html/", "browser-load-%s-%s-trackhubtest" % (project, browser))
+        outdir = os.path.join( basedir, "browser-load-%s-%s" % (project, browser))
 
         loader = MakeBrowserload(lane_group, browserconfig, basedir, outdir, mersize, poptions.priority, paired_end, project, label, date)
         loader.load()
