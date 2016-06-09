@@ -7,7 +7,7 @@ HUBNAME=$1
 HUBFILE=$2
 
 OUTPUTDIR_FC=/net/seq/data/flowcells/trackhubs/flowcells/
-OUTPUTDIR_MASTERHUBS=/net/seq/data/flowcells/trackhubs/by_date/
+OUTPUTDIR_MASTERHUBS=/net/seq/data/flowcells/trackhubs/master_hubs/
 
 # check if hub name exists
 if [ -d $OUTPUTDIR_MASTERHUBS$HUBNAME ];
