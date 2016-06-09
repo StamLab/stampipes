@@ -587,6 +587,13 @@ def main(args = sys.argv):
 
     # get basedir
     basedir = data['alignment_group']['directory']
+    
+    # anishida: replace basedir in lims with updated basedirs
+    if re.search("monarch",basedir):
+        fc_loc = "/net/seq/data/flowcells/"
+        fc_dirname = basedir.replace("/net/monarch/vol2/tag/stamlab/flowcells/","")
+        basedir = fc_loc+fc_dirname
+    
     # Fetch paired endedness?
     paired_end = data['flowcell']['paired_end']
     label = data['alignment_group']['label']	# anishida: added label
@@ -625,6 +632,8 @@ def main(args = sys.argv):
 
 
         logging.info("Reading browser configuration from %s" % browserconfig)
+
+        logging.info("the basedirectory is: %s" % basedir)
 
         outdir = os.path.join( basedir, "browser-load-%s-%s" % (project, browser))
 

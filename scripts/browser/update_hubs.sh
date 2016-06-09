@@ -1,70 +1,47 @@
 # !/bin/bash
 
-# keep master hubs locations updated
+# create hub with given name from a text file listing all flowcells desired for that hub
+# ex: update_hubs.sh june_2016 list_of_fc_from_june2016.txt
 
-FLOWCELL=$1
-OUTPUTDIR=/net/seq/data/flowcells/
-OUTPUTDIR_MASTERS=/net/seq/data/flowcells/trackhubs/masters/
+HUBNAME=$1
+HUBFILE=$2
+
 OUTPUTDIR_FC=/net/seq/data/flowcells/trackhubs/flowcells/
+OUTPUTDIR_MASTERHUBS=/net/seq/data/flowcells/trackhubs/by_date/
 
-# this is the list of names to create the master track from
-buildfile="master_flowcell_list.txt"
-
-# create flowcell link and add to master hub list
-if [ ! -L $OUTPUTDIR_FC$FLOWCELL ];
+# check if hub name exists
+if [ -d $OUTPUTDIR_MASTERHUBS$HUBNAME ];
 then
-    LOC=$(pwd)
-    ln -s $LOC/flowcell_trackhub $OUTPUTDIR_FC$FLOWCELL
-    echo "$FLOWCELL" >> $OUTPUTDIR_MASTERS$buildfile
+    echo "a hub with that name already exists, please remove existing directory or use a different name"
+    exit;
+else
+    mkdir $OUTPUTDIR_MASTERHUBS$HUBNAME
 fi
 
-# make master hubs.txt if doesn't exist
-if [ ! -f ${OUTPUTDIR_MASTERS}hub.txt ];
-then
-    echo "hub master_hub" > ${OUTPUTDIR_MASTERS}hub.txt
-    echo "shortLabel MasterHub" >> ${OUTPUTDIR_MASTERS}hub.txt
-    echo "longLabel all tracks" >> ${OUTPUTDIR_MASTERS}hub.txt
-    echo "genomesFile genomes.txt" >> ${OUTPUTDIR_MASTERS}hub.txt
-    echo "email placeholder@altiusinstitute.org" >> ${OUTPUTDIR_MASTERS}hub.txt
-fi
+# create hub.txt file
+echo "hub master_hub_${HUBNAME}" > ${OUTPUTDIR_MASTERHUBS}${HUBNAME}/hub.txt
+echo "shortLabel ${HUBNAME}" >> ${OUTPUTDIR_MASTERHUBS}${HUBNAME}/hub.txt
+echo "longLabel all tracks" >> ${OUTPUTDIR_MASTERHUBS}${HUBNAME}/hub.txt
+echo "genomesFile genomes.txt" >> ${OUTPUTDIR_MASTERHUBS}${HUBNAME}/hub.txt
+echo "email placeholder@altiusinstitute.org" >> ${OUTPUTDIR_MASTERHUBS}${HUBNAME}/hub.txt
 
-# make master genomes.txt if it doesn't exist
-if [ ! -f ${OUTPUTDIR_MASTERS}genomes.txt ];
-then 
-   echo "" > ${OUTPUTDIR_MASTERS}genomes.txt
-fi
+# create genome.txt file
+echo "" > ${OUTPUTDIR_MASTERHUBS}${HUBNAME}/genomes.txt
 
-# for each flowcell / genome, make sure each genome is represented and remove any existing tracks
+# for each flowcell / genome, make sure each genome is represented
 while IFS= read line
 do
     cd $OUTPUTDIR_FC$line
     for GENOME in */
     do
-        if [ ! -d $OUTPUTDIR_MASTERS$GENOME ]
-        then
-	    GENOME=$(echo "$GENOME" | sed -e 's/\///g')
-	    mkdir $OUTPUTDIR_MASTERS$GENOME
-	    echo "genome $GENOME" >> ${OUTPUTDIR_MASTERS}genomes.txt
-	    echo "trackDb $GENOME/super_track.txt" >> ${OUTPUTDIR_MASTERS}genomes.txt
-	    echo "" >> ${OUTPUTDIR_MASTERS}genomes.txt
-        else
-	    if [ -f $OUTPUTDIR_MASTERS$GENOME/super_track.txt ];
-	    then
-		echo "" > $OUTPUTDIR_MASTERS$GENOME/super_track.txt
-	    fi
+	if [ ! -d ${OUTPUTDIR_MASTERHUBS}${HUBNAME}/${GENOME} ];
+	then
+	   GENOME=$(echo "$GENOME" | sed -e 's/\///g')
+	   mkdir ${OUTPUTDIR_MASTERHUBS}${HUBNAME}/$GENOME
+	   echo "genome $GENOME" >> ${OUTPUTDIR_MASTERHUBS}${HUBNAME}/genomes.txt
+	   echo "trackDb $GENOME/super_track.txt" >> ${OUTPUTDIR_MASTERHUBS}${HUBNAME}/genomes.txt
+	   echo "" >> ${OUTPUTDIR_MASTERHUBS}${HUBNAME}/genomes.txt
 	fi
+	cat ${OUTPUTDIR_FC}${line}/$GENOME/super_track.txt >> ${OUTPUTDIR_MASTERHUBS}${HUBNAME}/$GENOME/super_track.txt
     done
-    cd ..
-done < $OUTPUTDIR_MASTERS$buildfile
-
-# now for each flowcell / genome, go and add the super tracks togethers
-while IFS= read line
-do
-    cd $OUTPUTDIR_FC$line
-    for GENOME in */
-    do
-        GENOME=$(echo "$GENOME" | sed -e 's/\///g')
-        cat $OUTPUTDIR_FC$line/$GENOME/super_track.txt >> $OUTPUTDIR_MASTERS$GENOME/super_track.txt
-    done
-    cd ..
-done < $OUTPUTDIR_MASTERS$buildfile
+done < $HUBFILE

@@ -2,6 +2,8 @@
 # generate trackhub at the level of the flowcell
 
 FLOW=$1
+OUTPUTDIR_FC=/net/seq/data/flowcells/trackhubs/flowcells/
+LOC=$(pwd)
 
 # make directory for the concatenated flowcell hub
 if [ ! -d flowcell_trackhub ];
@@ -67,3 +69,9 @@ do
     cat $GENOME\master_track.txt | sed -e "s/compositeTrack on/parent ${FLOW}_super\ncompositeTrack on/g" >> $GENOME/super_track.txt
 
 done
+
+# create flowcell link in web-accessible location
+if [ ! -L $OUTPUTDIR_FC$FLOWCELL ];
+then
+    ln -s $LOC/flowcell_trackhub $OUTPUTDIR_FC$FLOW
+fi

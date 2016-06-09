@@ -31,4 +31,3 @@ cd "$flowcell_dir"
 python "$STAMPIPES/scripts/lims/get_processing.py" -f "$flowcell_name" --quiet
 python "$STAMPIPES/scripts/browser/make_trackhubs.py" -p "$priority" --quiet
 bash "$STAMPIPES/scripts/browser/make_flowcell_hub.sh" "$flowcell_name"
-bash "$STAMPIPES/scripts/browser/update_hubs.sh" "$flowcell_name"
