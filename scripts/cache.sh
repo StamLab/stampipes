@@ -6,7 +6,7 @@
 # Destination can be controlled by setting the $CACHE_DIR envvar
 #
 # If the cache cannot be created, the original filename will be returned, and
-# exit status will be non-zero
+# exit status will still be zero
 
 usage="Usage: $0 input_file"
 
@@ -15,7 +15,7 @@ CACHE_DIR="${CACHE_DIR:-/node-data/cache/}"
 error(){
   echo "ERROR:" "$1" 1>&2
   echo "$src"
-  exit 1
+  exit 0
 }
 
 # Check arguments

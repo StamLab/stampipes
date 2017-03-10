@@ -2,23 +2,23 @@
 
 # Dependencies
 source $MODULELOAD
-module load bedops/2.4.15
-module load bedtools/2.16.2
+module load bedops/2.4.19
+module load bedtools/2.25.0
 module load bwa/0.7.12
-module load java/jdk1.7.0_05
-module load picard/1.118
-module load samtools/1.2
+module load jdk/1.8.0_92
+module load picard/1.120
+module load samtools/1.3
 module load gcc/4.7.2
-module load R/3.1.0
+module load R/3.2.5
 module load git/2.3.3
-module load coreutils/8.9
-module load FastQC/0.11.3
-module load pigz/2.3.1
+module load coreutils/8.25
+module load pigz/2.3.3
 
 # Load in this order specifically, currently the python3 activation
 # overwrites the default "python" call, against advice
-source $PYTHON3_ACTIVATE
-module load python/2.7.3
+module load python/3.5.1
+module load pysam/0.9.0
+module load python/2.7.11
 
 MAX_MISMATCHES=2
 MIN_MAPPING_QUALITY=10
@@ -69,7 +69,7 @@ do
     
 if [ ! -e $BAMFILE -a ! -e ${FINAL_BAM} ]; then
 
-qsub -l h_data=5650M -N ${NAME} -V -cwd -S /bin/bash > /dev/stderr << __SCRIPT__
+qsub -N ${NAME} -V -cwd -S /bin/bash > /dev/stderr << __SCRIPT__
   set -x -e -o pipefail
 
   echo "Hostname: "
@@ -101,7 +101,7 @@ if [ -n "$FASTQ_PAIR_HOLDS" ]; then
     SPLIT_ALIGN_HOLD="-hold_jid $FASTQ_PAIR_HOLDS"
 fi
 
-if [ ! -e ${FINAL_BAM} -o ! -e ${UNIQUES_BAM} ]; then
+if [ ! -e ${FINAL_BAM}.bai -o ! -e ${UNIQUES_BAM}.bai ]; then
 
 # If we are redoing this part, then we should make sure
 # to redo all the other results as well
@@ -162,7 +162,7 @@ qsub ${SPLIT_ALIGN_HOLD} ${SUBMIT_SLOTS} -N "$JOBNAME" -V -cwd -S /bin/bash << _
   
   if [ "$NUMBER_FASTQ_FILES" -gt "1" ]
   then
-    rm $FASTQ_PAIR_BAMS
+    rm -f $FASTQ_PAIR_BAMS
   fi
 
   echo "FINISH: "
@@ -172,13 +172,12 @@ __SCRIPT__
 
 fi
 
-
 if [ ! -e ${SAMPLE_NAME}.tagcounts.txt -o -n "$FORCE_COUNTS" ]; then
 
-JOBNAME=".ct${JOB_BASENAME}"
-PROCESSING="$PROCESSING,$JOBNAME"
-   
-qsub $PROCESS_HOLD -N "$JOBNAME" -V -cwd -S /bin/bash > /dev/stderr << __SCRIPT__
+  JOBNAME=".ct${JOB_BASENAME}"
+  PROCESSING="$PROCESSING,$JOBNAME"
+
+  qsub $PROCESS_HOLD -N "$JOBNAME" -V -cwd -S /bin/bash >/dev/stderr <<__SCRIPT__
   set -x -e -o pipefail
   echo "Hostname: "
   hostname
@@ -236,10 +235,10 @@ fi
 
 if [ ! -e ${SAMPLE_NAME}.75_20.${GENOME}.bw ]; then
 
-JOBNAME=".den${JOB_BASENAME}"
-PROCESSING="$PROCESSING,$JOBNAME" 
+  JOBNAME=".den${JOB_BASENAME}"
+  PROCESSING="$PROCESSING,$JOBNAME"
 
-qsub $PROCESS_HOLD -N "$JOBNAME" -V -cwd -S /bin/bash > /dev/stderr << __SCRIPT__
+  qsub $PROCESS_HOLD -N "$JOBNAME" -V -cwd -S /bin/bash >/dev/stderr <<__SCRIPT__
   set -x -e -o pipefail
 
   echo "Hostname: "
@@ -278,7 +277,7 @@ qsub -hold_jid ${PROCESSING} -N ".com${JOB_BASENAME}" -V -cwd -S /bin/bash > /de
 
   bash $STAMPIPES/scripts/bwa/attachfiles.bash
 
-  rm -r $ALIGN_DIR/fastq
+  rm -rf $ALIGN_DIR/fastq
 
   echo "FINISH: "
   date

@@ -8,14 +8,14 @@ files=( \
     "${SAMPLE_NAME}.versions.txt" \
     "Aligned.sortedByCoord.out.bam" \
     "Aligned.toTranscriptome.out.bam" \
-    "Quant.genes.results" \
-    "Quant.isoforms.results" \
-    "Quant.pdf" \
-    "Signal.Unique.strand+.bw" \
-    "Signal.Unique.strand-.bw" \
-    "Signal.UniqueMultiple.strand+.bw" \
-    "Signal.UniqueMultiple.strand-.bw" \
 )
+    #"Quant.genes.results" \
+    #"Quant.isoforms.results" \
+    #"Quant.pdf" \
+    #"Signal.Unique.strand+.bw" \
+    #"Signal.Unique.strand-.bw" \
+    #"Signal.UniqueMultiple.strand+.bw" \
+    #"Signal.UniqueMultiple.strand-.bw" \
 
 for FILE in "${files[@]}"; do
 if [ ! -s $FILE ]; then

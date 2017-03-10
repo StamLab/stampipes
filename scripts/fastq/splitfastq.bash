@@ -38,7 +38,7 @@ if [ "$SPLIT_COUNT" -eq 1 ]; then
     # Don't bother compressing again, just symlink the existing full fastq files
     echo "Files do not exceed $CHUNK_SIZE; symlinking original files"
     ln -s $R1_FASTQ $FASTQ_TMP/${SAMPLE_NAME}_R1_000.fastq.gz
-    if [ -n $R1_FASTQ ]; then
+    if [ -n $R2_FASTQ ]; then
       ln -s $R2_FASTQ $FASTQ_TMP/${SAMPLE_NAME}_R2_000.fastq.gz
     fi
     exit

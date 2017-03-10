@@ -5,6 +5,7 @@ import fileinput
 import argparse
 import datetime
 import hashlib
+import time
 from zipfile import ZipFile
 
 token = None
@@ -55,6 +56,8 @@ script_options = {
     "attach_file_type": None,
 
     "clear_align_stats": False,
+
+    "skip_md5_check": False,
 }
 
 def parser_setup():
@@ -134,6 +137,9 @@ def parser_setup():
         help="The file's purpose slug.")
     parser.add_argument("--attach_file_type", dest="attach_file_type",
         help="The file's type slug.")
+
+    parser.add_argument("--skip_md5_check", dest="skip_md5_check", action="store_true",
+        help="If file exists and path/size match, don't check md5sum.")
 
     parser.set_defaults( **script_options )
     parser.set_defaults( quiet=False, debug=False )
@@ -446,7 +452,7 @@ class UploadLIMS(object):
         else:
             log.debug(result.json())
 
-    def upload_file_attachment(self, path, contenttype_name, object_id, file_purpose=None, file_type=None):
+    def upload_file_attachment(self, path, contenttype_name, object_id, file_purpose=None, file_type=None, skip_md5_check=False):
         path = os.path.abspath(path)
 
         log.info("Attaching file %s to object %d (contenttype %s)" % (path, object_id, contenttype_name))
@@ -480,9 +486,21 @@ class UploadLIMS(object):
         check_exist_url = "%s/file/?path=%s" % (self.api_url, path)
         exists = self.get_single_result(check_exist_url)
 
-        md5sum = md5sum_file(path)
+
         file_size = os.path.getsize(path)
         last_modified = datetime.datetime.fromtimestamp(os.path.getmtime(path))
+
+
+        #if exists:
+        #recorded_mtime = datetime.datetime.fromtimestamp(time.mktime(time.strptime( exists["file_last_modified"], "%Y-%m-%dT%H:%M:%S")))
+
+        # TODO: Make time-checking work!
+        # Current issue: sub-second precision.
+        if skip_md5_check and exists and exists["size_bytes"] == file_size :#and last_modified == recorded_mtime:
+            log.info("File exists and matches recorded size, skipping %s" % path)
+            return
+
+        md5sum = md5sum_file(path)
 
         log.info("MD5sum: %s\tFile size: %d\tLast modified: %s" % (md5sum, file_size, str(last_modified)))
 
@@ -694,8 +712,13 @@ class UploadLIMS(object):
             log.error("Barcode report %s is not valid JSON" % barcode_file)
             return
 
-        # This may need to be revisited if we get a new sequencer
-        flowcell_label = re.search( '.*_[AB]([A-Z0-9]{5})[AB][BNG]X[XY]$', jsondata['BaseDir'] ).group(1)
+        if jsondata['Sequencer'] == 'MiniSeq':
+            print(jsondata['BaseDir'])
+            flowcell_label = re.search( '.*_[AB]000([A-Z0-9]{6}).*$', jsondata['BaseDir'] ).group(1)
+            print(flowcell_label)
+
+        else:
+            flowcell_label = re.search( '.*_[AB]([A-Z0-9]{5})[AB][BNG]X[XY2]$', jsondata['BaseDir'] ).group(1)
 
         flowcell_url = self.get_flowcell_url_by_label(flowcell_label)
 
@@ -1118,7 +1141,7 @@ from the command line."""
 
     if poptions.attach_file:
         uploader.upload_file_attachment(poptions.attach_file, poptions.attach_file_contenttype, poptions.attach_file_objectid,
-            file_type=poptions.attach_file_type, file_purpose=poptions.attach_file_purpose)
+            file_type=poptions.attach_file_type, file_purpose=poptions.attach_file_purpose, skip_md5_check=poptions.skip_md5_check)
 
     if poptions.attach_directory:
         uploader.upload_directory_attachment(poptions.attach_directory, poptions.attach_file_contenttype, poptions.attach_file_objectid,

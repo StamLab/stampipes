@@ -15,8 +15,7 @@
 ###################
 # REQUIRED MODULES
 ###################
-# module load java
-# module load bwa/0.7.0
+# module load bwa/0.7.12
 # module load samtools
 ###################
 # LOAD PYTHON 3 VIRTUAL ENV WITH ALL REQUIRED PYTHON PACKAGES
@@ -30,7 +29,7 @@ PYTHON = python3
 # We can use that for the default number of threads to use for the bwa
 # aln process
 NSLOTS ?= 1
-THREADS ?= $(NSLOTS)
+THREADS ?= 3
 
 # Use the default PATH version of each of these programs unless overridden
 SAMTOOLS ?= samtools
@@ -101,7 +100,7 @@ $(OUTBAM) : $(TMPDIR)/align.sorted.bam
 # Note: samtools expects the output name without a .bam suffix and will
 # add it, so take it away to prevent .bam.bam
 $(TMPDIR)/align.sorted.bam : $(TMPDIR)/align.filtered.bam
-	time $(SAMTOOLS) sort $^ $(basename $@) && echo made $@ >&2
+	time $(SAMTOOLS) sort $^ > $@ && echo made $@ >&2
 
 # Create unsorted filtered BAM files
 $(TMPDIR)/align.filtered.bam : $(TMPDIR)/align.unsorted.bam
@@ -126,6 +125,7 @@ $(TMPDIR)/trimmed.R1.fastq.gz $(TMPDIR)/trimmed.R2.fastq.gz : $(FASTQ1_FILE) $(F
 	time trim-adapters-illumina \
 		-f $(ADAPTER_FILE) \
 		-1 $(ADAPTER_P5_NAME) -2 $(ADAPTER_P7_NAME) \
+		--threads=$(THREADS) \
 		$(FASTQ1_FILE) $(FASTQ2_FILE) \
 		$(TMPDIR)/trimmed.R1.fastq.gz $(TMPDIR)/trimmed.R2.fastq.gz \
 		&> $(TRIMSTATS) \

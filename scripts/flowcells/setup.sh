@@ -121,6 +121,7 @@ Workflow,GenerateFASTQ
 
 [Data]
 SampleID,SampleName,index,index2
+none,none,GGGGGGGG,GGGGGGGG
 __SHEET__
 
 if [ -z "$demux" ] ; then
@@ -170,11 +171,12 @@ fi
 case $run_type in
 "NextSeq 500")
     echo "Regular NextSeq 500 run detected"
-    parallel_env="-pe threads 4-8"
+    parallel_env="-pe threads 6"
     link_command="python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o ."
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--nextseq"
+    queue="queue2"
     make_nextseq_samplesheet > SampleSheet.csv
     bcl_tasks=1
 
@@ -207,11 +209,12 @@ _U_
     ;;
 "HiSeq 4000")
     echo "Hiseq 4000 run detected"
-    parallel_env="-pe threads 4-8"
+    parallel_env="-pe threads 6"
     link_command="python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o ."
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--hiseq4k"
+    queue="queue2"
     make_nextseq_samplesheet > SampleSheet.csv
     bcl_tasks=1-8
 
@@ -245,11 +248,12 @@ _U_
 "MiniSeq High Output Kit")
     # Identical to nextseq processing
     echo "High-output MiniSeq run detected"
-    parallel_env="-pe threads 4-8"
+    parallel_env="-pe threads 6"
     link_command="python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o ."
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
-    bc_flag="--nextseq"
+    bc_flag="--miniseq"
+    queue="queue2"
     make_nextseq_samplesheet > SampleSheet.csv
     bcl_tasks=1
     set +e
@@ -269,31 +273,33 @@ _U_
     #TODO: Add HISEQ V3 on hiseq 2500 (rapid run mode)
 "HISEQ V4")
     echo "Regular HiSeq 2500 run detected"
-    parallel_env=""
-    link_command='#no linking to do'
-    samplesheet=$(pwd)/Data/Intensities/BaseCalls/SampleSheet.csv
-    mkdir -p $(dirname "$samplesheet")
-    make_hiseq_samplesheet > "$samplesheet"
-    fastq_dir="$illumina_dir/Unaligned/"  # Trailing slash is important for rsync!
-    bc_flag="--hiseq"
-    bcl_tasks=1
+    echo "HiSeq 2500 processing not supported on the new cluster! (Does not have old version of bcl2fastq)"
+    exit 2
+    #parallel_env=""
+    #link_command='#no linking to do'
+    #samplesheet=$(pwd)/Data/Intensities/BaseCalls/SampleSheet.csv
+    #mkdir -p $(dirname "$samplesheet")
+    #make_hiseq_samplesheet > "$samplesheet"
+    #fastq_dir="$illumina_dir/Unaligned/"  # Trailing slash is important for rsync!
+    #bc_flag="--hiseq"
+    #bcl_tasks=1
 
-    set +e
-    read -d '' unaligned_command <<_U_
-    if [ ! -e "$fastq_dir" ] ; then
-            configureBclToFastq.pl \\\\
-              --mismatches "$mismatches" \\\\
-              --output-dir "$fastq_dir" \\\\
-              --fastq-cluster-count 16000000 \\\\
-              --with-failed-reads --sample-sheet $samplesheet \\\\
-              --use-bases-mask "$bcl_mask"  \\\\
-              --input-dir "$illumina_dir/Data/Intensities/BaseCalls"
-    fi
+    #set +e
+    #read -d '' unaligned_command <<_U_
+    #if [ ! -e "$fastq_dir" ] ; then
+    #        configureBclToFastq.pl \\\\
+    #          --mismatches "$mismatches" \\\\
+    #          --output-dir "$fastq_dir" \\\\
+    #          --fastq-cluster-count 16000000 \\\\
+    #          --with-failed-reads --sample-sheet $samplesheet \\\\
+    #          --use-bases-mask "$bcl_mask"  \\\\
+    #          --input-dir "$illumina_dir/Data/Intensities/BaseCalls"
+    #fi
 
-    cd "$fastq_dir"
-    qmake -now no -cwd -q all.q -V -- -j "$NODES"
-_U_
-    set -e
+    #cd "$fastq_dir"
+    #qmake -now no -cwd -q all.q -V -- -j "$NODES"
+#_U_
+    #set -e
     ;;
 *)
     echo "Unrecognized run type '$run_type'"
@@ -304,7 +310,7 @@ esac
 copy_from_dir="$fastq_dir"
 if [ -n "$demux" ] ; then
   copy_from_dir="$(pwd)/Demultiplexed/"
-  demux_cmd="$STAMPIPES/scripts/flowcells/demux_flowcell.sh -i $fastq_dir -o $copy_from_dir -p $json -m $dmx_mismatches"
+  demux_cmd="$STAMPIPES/scripts/flowcells/demux_flowcell.sh -i $fastq_dir -o $copy_from_dir -p $json -q $queue -m $dmx_mismatches"
   link_command="#Demuxing happened, no linking to do"
 fi
 
@@ -322,8 +328,7 @@ cat > run_bcl2fastq.sh <<__BCL2FASTQ__
 #!/bin/bash
 
 source $MODULELOAD
-module load bcl2fastq/1.8.4
-module load bcl2fastq2/2.15.0.4
+module load bcl2fastq2/2.17.1.14
 source $PYTHON3_ACTIVATE
 
 source $STAMPIPES/scripts/lims/api_functions.sh
@@ -347,14 +352,14 @@ lims_patch "flowcell_run/$flowcell_id/" "folder_name=${PWD##*/}"
 # Submit a barcode job for each mask
 for bcmask in $(python $STAMPIPES/scripts/flowcells/barcode_masks.py | xargs) ; do
     export bcmask
-    qsub -cwd -N "bc-$flowcell" -pe threads 4-8 -V -S /bin/bash <<'__BARCODES__'
+    qsub -cwd -N "bc-$flowcell" -q $queue $parallel_env -V -S /bin/bash <<'__BARCODES__'
     GOMAXPROCS=\$(( NSLOTS * 2 )) bcl_barcode_count --mask=\$bcmask $bc_flag > barcodes.\$bcmask.json
 
     python3 $STAMPIPES/scripts/lims/upload_data.py --barcode_report barcodes.\$bcmask.json
 __BARCODES__
 done
 
-qsub -cwd -N "u-$flowcell" $parallel_env  -V -t $bcl_tasks -S /bin/bash  <<'__FASTQ__'
+qsub -cwd -N "u-$flowcell" -q $queue $parallel_env -V -t $bcl_tasks -S /bin/bash  <<'__FASTQ__'
 
 set -x -e -o pipefail
 
@@ -364,15 +369,15 @@ $unaligned_command
 
 __FASTQ__
 
-qsub -cwd -N "dmx-$flowcell" -hold_jid "u-$flowcell" -V -S /bin/bash <<__DMX__
+qsub -cwd -N "dmx-$flowcell" -q $queue -hold_jid "u-$flowcell" -V -S /bin/bash <<__DMX__
   $demux_cmd
   # Wait for jobs to finish
-  while ( qstat -xml | grep -q '<JB_name>.dmx' ) ; do
+  while ( squeue -o "%j" | grep -q '^.dmx') ; do
     sleep 60
   done
 __DMX__
 
-qsub -cwd -N "c-$flowcell" -hold_jid "dmx-$flowcell" -V -S /bin/bash <<__COPY__
+qsub -cwd -N "c-$flowcell" -q $queue -hold_jid "dmx-$flowcell" -V -S /bin/bash <<__COPY__
 mkdir -p "$analysis_dir"
 
 rsync -avP "$copy_from_dir" "$analysis_dir/"
@@ -391,6 +396,7 @@ rm -f fastqc.bash collate.bash run.bash
 python3 "$STAMPIPES/scripts/laneprocess.py" \
   --script_template "$STAMPIPES/processes/fastq/fastqc.bash" \
   --qsub-prefix .fq \
+  --queue $queue \
   --sample-script-basename fastqc.bash \
   --flowcell_label "$flowcell" \
   --outfile fastqc.bash
@@ -398,14 +404,15 @@ python3 "$STAMPIPES/scripts/laneprocess.py" \
 # Create collation scripts
 python3 "$STAMPIPES/scripts/laneprocess.py" \
   --script_template "$STAMPIPES/processes/fastq/collate_fastq.bash" \
-  --qsub-prefix .cl \
+  --qsub-prefix .collatefq \
+  --queue $queue \
   --sample-script-basename "collate.bash" \
   --flowcell_label "$flowcell" \
   --outfile collate.bash
 
 bash collate.bash
 
-qsub -N .run$flowcell -hold_jid '.cl*' -cwd -V -q all.q -S /bin/bash <<__ALIGN__
+qsub -N .run$flowcell -q $queue -hold_jid '.collatefq*$flowcell*' -cwd -V -S /bin/bash <<__ALIGN__
   bash fastqc.bash
 
   # Create alignment scripts

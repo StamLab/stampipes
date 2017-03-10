@@ -20,7 +20,7 @@ SAMTOOLS ?= samtools
 JAVA ?= java
 
 # This might not work in qmake??
-MARK_DUPS ?= $(shell which MarkDuplicates.jar)
+MARK_DUPS ?= $(PICARDPATH)/MarkDuplicates.jar
 
 SCRIPT_DIR ?= $(STAMPIPES)/scripts/tophat
 

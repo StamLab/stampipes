@@ -19,19 +19,27 @@ Modules
 
 The current modules to load for working the pipeline are:
 
-    module load bedops/2.4.14
-    module load bedtools/2.16.2
-    module load bowtie/1.0.0
-    module load bwa/0.7.12
-    module load coreutils/8.9
-    module load cufflinks/2.2.1
-    module load FastQC/0.11.3
-    module load gcc/4.7.2
-    module load git/2.3.3
-    module load java/jdk1.7.0_05
-    module load picard/1.118
-    module load R/3.1.0
-    module load samtools/1.2
-    module load tophat/2.0.13
+* `bcl2fastq/1.8.4`
+* `bcl2fastq2/2.15.0.4`
+* `bedops/2.4.19`
+* `bedtools/2.25.0`
+* `bowtie/1.0.0`
+* `bwa/0.7.12`
+* `coreutils/8.25`
+* `cufflinks/2.2.1`
+* `fastqc/0.11.5`
+* `gcc/4.7.2`
+* `git/2.3.3`
+* `jdk/1.8.0_92`
+* `picard/1.120`
+* `pigz/2.3.3`
+* `pysam/0.9.0`
+* `python/2.7.11`
+* `python/3.5.1`
+* `R/3.2.5`
+* `RSEM/1.2.30`
+* `samtools/1.3`
+* `STAR/2.4.2a`
+* `tophat/2.0.13`
 
 If $MODULELOAD is set, then the processing scripts should load the required modules automatically.

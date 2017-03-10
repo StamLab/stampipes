@@ -12,7 +12,7 @@ REF_FLAT=$4
 
 pushd `dirname $bam`
 bam=`basename $bam`
-picardfolder=$(dirname $(which MarkDuplicates.jar))
+picardfolder=$PICARDPATH
 
 opspecs=( "InsertSize?HISTOGRAM_FILE=histo_insert_size_$name.pdf"  \
          "AlignmentSummary?" )
@@ -28,7 +28,7 @@ do
     output=picard.$name.$op.txt
     if ! [ -f  "$output" ] ; then
         operationjar=$picardfolder/Collect${op}Metrics.jar
-        /opt/jdk1.6.0_10/bin/java -Xmx1000m -jar $operationjar INPUT=$bam OUTPUT=$output $params VALIDATION_STRINGENCY=SILENT
+        java -Xmx1000m -jar $operationjar INPUT=$bam OUTPUT=$output $params VALIDATION_STRINGENCY=SILENT
     fi
     if [ -s "$output" ] ; then
         cat $output | grep -v '^#' | grep -A4 _ | $SCRIPT_DIR/transposeTable.pl | $SCRIPT_DIR/encomma.pl  > xp.$output

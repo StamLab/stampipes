@@ -77,10 +77,8 @@ $(OUTBAM) : $(TMPDIR)/align.sorted.bam
 	rsync $^ $@
 
 # Create sorted BAM files
-# Note: samtools expects the output name without a .bam suffix and will
-# add it, so take it away to prevent .bam.bam
 $(TMPDIR)/align.sorted.bam : $(TMPDIR)/align.filtered.bam
-	time $(SAMTOOLS) sort $^ $(basename $@) && echo made $@ >&2
+	time $(SAMTOOLS) sort $^ > $@ && echo made $@ >&2
 
 # Create unsorted filtered BAM files
 $(TMPDIR)/align.filtered.bam : $(TMPDIR)/align.unsorted.bam

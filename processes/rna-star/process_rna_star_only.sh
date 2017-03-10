@@ -1,12 +1,10 @@
 source "$MODULELOAD"
 module load samtools/1.3
 module load gcc/4.7.2     # for adapter trimming
-module load R/3.2.5       # for RSEM
 module load coreutils/8.25 # parallel sort
 
 module load STAR/2.4.2a
 module load perl/5.16.3
-module load RSEM/1.2.30
 
 source "$PYTHON3_ACTIVATE"
 
@@ -17,13 +15,12 @@ SLOTS=${SLOTS:-8}
 outdir=$(pwd)
 
 scriptdir="$STAMPIPES/scripts/rna-star/"
-script="$scriptdir/STAR_RSEM.sh"
+script="$scriptdir/STAR_ONLY.sh"
 
 REFDIR=$(dirname "$BWAINDEX")
 
-# $STAR_DIR and $RSEM_DIR are set by the process template, and are relative to the reference directory
+# $STAR_DIR is set by the process template, and are relative to the reference directory
 export STARdir="$REFDIR/$STAR_DIR"
-export RSEMdir="$REFDIR/$RSEM_DIR"
 
 TRIMDIR="trimmed/"
 TRIM_R1=$TRIMDIR/$(basename "$R1_FASTQ")
@@ -77,22 +74,19 @@ jobbase="${SAMPLE_NAME}-ALIGN#${ALIGNMENT_ID}"
 starjob=".rs$jobbase"
 uploadjob=".up$jobbase"
 
-# Run STAR & RSEM
-# TODO: Break these into sub-steps
+# Run STAR
 if ! "$STAMPIPES/scripts/rna-star/checkcomplete.bash" ; then
   qsub -cwd -V -N "$starjob" -pe threads "$SLOTS" -p "$PRIORITY" -S /bin/bash << __RNA-STAR__
     set -x
 
     STARdir=\$("$STAMPIPES/scripts/cache.sh" "$STARdir")
-    RSEMdir=\$("$STAMPIPES/scripts/cache.sh" "$RSEMdir")
 
     nThreadsSTAR=\$((NSLOTS * 2))
-    nThreadsRSEM=\$((NSLOTS * 2))
 
     cd "$outdir"
 
     # Run!
-    "$script" "$TRIM_R1" "$TRIM_R2" "\$STARdir" "\$RSEMdir/RSEMref" "$dataType" "\$nThreadsSTAR" "\$nThreadsRSEM"
+    "$script" "$TRIM_R1" "$TRIM_R2" "\$STARdir" "$dataType" "\$nThreadsSTAR" 
 __RNA-STAR__
 fi
 

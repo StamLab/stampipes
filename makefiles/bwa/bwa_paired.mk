@@ -14,8 +14,7 @@
 ###################
 # REQUIRED MODULES
 ###################
-# module load java
-# module load bwa/0.7.0
+# module load bwa/0.7.12
 # module load samtools
 # module load python
 ###################
@@ -27,7 +26,7 @@ SHELL = bash
 # We can use that for the default number of threads to use for the bwa
 # aln process
 NSLOTS ?= 1
-THREADS ?= $(NSLOTS)
+THREADS ?= 3
 
 # Use the default PATH version of each of these programs unless overridden
 SAMTOOLS ?= samtools
@@ -86,7 +85,7 @@ $(OUTBAM) : $(TMPDIR)/align.sorted.bam
 # Note: samtools expects the output name without a .bam suffix and will
 # add it, so take it away to prevent .bam.bam
 $(TMPDIR)/align.sorted.bam : $(TMPDIR)/align.unsorted.bam
-	time $(SAMTOOLS) sort $^ $(basename $@) && echo made $(TMPDIR)/align.sorted.bam >&2
+	time $(SAMTOOLS) sort $^ > $@ && echo made $(TMPDIR)/align.sorted.bam >&2
 
 # Create unsorted raw BAM files
 $(TMPDIR)/align.unsorted.bam : $(TMPDIR)/align.sam

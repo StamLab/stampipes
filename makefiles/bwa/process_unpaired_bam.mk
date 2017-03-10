@@ -7,7 +7,6 @@
 ###################
 # REQUIRED MODULES
 ###################
-# module load java
 # module load samtools
 # module load python
 ###################

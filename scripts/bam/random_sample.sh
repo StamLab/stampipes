@@ -2,9 +2,6 @@
 # 
 USAGE_MSG="Usage: $0 in.bam out.bam numPairs [pairTotal]"
 
-source $MODULELOAD
-module load samtools/1.2
-source $PYTHON3_ACTIVATE
 
 die(){
   echo $@ >&2

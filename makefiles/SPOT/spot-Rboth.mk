@@ -11,7 +11,8 @@
 ###################
 # REQUIRED MODULES
 ###################
-# module load java
+# module load jdk
+# module load picard
 # module load samtools
 # module load python
 # module load bedops
@@ -69,10 +70,10 @@ $(RANDOM_SAMPLE_BAM).bed : $(RANDOM_SAMPLE_BAM)
 
 $(RANDOM_SAMPLE_BAM).bed.sorted.bam : $(RANDOM_SAMPLE_BAM).bed
 	bedToBam -i $^ -g $(FAI) > $(RANDOM_SAMPLE_BAM).bed.bam
-	samtools sort $(RANDOM_SAMPLE_BAM).bed.bam $(RANDOM_SAMPLE_BAM).bed.sorted
+	samtools sort $(RANDOM_SAMPLE_BAM).bed.bam > $@
 
 # Calculate the duplication score of the random sample
 $(DUP_OUT) : $(RANDOM_SAMPLE_BAM).bed.sorted.bam
-	java -jar `which MarkDuplicates.jar` INPUT=$(RANDOM_SAMPLE_BAM).bed.sorted.bam OUTPUT=$(TMPDIR)/$(SAMPLE_NAME).Rboth.rand.uniques.dup \
+	java -jar $(PICARDPATH)/MarkDuplicates.jar INPUT=$(RANDOM_SAMPLE_BAM).bed.sorted.bam OUTPUT=$(TMPDIR)/$(SAMPLE_NAME).Rboth.rand.uniques.dup \
 	  METRICS_FILE=$(OUTDIR)/$(SAMPLE_NAME).Rboth.rand.uniques.sorted.spotdups.txt ASSUME_SORTED=true VALIDATION_STRINGENCY=SILENT \
 		READ_NAME_REGEX='[a-zA-Z0-9]+:[0-9]+:[a-zA-Z0-9]+:[0-9]+:([0-9]+):([0-9]+):([0-9]+).*'

@@ -47,7 +47,9 @@ all : $(STARCH_OUT) $(BW_OUT)
 
 # clip tags to single 5' end base
 $(BED_TMP) : $(BAMFILE)
-	bamToBed -i $^ \
+	bam2bed -d \
+	  < $^ \
+	  | cut -f1-6 \
     | awk '{ if( $$6=="+" ){ s=$$2; e=$$2+1 } else { s=$$3-1; e=$$3 } print $$1 "\t" s "\t" e "\tid\t" 1 }' \
     | sort-bed - \
     > $@

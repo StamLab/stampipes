@@ -21,7 +21,13 @@ script_options = {
     "basedir": os.getcwd(),
     "quiet": False,
     "debug": False,
+    "cluster": "sge",
 }
+
+ALIGN_REGEX = re.compile(r"ALIGN#(\d+)")
+
+def run_command(args):
+    return subprocess.check_output(args, stderr=subprocess.STDOUT).decode("utf-8")
 
 def parser_setup():
 
@@ -38,17 +44,77 @@ def parser_setup():
     parser.add_argument("-t", "--token", dest="token",
         help="Your authentication token.  Required.")
 
+    parser.add_argument("-c", "--cluster", dest="cluster",
+                        help="The type of cluster: SGE (default) or SLURM")
+
     return parser
 
-class ClusterMonitor(object):
-
+class SGEChecker(object):
     QSTAT_COMMAND = ["qstat", "-xml"]
     QHOST_COMMAND = ["qhost"]
 
-    def __init__(self, api_url, token):
+    def parse_jobnames(self):
+        qstat_xml = run_command(self.QSTAT_COMMAND)
+        dom=xml.dom.minidom.parseString(qstat_xml)
+
+        jobnames = dom.getElementsByTagName('JB_name')
+
+        alignments = set()
+
+        for job in jobnames:
+            jobname = job.childNodes[0].data
+            log.debug(jobname)
+            match = ALIGN_REGEX.search(jobname)
+            if match:
+                alignments.add(int(match.group(1)))
+
+        log.info("Alignment IDs: %s" % alignments)
+        return alignments
+
+    def get_host_info(self):
+        qhost = run_command(self.QHOST_COMMAND)
+        return qhost
+
+
+
+class SLURMChecker(object):
+
+    SQUEUE_COMMAND = ["squeue", "-o", "%j", "--noheader"]
+    SNODES_COMMAND = ["scontrol", "show", "nodes"]
+
+    def parse_jobnames(self):
+        alignments = set()
+        jobnames = run_command(self.SQUEUE_COMMAND).split("\n")
+        for jobname in jobnames:
+            match = ALIGN_REGEX.search(jobname)
+            if match:
+                alignments.add(int(match.group(1)))
+        log.info("Alignment IDs: %s" % alignments)
+        return alignments
+
+    def get_host_info(self):
+        snodes = run_command(self.SNODES_COMMAND)
+        return snodes
+
+class ClusterMonitor(object):
+
+    checker = None
+
+    def __init__(self, api_url, token, cluster_type=None):
         self.api_url = api_url
         self.token = token
         self.headers = {'Authorization': "Token %s" % token}
+        if cluster_type is None:
+            cluster_type = "sge"
+        cluster_type = cluster_type.lower()
+        if cluster_type == "sge":
+            self.checker = SGEChecker()
+        elif cluster_type == "slurm":
+            self.checker = SLURMChecker()
+        else:
+            log.critical("Invalid cluster type %s", cluster_type)
+            sys.exit(1)
+
 
     def api_list_result(self, url_addition=None, url=None):
 
@@ -77,7 +143,7 @@ class ClusterMonitor(object):
         return results
 
     def run(self):
-        currently_running = self.parse_jobnames()
+        currently_running = self.checker.parse_jobnames()
         marked_running = self.lims_currently_processing()
 
         # What alignments are currently running but not marked yet?
@@ -92,7 +158,7 @@ class ClusterMonitor(object):
             log.info("Alignments no longer processing: %s" % str(finished_alignments))
             [self.update_processing_status(align_id, False) for align_id in finished_alignments]
 
-        self.update_qhost()
+        self.update_host_info()
 
     def update_processing_status(self, align_id, processing=True):
 
@@ -120,38 +186,27 @@ class ClusterMonitor(object):
         log.info("Currently marked as processing on LIMS: %s" % str(lims_process_align_ids))
         return lims_process_align_ids
 
-    def parse_jobnames(self):
-        qstat_xml = subprocess.check_output(self.QSTAT_COMMAND, stderr=subprocess.STDOUT)
-        dom=xml.dom.minidom.parseString(qstat_xml)
 
-        jobnames = dom.getElementsByTagName('JB_name')
+    def update_host_info(self):
+        host_usage = self.checker.get_host_info()
 
-        alignments = set()
-
-        for job in jobnames:
-            jobname = job.childNodes[0].data
-            log.debug(jobname)
-            match = re.search("ALIGN#(\d+)", jobname)
-            if match:
-                alignments.add(int(match.group(1)))
-
-        log.info("Alignment IDs: %s" % alignments)
-        return alignments
-
-    def update_qhost(self):
-        qhost = subprocess.check_output(self.QHOST_COMMAND, stderr=subprocess.STDOUT)
-
-        key_value = self.get_single_result("%s/key_value/?key=monarch-usage" % self.api_url)
+        host = run_command("hostname").split(".")[0]
+        key = "%s-usage" % host
+        url = "%s/key_value/?key=%s" % (self.api_url, key)
+        key_value = self.get_single_result("%s/key_value/?key=%s" % (self.api_url, key))
         if not key_value:
-            log.error("Cannot find \'monarch-usage\' key value")
+            log.error("Cannot find \'%s\' key value" % key)
             return
 
-        update = requests.patch(key_value["url"], data={"value": qhost}, headers=headers)
+        update = requests.patch(key_value["url"], data={"value": host_usage}, headers=headers)
 
         if update.ok:
             log.info(update.results)
         else:
-            log.error("Could not update monarch usage.")
+            log.error("Could not update %s usage." % host)
+            log.error(update.text)
+
+
 
     def get_single_result(self, fetch_url, field=None):
         """
@@ -214,7 +269,7 @@ from the command line."""
         sys.stderr.write("Could not find LIMS API TOKEN.\n")
         sys.exit(1)
 
-    monitor = ClusterMonitor(api_url, token)
+    monitor = ClusterMonitor(api_url, token, cluster_type=poptions.cluster)
 
     monitor.run()
 

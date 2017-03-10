@@ -1,16 +1,16 @@
 # Dependencies
 source "$MODULELOAD"
-module load bedops/2.4.2
-module load bedtools/2.16.2
+module load bedops/2.4.19
+module load bedtools/2.25.0
 module load bwa/0.7.12
-module load java/jdk1.7.0_05
-module load picard/1.118
-module load samtools/0.1.19
+module load jdk/1.8.0_92
+module load picard/1.120
+module load samtools/1.3
 module load gcc/4.7.2
-module load R/3.1.0
+module load R/3.2.5
 
-# Activate Python3 virtualenv
-source "$PYTHON3_ACTIVATE"
+module load python/3.5.1
+module load pysam/0.9.0
 
 FINAL_BAM=${SAMPLE_NAME}.sorted.bam
 UNIQUES_BAM=${SAMPLE_NAME}.uniques.sorted.bam
@@ -34,7 +34,7 @@ if [[ ! -e "$FINAL_BAM" ]]; then
     BAMFILE="${SAMPLE_NAME}_${filenum}.sorted.bam"
 
     if [[ ! -e "$BAMFILE" ]]; then
-      qsub -l h_data=5650M -N "$NAME" -V -cwd -S /bin/bash >/dev/stderr <<__SCRIPT__
+      qsub -N "$NAME" -V -cwd -S /bin/bash >/dev/stderr <<__SCRIPT__
       set -x -e -o pipefail
       echo "Hostname: " \$(hostname)
 
@@ -61,7 +61,7 @@ if [ -n "$FASTQ_PAIR_HOLDS" ]; then
   HOLD="-hold_jid $FASTQ_PAIR_HOLDS"
 fi
 
-if [[ ! -e "$FINAL_BAM" || ! -e "$UNIQUES_BAM" ]]; then
+if [[ ! -e "$FINAL_BAM.bai" || ! -e "$UNIQUES_BAM.bai" ]]; then
 
   PROCESS_HOLD="-hold_jid .pb${SAMPLE_NAME}_${FLOWCELL}"
 
@@ -91,7 +91,7 @@ if [[ ! -e "$FINAL_BAM" || ! -e "$UNIQUES_BAM" ]]; then
 
   if [ "$NUMBER_FASTQ_FILES" -gt "1" ]
   then
-    rm $FASTQ_PAIR_BAMS
+    rm -f $FASTQ_PAIR_BAMS
   fi
 __SCRIPT__
 
@@ -124,7 +124,7 @@ if [[ ! -e "${SAMPLE_NAME}.R1.rand.uniques.sorted.spot.out" || ! -e "${SAMPLE_NA
 
   # SPOT process requires python 2
   source "$MODULELOAD"
-  module load python/2.7.3
+  module load python/2.7.11
 
   make -f"" $STAMPIPES/makefiles/SPOT/spot-R1-paired.mk "BWAINDEX=$BWAINDEX" "ASSAY=$ASSAY" "GENOME=$GENOME" \
     "READLENGTH=$READLENGTH" "SAMPLE_NAME=$SAMPLE_NAME"

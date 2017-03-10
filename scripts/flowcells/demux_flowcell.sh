@@ -15,6 +15,8 @@ OPTIONS:
 -i [dir]  Unaligned input directory
 -o [dir]  Unaligned output directory
 -p [json] processing.json
+-m        mismatches
+-q        queue
 -l [int]  lane; integer (default: all lanes)
 -n        Dry-run - do not actually demux
 EOF
@@ -34,7 +36,8 @@ processing=
 LANE=
 dryrun=
 mismatches=0
-while getopts ":hi:o:p:m:l:n" opt ; do
+queue='queue2'
+while getopts ":hi:o:p:m:q:l:n" opt ; do
   case $opt in
     h)
       usage
@@ -51,6 +54,9 @@ while getopts ":hi:o:p:m:l:n" opt ; do
       ;;
     m)
       mismatches="$OPTARG"
+      ;;
+    q)
+      queue="$OPTARG"
       ;;
     l)
       LANE="L00$OPTARG"
@@ -100,7 +106,7 @@ for i in "${inputfiles[@]}" ; do
 
   # If dryrun; we want the output on stdout, not qsubbed.
   if [ -z "$dryrun" ] ; then
-    submitjob="qsub -cwd -V -q all.q -N .dmx$(basename "$i")"
+    submitjob="qsub -cwd -V -N -q $queue .dmx$(basename "$i")"
   else
     submitjob="bash"
   fi

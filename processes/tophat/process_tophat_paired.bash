@@ -1,15 +1,15 @@
 source "$MODULELOAD"
-module load bedops/2.4.14
+module load bedops/2.4.19
 module load bowtie/1.0.0
 module load cufflinks/2.2.1
 module load gcc/4.7.2
-module load java/jdk1.7.0_05
-module load picard/1.118
-module load samtools/1.2
+module load jdk/1.8.0_92
+module load picard/1.120
+module load samtools/1.3
 module load tophat/2.0.13
 
 source "$PYTHON3_ACTIVATE"
-module load python/2.7.9
+module load python/2.7.11
 
 export GENOME_INDEX="${GENOME_INDEX:-$BWAINDEX}"
 export SCRIPT_DIR="$STAMPIPES/scripts/tophat"
@@ -33,7 +33,7 @@ fi
 
 bash "$STAMPIPES/scripts/versions.bash" &> "$VERSION_FILE"
 
-qsub -cwd -V -q all.q -N ".th${SAMPLE_NAME}_${FLOWCELL}_ALIGN#${ALIGNMENT_ID}" -now no -pe threads "$SLOTS" -S /bin/bash <<__MAKE__
+qsub -cwd -V -N ".th${SAMPLE_NAME}_${FLOWCELL}_ALIGN#${ALIGNMENT_ID}" -now no -pe threads "$SLOTS" -S /bin/bash <<__MAKE__
   set -x -e -o pipefail
   echo "Hostname: "
   hostname

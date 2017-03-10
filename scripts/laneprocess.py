@@ -21,6 +21,7 @@ script_options = {
     "outfile": os.path.join(os.getcwd(), "run.bash"),
     "sample_script_basename": "run.bash",
     "qsub_prefix": ".proc",
+    "queue": "queue2",
     "dry_run": False,
     "no_mask": False,
     "bases_mask": None,
@@ -58,6 +59,9 @@ def parser_setup():
 
     parser.add_argument("--qsub-prefix", dest="qsub_prefix",
         help="Name of the qsub prefix in the qsub job name.  Use a . in front to make it non-cluttery.")
+    parser.add_argument("--queue", dest="queue",
+        help="SLURM queue for jobs.")
+
     parser.add_argument("-n", "--dry-run", dest="dry_run", action="store_true",
         help="Take no action, only print messages.")
     parser.add_argument("--no-mask", dest="no_mask", action="store_true",
@@ -79,6 +83,7 @@ class ProcessSetUp(object):
         self.api_url = api_url
         self.qsub_scriptname = args.sample_script_basename
         self.qsub_prefix = args.qsub_prefix
+        self.queue = args.queue
         self.outfile = args.outfile
         self.script_template = args.script_template
         self.dry_run = args.dry_run
@@ -187,7 +192,7 @@ class ProcessSetUp(object):
             outfile = open(self.outfile, 'a')
 
         outfile.write("cd %s && " % os.path.dirname(script_file))
-        outfile.write("qsub -N \"%s%s-%s-LANE#%d\" -cwd -V -S /bin/bash %s\n\n" % (self.qsub_prefix, sample_name, flowcell_label, lane_id, script_file))
+        outfile.write("qsub -N \"%s%s-%s-LANE#%d\" -q %s -cwd -V -S /bin/bash %s\n\n" % (self.qsub_prefix, sample_name, flowcell_label, lane_id, self.queue, script_file))
 
         outfile.close()
 

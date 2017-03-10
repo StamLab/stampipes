@@ -2,20 +2,17 @@ source $MODULELOAD
 module load samtools/1.3
 module load gcc/4.7.2     # R dependent on this
 module load R/3.2.5
-
 module load STAR/2.4.2a   # Just for densities
 module load bedops/2.4.19
-
-module load perl/5.16.3
-module load RSEM/1.2.30
+module load subread/1.5.1 # for featureCounts
+module load cufflinks/2.2.1 # for cuffLinks
 
 export REFDIR="$(dirname $GENOME_INDEX)"
-# $STAR_DIR and $RSEM_DIR are set by the process template, and are relative to the reference directory
-export STARrefDir="$REFDIR/$STAR_DIR"
-export RSEMrefDir="$REFDIR/$RSEM_DIR"
-
+export STARrefDir="$REFDIR/${STAR_DIR}"
 export TARGET_BAM=Aligned.toTranscriptome.out.bam
 export GENOME_BAM=Aligned.toGenome.out.bam
+
+export QUEUE=queue0
 
 numbam=$(wc -w <<< $BAM_FILES)
 # Temporary
@@ -33,15 +30,14 @@ if [ ! -s "$GENOME_BAM" ] ; then
   samtools index "$GENOME_BAM"
 fi
 
+# density information
 if [ ! -s "Signal.UniqueMultiple.str+.starch" ] ; then
-  qsub -cwd -V -N ".AGG#${AGGREGATION_ID}.den" -S /bin/bash <<'__DEN__'
+  qsub -cwd -V -N ".AGG${AGGREGATION_ID}.star_den" -q $QUEUE -S /bin/bash <<'__DEN__'
 
     # Write starch and bigwig to .tmp files
     function convertBedGraph(){
       in="$1"
       base="$2"
-
-
       chrom="$in.onlyChr.bg"
       grep '^chr' "$in" | sort -k1,1 -k2,2n > $chrom
       bedGraphToBigWig "$chrom" chrNL.txt "$base.bw.tmp"
@@ -67,40 +63,27 @@ if [ ! -s "Signal.UniqueMultiple.str+.starch" ] ; then
     done
 
 __DEN__
-
 fi
 
-if [ ! -s "Quant.genes.results" ] ; then
-
-  qsub -cwd -V -N ".AGG#${AGGREGATION_ID}.rsem" -pe threads 4 -S /bin/bash <<'__RSEM__'
-    set -x
-
-    nThreadsRSEM=$((NSLOTS * 2))
-
-    SORTED_BAM=$TARGET_BAM
-
-    RSEM=rsem-calculate-expression
-
-    # RSEM parameters: common
-    RSEMparCommon="--bam --estimate-rspd  --calc-ci --no-bam-output --seed 12345 --temporary-folder $TMPDIR"
-
-    # RSEM parameters: run-time, number of threads and RAM in MB
-    RSEMparRun=" -p $nThreadsRSEM --ci-memory 30000 "
-
-    # RSEM parameters: data type dependent
-    #OPTION: stranded paired end
-    RSEMparType="--paired-end --forward-prob 1.0"
-
-    RSEMrefDir=$($STAMPIPES/scripts/cache.sh $RSEMrefDir)
-
-    ###### RSEM command
-    (
-    echo $RSEM $RSEMparCommon $RSEMparRun $RSEMparType $SORTED_BAM $RSEMrefDir/RSEMref Quant
-         $RSEM $RSEMparCommon $RSEMparRun $RSEMparType $SORTED_BAM $RSEMrefDir/RSEMref Quant
-    ) >& Log.rsem
-
-    echo rsem-plot-model Quant Quant.pdf
-    rsem-plot-model Quant Quant.pdf
-__RSEM__
-
+# cufflinks
+if [ ! -s "genes.fpkm_tracking" ] ; then
+qsub -cwd -V -N ".AGG${AGGREGATION_ID}.star_cuff" -q $QUEUE -S /bin/bash <<'__CUFF__'
+    CUFF=cufflinks
+    CUFF_COMMON="--no-update-check --library-type fr-firststrand"
+    $CUFF $CUFF_COMMON --GTF $ANNOTATION $GENOME_BAM
+__CUFF__
 fi
+
+# featureCounts
+if [ ! -s "feature_counts.txt" ] ; then
+qsub -cwd -V -N ".AGG${AGGREGATION_ID}.star_fcounts" -q $QUEUE -S /bin/bash <<'__FCOUNTS__'
+    FCOUNTS=featureCounts
+    FCOUNTS_COMMON="--primary -B -C -p -P --fracOverlap .5 -s 2"
+    $FCOUNTS $FCOUNTS_COMMON -t 'exon' -g 'gene_id' -a $ANNOTATION -o feature_counts.txt $GENOME_BAM
+__FCOUNTS__
+fi
+
+qsub -N ".AGG#${AGGREGATION_ID}.complete" -hold_jid ".star_*" -V -cwd -q $QUEUE -S /bin/bash > /dev/stderr <<__SCRIPT__
+    bash $STAMPIPES/scripts/rna-star/aggregate/checkcomplete.sh
+    bash $STAMPIPES/scripts/rna-star/aggregate/attachfiles.sh
+__SCRIPT__

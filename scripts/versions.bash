@@ -40,8 +40,8 @@ fastqc --version
 echo "---"
 fi
 
-CollectInsertSizeMetrics=`command -v CollectInsertSizeMetrics.jar`
-MarkDuplicates=`command -v MarkDuplicates.jar`
+CollectInsertSizeMetrics=$PICARDPATH/CollectInsertSizeMetrics.jar
+MarkDuplicates=$PICARDPATH/MarkDuplicates.jar
 
 if [[ $CollectInsertSizeMetrics || $MarkDuplicates ]]; then
 echo "PICARD APPS: "

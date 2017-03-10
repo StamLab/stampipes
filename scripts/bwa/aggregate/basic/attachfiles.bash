@@ -8,6 +8,9 @@
 
 UPLOAD_SCRIPT=$STAMPIPES/scripts/lims/upload_data.py
 
+# All peaks files start with this:
+PEAKS_PREFIX="peaks/$LIBRARY_NAME.$GENOME.uniques.sorted"
+
 ATTACH_AGGREGATION="python3 $UPLOAD_SCRIPT --attach_file_contenttype AggregationData.aggregation --attach_file_objectid ${AGGREGATION_ID}"
 
 $ATTACH_AGGREGATION --attach_directory `pwd` --attach_file_purpose aggregation-directory 
@@ -25,6 +28,15 @@ $ATTACH_AGGREGATION --attach_file $LIBRARY_NAME.${GENOME}.cutcounts.$READ_LENGTH
 $ATTACH_AGGREGATION --attach_file $LIBRARY_NAME.${GENOME}.cuts.sorted.bed.starch --attach_file_type starch --attach_file_purpose cuts-starch
 $ATTACH_AGGREGATION --attach_file $LIBRARY_NAME.${GENOME}.cutcounts.sorted.bed.starch --attach_file_type starch --attach_file_purpose cutcounts-starch
 $ATTACH_AGGREGATION --attach_file $LIBRARY_NAME.${GENOME}.fragments.sorted.bed.starch --attach_file_type starch --attach_file_purpose fragments-starch
+
+$ATTACH_AGGREGATION --attach_file $PEAKS_PREFIX.allcalls.starch --attach_file_purpose hotspot-per-base --attach_file_type starch
+$ATTACH_AGGREGATION --attach_file $PEAKS_PREFIX.fragments.sorted.starch --attach_file_purpose fragments-starch-fragments --attach_file_type starch
+$ATTACH_AGGREGATION --attach_file $PEAKS_PREFIX.hotspots.fdr0.05.starch --attach_file_purpose hotspot-calls --attach_file_type starch
+$ATTACH_AGGREGATION --attach_file $PEAKS_PREFIX.peaks.starch --attach_file_purpose hotspot-peaks --attach_file_type starch
+
+#TODO: We're effectively generating these twice, simplify
+#$ATTACH_AGGREGATION --attach_file $PEAKS_PREFIX.cutcounts.starch --attach_file_purpose cutcounts-starch --attach_file_type starch
+#$ATTACH_AGGREGATION --attach_file $PEAKS_PREFIX.density.starch --attach_file_purpose density-bed-starch-windowed --attach_file_type starch
 
 python3 $UPLOAD_SCRIPT \
     --aggregation_id ${AGGREGATION_ID} \

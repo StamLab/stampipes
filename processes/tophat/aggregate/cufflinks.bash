@@ -1,16 +1,16 @@
 source $PYTHON3_ACTIVATE
 
 source $MODULELOAD
-module load bedops/2.4.14
-module load java/jdk1.7.0_05
+module load bedops/2.4.19
+module load jdk/1.8.0_92
 module load gcc/4.7.2
-module load R/3.1.0
-module load picard/1.118
-module load samtools/1.2
+module load R/3.2.5
+module load picard/1.120
+module load samtools/1.3
 module load git/2.3.3
-module load coreutils/8.9
+module load coreutils/8.25
 
-module load python/2.7.9
+module load python/2.7.11
 module load cufflinks/2.2.1
 
 cd $AGGREGATION_FOLDER
@@ -56,7 +56,7 @@ if [ ! -e ${FINAL_BAM} ]; then
 
     $STAMPIPES/scripts/tophat/merge_or_copy_bam.sh \$TMPBAM  $BAM_FILES
 
-    java -Xmx24g -jar \$(which MarkDuplicates.jar) \
+    java -Xmx24g -jar $PICARDPATH/MarkDuplicates.jar \
       INPUT=\$TMPBAM \
       METRICS_FILE=$LIBRARY_NAME.dups.txt \
       OUTPUT=$FINAL_BAM \
@@ -104,14 +104,14 @@ do_cufflinks(){
   targets="${LIBRARY_NAME}_cufflinks/finished.txt"
   makefile="$STAMPIPES/makefiles/tophat/tophat_and_cufflinks.mk"
 
+  export SAMPLE_NAME=$LIBRARY_NAME
   if ! make -q -f $makefile $targets ; then
 
     jobname="${MAKE_JOBNAME}-cufflinks" 
     PROCESSING="$PROCESSING,$jobname"
     tmpbamlink="$LIBRARY_NAME.all.$GENOME.bam"
 
-    export SAMPLE_NAME=$LIBRARY_NAME
-    qsub -N $jobname -hold_jid ${MERGE_DUP_JOBNAME} -V -cwd -S /bin/bash > /dev/stderr -pe threads 2-4 << __CUFFLINKS__
+    qsub -N $jobname -hold_jid ${MERGE_DUP_JOBNAME} -V -cwd -S /bin/bash > /dev/stderr -pe threads 4 << __CUFFLINKS__
     set -x -e -o pipefail
 
     echo "Hostname: "

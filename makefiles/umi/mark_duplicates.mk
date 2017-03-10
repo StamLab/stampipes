@@ -35,7 +35,7 @@ all: markdups
 markdups: $(OUTPUT_BAM_FILE)
 
 $(OUTPUT_BAM_FILE): $(CHROM_FILES) $(TMPDIR)/unmapped.marked.bam
-	samtools merge -@ $(THREADS) $@ $^
+	samtools merge -f -@ $(THREADS) $@ $^
 
 $(TMPDIR)/%.marked.bam: $(TMPDIR)/%.reads.bam $(TMPDIR)/%.reads.dups
 	( \
