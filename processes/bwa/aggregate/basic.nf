@@ -48,7 +48,7 @@ process merge {
   output:
   file 'merged.bam' into merged
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   script:
   """
@@ -59,7 +59,7 @@ process merge {
 // TODO: single end
 process dups {
   label "modules"
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
   label 'high_mem'
 
   input:
@@ -97,7 +97,7 @@ marked_bam.into { bam_for_counts; bam_for_adapter_counts; bam_for_filter; bam_fo
 process filter {
   label "modules"
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   file bam from bam_for_filter
@@ -135,7 +135,7 @@ process filter_nuclear {
 
 process macs2 {
   label "macs2"
-  publishDir "${params.outdir}/peaks_macs2"
+  publishDir "${params.outdir}/peaks_macs2", mode: "link"
   scratch false
 
   when:
@@ -161,7 +161,7 @@ process macs2 {
 process hotspot2 {
   label "modules"
 
-  publishDir "${params.outdir}"
+  publishDir "${params.outdir}", mode: "link"
   container "fwip/hotspot2:latest"
 
   when:
@@ -215,7 +215,7 @@ process hotspot2 {
 
 process spot_score {
   label "modules"
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   file(bam) from bam_for_spot_score
@@ -256,7 +256,7 @@ process spot_score {
 
 process bam_counts {
   label "modules"
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   file(bam) from bam_for_counts
@@ -274,7 +274,7 @@ process bam_counts {
 
 process count_adapters {
   label "modules"
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   file(bam) from bam_for_adapter_counts
@@ -292,7 +292,7 @@ process count_adapters {
 
 process preseq {
   label "modules"
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
   input:
   file nuclear_bam
 
@@ -318,7 +318,7 @@ process preseq {
 process cutcounts {
   label "modules"
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   file(fai) from file("${params.genome}.fai")
@@ -366,7 +366,7 @@ process cutcounts {
 process density {
   label "modules"
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
   label 'high_mem'
 
   input:
@@ -419,7 +419,7 @@ process density {
 
 process multimapping_density {
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
   label 'modules'
   label 'high_mem'
 
@@ -498,7 +498,7 @@ process multimapping_density {
 
 process normalize_density {
   label "modules"
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   set(file(filtered_bam), file(density)) from to_normalize
@@ -541,7 +541,7 @@ process normalize_density {
 process insert_sizes {
   label "modules"
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   file nuclear_bam from bam_for_inserts
@@ -571,7 +571,7 @@ process insert_sizes {
 process motif_matrix {
   label "modules"
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   file hotspot_calls
@@ -595,7 +595,7 @@ process motif_matrix {
 process closest_features {
   label "modules"
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   file hotspot_calls
@@ -639,7 +639,7 @@ process closest_features {
 process differential_hotspots {
   label "modules"
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   file bam from bam_for_diff_peaks
@@ -683,7 +683,7 @@ process differential_hotspots {
 process learn_dispersion {
 
   label "footprints"
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   memory = '8 GB'
   cpus = 8
@@ -805,7 +805,7 @@ process working_tracks {
   memory = '32 GB'
   cpus = 1
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   file merged_interval
@@ -833,7 +833,7 @@ process compute_footprints {
   memory = '8 GB'
   cpus = 1
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   set file(merged_interval), val(threshold) from merged_interval.combine(thresholds)
@@ -861,7 +861,7 @@ process compute_footprints {
 process plot_footprints {
 
   label "footprints"
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   file model from to_plot

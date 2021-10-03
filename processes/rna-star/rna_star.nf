@@ -49,7 +49,7 @@ process star {
   cpus params.star_threads
   module 'STAR', 'samtools/1.7', 'gcc/4.7.2'
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   set file(r1), file(r2) from trimmed
@@ -102,7 +102,7 @@ process star_bedgraph {
 
   module 'STAR'
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   file coordBam from coordinateBam
@@ -128,7 +128,7 @@ process rsem {
 
   module 'perl/5.16.3', 'RSEM/1.2.30'
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   file transcriptBam
@@ -158,7 +158,7 @@ process rsem_plot {
 
   module 'perl/5.16.3', 'RSEM/1.2.30', 'R/3.2.5'
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   file "Quant.stat/*" from rsem_quant

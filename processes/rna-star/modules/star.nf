@@ -8,7 +8,7 @@ process star {
   cpus params.star_threads
   module 'STAR/2.4.2a', 'samtools/1.7'
 
-  publishDir params.outdir, enabled: params.publish
+  publishDir params.outdir, enabled: params.publish, mode: "link"
 
   label 'high_mem'
 

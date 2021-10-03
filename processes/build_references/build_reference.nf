@@ -14,7 +14,7 @@ readlengths = params.readlength.tokenize(',')
 
 process bwa {
 
-  publishDir "${params.outdir}/bwa"
+  publishDir "${params.outdir}/bwa", mode: "link"
 
   input:
   file genome from file(params.genome)
@@ -29,7 +29,7 @@ process bwa {
 }
 
 process samtools {
-  publishDir "${params.outdir}/samtools"
+  publishDir "${params.outdir}/samtools", mode: "link"
 
   input:
   file genome from file(params.genome)
@@ -61,7 +61,7 @@ process bowtie_index {
 
 process mappability {
 
-  publishDir "${params.outdir}/annotations"
+  publishDir "${params.outdir}/annotations", mode: "link"
 
   input:
   file genome from file(params.genome)
@@ -85,7 +85,7 @@ process mappability {
 
 process density {
 
-  publishDir "${params.outdir}/densities"
+  publishDir "${params.outdir}/densities", mode: "link"
 
   input:
   file fai
@@ -104,7 +104,7 @@ process density {
 
 process chrom_sizes {
 
-  publishDir "${params.outdir}/hotspot2"
+  publishDir "${params.outdir}/hotspot2", mode: "link"
 
   input:
   file fai
@@ -120,7 +120,7 @@ process chrom_sizes {
 
 process chrom_info {
 
-  publishDir "${params.outdir}/annotations"
+  publishDir "${params.outdir}/annotations", mode: "link"
 
   input:
   file chrom_sizes
@@ -138,7 +138,7 @@ process hotspot2 {
 
   container "fwip/hotspot2:latest"
 
-  publishDir "${params.outdir}/hotspot2"
+  publishDir "${params.outdir}/hotspot2", mode: "link"
 
   input:
   file chrom_sizes
@@ -161,7 +161,7 @@ process hotspot2 {
 }
 
 process nuclear_center_sites {
-  publishDir "${params.outdir}/hotspot2"
+  publishDir "${params.outdir}/hotspot2", mode: "link"
 
   input:
   file center_sites

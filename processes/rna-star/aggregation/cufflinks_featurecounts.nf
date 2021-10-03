@@ -69,7 +69,7 @@ workflow RNA_AGG {
 
 process merge_transcriptome_bam {
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
   module "samtools/1.12"
   input:
     // Assume sorted by coord
@@ -90,7 +90,7 @@ process merge_transcriptome_bam {
 }
 
 process merge_genome_bam {
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
   module "samtools/1.12"
   input:
     // Assume sorted by coord
@@ -114,7 +114,7 @@ process merge_genome_bam {
 
 
 process remove_duplicate_reads {
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
   module "jdk/2.8.1", "picard/2.8.1", "samtools/1.12"
   label 'high_mem'
   input:
@@ -152,7 +152,7 @@ process remove_duplicate_reads {
 }
 
 process mark_duplicate_reads {
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   module "jdk/2.8.1", "picard/2.8.1", "samtools/1.12"
   input:
@@ -177,7 +177,7 @@ process mark_duplicate_reads {
 
 
 process bam_to_fastq {
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
   module "samtools/1.12"
   
   input:
@@ -202,7 +202,7 @@ process bam_to_fastq {
 process density {
 
   module "STAR/2.4.2a", "bedops/2.4.19", "htslib/1.6.0"
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
   input:
     path(input_bam)
     path("ref/*")
@@ -260,7 +260,7 @@ process density {
 
 process cufflinks {
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
   module "cufflinks/2.2.1", "R/3.2.5", "anaquin/2.0.1"
 
   input:
@@ -300,7 +300,7 @@ process cufflinks {
 
 process stringtie {
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
   module "stringtie/1.3.4d"
   input:
     path(input_bam)
@@ -321,7 +321,7 @@ process stringtie {
 
 process feature_counts {
 
-    publishDir params.outdir
+    publishDir params.outdir, mode: "link"
     module "subread/1.5.1"
 
     input:
@@ -343,7 +343,7 @@ process feature_counts {
 
 process kallisto {
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
   module "kallisto/0.43.1", "anaquin/2.0.1"
 
   input:
@@ -369,7 +369,7 @@ process kallisto {
 
 process kallisto_advanced {
   
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
   module "kallisto/0.43.1", "anaquin/2.0.1"
 
   input:
@@ -397,7 +397,7 @@ process kallisto_advanced {
 process anaquin {
 
   module "samtools/1.12", "anaquin/2.0.1", "kallisto/0.43.1", "R/3.2.5"
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
     path input_bam
@@ -457,7 +457,7 @@ process anaquin {
 process insert_sizes {
 
   module "jdk", "picard/2.9.0", "R/3.2.5"
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
     path input_bam
@@ -474,7 +474,7 @@ process insert_sizes {
 process rna_metrics {
 
   module "jdk", "picard/2.9.0"
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
     path input_bam
@@ -495,7 +495,7 @@ process rna_metrics {
 process adapter_count {
 
   module "bwa", "samtools", "jdk", "picard/2.9.0"
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
   input:
     path input_bam
 
@@ -513,7 +513,7 @@ process adapter_count {
 process ribosomal_count {
 
   module "bowtie/1.0.0"
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
     tuple path(r1_fq), path(r2_fq)

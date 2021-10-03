@@ -308,7 +308,7 @@ process mark_duplicates {
 
   label "high_mem"
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   file(merged_bam) from merged_bam
@@ -352,7 +352,7 @@ if (params.UMI)
 
 process filter_bam_to_unique {
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   file marked_bam
@@ -396,7 +396,7 @@ process bam_counts {
  */
 process insert_size {
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   set file(bam), file(bai) from bam_for_insert
@@ -429,7 +429,7 @@ process insert_size {
 
 process spot_score {
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   set file(bam), file(bai) from bam_for_spot
@@ -484,7 +484,7 @@ win = 75
 bini = 20
 process density_files {
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   set file(bam), file(bai) from bam_for_density
@@ -530,7 +530,7 @@ process density_files {
  */
 process total_counts {
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "link"
 
   input:
   file 'fastqcounts*' from fastq_counts.collect()
