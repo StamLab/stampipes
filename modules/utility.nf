@@ -1,6 +1,7 @@
 /// This file is only for "utility" processes that are extremely generic.
 
-params.publishmode = "link"
+params.outdir = "output"
+params.publishmode = "copy"
 
 process publish_and_rename {
 
@@ -12,10 +13,10 @@ process publish_and_rename {
   output:
     path(filename)
 
-  script:
-    """
-    ln -s "__infile__" "$filename"
-    """
+  shell:
+    '''
+    ln -s $(readlink -f "__infile__") "!{filename}"
+    '''
 }
 
 process publish {
@@ -30,8 +31,8 @@ process publish {
     path filename, includeInputs: true
     
   script:
-  """
-  """
+    """
+    """
 }
 
 process publish_with_meta {

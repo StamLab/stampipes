@@ -13,17 +13,16 @@ params.bcl2fastq_tiles = "*"
 
 
 params.samplesheet_header = """[Header]
+                              |Project Name,Stamlab
                               |Workflow,GenerateFASTQ""".stripMargin()
 
 // Functions
-
 def parse_sample_config(sample_config_tsv) {
   def data = new CsvParser().parseCsv(sample_config_tsv, separator: "\t")
   def sample_info = []
   for (sample in data) {
     sample_info.add( sample )
   } 
-  //sample_info = sample_info.collect { it[]}
   for (s in sample_info) {
     println "sample is ${s}"
   }
@@ -33,7 +32,6 @@ def parse_sample_config(sample_config_tsv) {
 def validate_sample_config(sample_info) {
   // Check for required info
   sample_info.collect {
-    // println "Sample info: ${it}"
     assert it.lane > 0 : "Sample has no lane: ${it}"
     assert it.barcode_index.size() > 0 : "Sample has no barcode index: ${it}"
     assert it.name : "Sample has name: ${it}"
@@ -55,10 +53,10 @@ workflow {
 }
 
 workflow test {
-  // Dunno yet how to test this... Maybe with a real flowcell, but only a couple of tiles of data?
-  def tiles = "s_1_0002"
+  // Test with a subset of tiles
+  def tiles = "s_1_121[0-9]"
   def input_dir = "/net/seq/data2/sequencers/220627_A01698_0053_BH2TCJDSX5"
-  def txt = """name\tbarcode_index\tlane
+  def config_txt = """name\tbarcode_index\tlane
               |N701\tTAAGGCGA\t1
               |N702\tCGTACTAG\t1
               |N703\tAGGCAGAA\t1
@@ -72,7 +70,7 @@ workflow test {
               |N711\tAAGAGGCA\t1
               |N712\tGTAGAGGA\t1""".stripMargin()
 
-  def sample_info = parse_sample_config(txt)
+  def sample_info = parse_sample_config(config_txt)
   validate_sample_config(sample_info)
 
 
@@ -91,14 +89,14 @@ workflow BCL2DEMUX {
     illumina_dir 
     sample_info 
     tiles
-    // TODO
 
   main:
-    text = generate_samplesheet( [params.samplesheet_header, sample_info])
-    
+    generate_samplesheet( [params.samplesheet_header, sample_info] )
+      .map { it -> [ illumina_dir, it, tiles] }
+      | bcl2fastq
 
-  //emit:
-    // TODO
+  emit:
+    bcl2fastq.out
   
 }
 
@@ -116,17 +114,20 @@ process generate_samplesheet {
     file("Samplesheet.csv")
 
   shell:
+    settings = ""
     sheet = [
       header,
       "",
       "[Settings]",
-      "Lane,SampleID,index",
-      *sample_info.collect { "${it.lane},${it.name},${it.barcode_index}" }
+      settings,
+      "[Data]",
+      "Lane,SampleID,SampleName,index",
+      *sample_info.collect { "${it.lane},${it.name},${it.name},${it.barcode_index}" }
     ].join("\n")
 
 
     '''
-    printf '!{sheet}' > Samplesheet.csv
+    echo '!{sheet}' > Samplesheet.csv
     '''
 }
 
@@ -138,27 +139,28 @@ process generate_samplesheet {
 process bcl2fastq {
 
   container "dceoy/bcl2fastq@sha256:6d7233f2160721d6cb62f77a127d499597f4b35bb435cc8265d05f5bf54c7b94"
+  cpus {cpus}
 
   input:
-    tuple file(illumina_dir), file(samplesheet), val(tiles)
+    tuple path(illumina_dir), path(samplesheet), val(tiles)
 
   output:
-    file("output/*")
+    file("output/*fastq.gz")
 
   shell:
-  '''
-    mkdir output
+    cpus = 10
+    '''
+    workdir=$PWD
+    outdir=$workdir/output
+    mkdir -p "$outdir"
+    cd "!{illumina_dir}"
     bcl2fastq \
-      --input-dir "!{illumina_dir}/Data/Intensities/BaseCalls" \
-      --samplesheet "${samplesheet}" \
-      --use-bases-mask "!{bcl_mask}" \
-      --output-dir "output/" \
-      --barcode-mismatches "!{mismatches}" \
+      --input-dir "Data/Intensities/BaseCalls" \
+      --sample-sheet "$workdir/!{samplesheet}" \
+      --output-dir "$outdir" \
       --tiles "!{tiles}" \
-      --loading-threads        $(( SLURM_CPUS_PER_TASK / 2 )) \
-      --writing-threads        $(( SLURM_CPUS_PER_TASK / 2 )) \
-      --processing-threads     $(( SLURM_CPUS_PER_TASK ))
-  '''
+      --barcode-mismatches 1
+    '''
 }
 
 // process bclconvert {
