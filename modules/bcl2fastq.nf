@@ -9,7 +9,7 @@ params.bcl2fastq_threads = 20
 params.bcl2fastq_sample_config_tsv = ""
 params.bases_mask = ""
 
-params.bcl2fastq_tiles = "*"
+params.bcl2fastq_tiles = "s_*"
 
 
 params.samplesheet_header = """[Header]
@@ -47,7 +47,7 @@ workflow {
   BCL2DEMUX(
     params.input_directory,
     Channel.from(sample_info),
-    "*",
+    params.bcl2fastq_tiles,
   )
 
 }
@@ -91,9 +91,20 @@ workflow BCL2DEMUX {
     tiles
 
   main:
-    generate_samplesheet( [params.samplesheet_header, sample_info] )
-      .map { it -> [ illumina_dir, it, tiles] }
-      | bcl2fastq
+
+    // Group samples by lanes of processing
+    // This will let us run 1 bcl2fastq job for each lane
+    Channel.fromList(sample_info)
+    | map { [it.lane, it] }
+    | groupTuple(sort: 'hash')
+    | map { it[1] }
+    .set { sample_info_by_lane }
+
+    sample_info_by_lane
+    | map { [params.samplesheet_header, it] }
+    | generate_samplesheet
+    | map { it -> [ illumina_dir, it, tiles] }
+    | bcl2fastq
 
   emit:
     bcl2fastq.out
@@ -115,7 +126,7 @@ process generate_samplesheet {
 
   shell:
     settings = ""
-    sheet = [
+    sheet_parts = [
       header,
       "",
       "[Settings]",
@@ -123,7 +134,8 @@ process generate_samplesheet {
       "[Data]",
       "Lane,SampleID,SampleName,index",
       *sample_info.collect { "${it.lane},${it.name},${it.name},${it.barcode_index}" }
-    ].join("\n")
+    ]
+    sheet = sheet_parts.join("\n")
 
 
     '''

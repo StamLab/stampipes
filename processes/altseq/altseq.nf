@@ -9,6 +9,7 @@ include { publish_and_rename; publish } from "../../modules/utility.nf"
 
 params.sample_config_tsv = ""
 params.input_directory = ""
+params.star_exe = "${workflow.projectDir}/../../third_party/STAR"
 
 
 // Functions
@@ -31,8 +32,110 @@ def validate_sample_config(sample_info) {
 }
 
 
+workflow ALTSEQ {
+
+  // TODO: This list can probably be refined or repackaged!
+  take:
+    genome_dir
+    genome_fa
+    barcode_whitelist
+    tiles
+    input_dir
+    sample_info
+
+  main:
+
+    // Run BCL2Fastq on all files
+    BCL2DEMUX(
+      input_dir,
+      sample_info,
+      tiles,
+    )
+
+    BCL2DEMUX.out
+    | flatMap { it.sort(); it.collate(2) }
+    | map { [
+      sample_info.find(s -> it[0].baseName.startsWith("${s.name}_S") ),
+        it[0],
+        it[1],
+    ]}
+    | filter { it[0] != null }
+    | set { fq_files }
+
+    // Merge and publish fastq files
+    bcl_fq_regex = /(.*)_S[0-9]+_(L[0-9]+)_(R[1-2])_.*/
+    BCL2DEMUX.out
+    | flatten()
+    | map {
+      match = (it.baseName =~ bcl_fq_regex)[0];
+      [ match[1,3], [match[2], it]]
+    }
+    | filter { it[0][0] != "Undetermined" }
+    | groupTuple
+    // regroup 
+    | map {[
+      "${it[0][0]}_${it[0][1]}",
+      it[1].sort { a, b -> a[0] <=> b[0] } .collect{ x -> x[1] }
+    ]}
+    | view { "sorted $it" }
+    | merge_fq
+    | publish
+
+    merge_fq.out
+    // TODO: Use groupTuple with size:2?
+    // Would allow alignments to start sooner.
+    | toSortedList()
+    | flatMap { it.sort { a, b -> a.baseName <=> b.baseName } ; it.collate(2) }
+    | map { [
+      sample_info.find(s -> it[0].baseName.startsWith("${s.name}_R") ),
+        it[0],
+        it[1],
+    ]}
+    | filter { it[0] != null }
+    | set { merged_fq_files }
+
+    // Invoke STAR Solo
+    align(
+      genome_dir,
+      params.star_exe,
+      barcode_whitelist,
+      merged_fq_files,
+    )
+
+    // Sort the cram files
+    align.out.aligned_bam
+    | map { [
+        [
+          name: it[0].name,
+          id: it[0].name,
+          barcode_index: it[0].barcode_index,
+          lane: it[0].lane
+        ],
+        it[1],
+        genome_fa,
+      ] }
+    | sort_and_encode_cram
+
+    // Publish CRAM files.
+    sort_and_encode_cram.out.cram
+    | map { ["${it[0].name}.sorted.cram", it[1]] }
+    | publish_and_rename
+}
+
+workflow {
+
+  def genome_dir = file(params.genome_dir)
+  def genome_fa = file(params.genome_fa)
+  def barcode_whitelist = file(params.barcode_whitelist)
+
+  def sample_info = parse_sample_config(file(params.sample_config_tsv).text)
+  validate_sample_config(sample_info)
+
+  ALTSEQ(genome_dir, genome_fa, barcode_whitelist, "s_*", params.input_directory, sample_info)
+}
+
 // test workflow
-workflow test {
+ workflow test {
 
   def star_exe = file("${workflow.projectDir}/../../third_party/STAR")
   def genome_dir = file("/net/seq/data2/projects/prime_seq/cell_ranger_ref/star_2.7.10_genome_2022_gencode.v39/")
@@ -41,61 +144,21 @@ workflow test {
 
   def sample_info = parse_sample_config(file(params.sample_config_tsv).text)
   validate_sample_config(sample_info)
-  
-  BCL2DEMUX(
-    params.input_directory,
-    sample_info,
-    "s_1_1101"
-  )
-  | flatMap { it.sort(); it.collate(2) }
-  | map { [
-    sample_info.find(s -> it[0].baseName.startsWith("${s.name}_S") ),
-    it[0],
-    it[1],
-  ]}
-  | filter { it[0] != null }
-  | view { "it is $it" }
-  | set { fq_files }
 
-  fq_files.flatMap { [ it[1], it[2] ] } | publish
-
-  align(
-    star_exe,
-    genome_dir,
-    barcode_whitelist,
-    fq_files,
-  )
-
-  align.out.aligned_bam
-  | map { [
-    [name: it[0].name, id: it[0].name, barcode_index: it[0].barcode_index, lane: it[0].lane] ,
-    it[1],
-    genome_fa,
-  ] }
-  | sort_and_encode_cram
-
-  sort_and_encode_cram.out.cram
-  | map { ["${it[0].name}.sorted.cram", it[1]] }
-  | publish_and_rename
-
+  ALTSEQ(genome_dir, genome_fa, barcode_whitelist, "s_[1-4]_1234", params.input_directory, sample_info)
 }
 
-
-// TODO once we figure out how it works
-workflow ALTSEQ {
-
-  }
 
 process align {
 
   memory "108681M"
-  cpus 5
+  cpus cpus
 
   input:
-    file star_exe
-    file genome_dir
-    file barcode_whitelist
-    tuple val(meta), file(fq1), file(fq2)
+    path genome_dir
+    path star_exe
+    path barcode_whitelist
+    tuple val(meta), path(fq1), path(fq2)
 
 
   output:
@@ -103,6 +166,7 @@ process align {
     tuple val(meta), file("Solo.out"), emit: solo_directory
 
   shell:
+    cpus = 5
     '''
     tmpdir=$(mktemp -d)
     "./!{star_exe}"   \
@@ -122,7 +186,7 @@ process align {
       --soloFeatures Gene GeneFull GeneFull_ExonOverIntron GeneFull_Ex50pAS   \
       --soloMultiMappers Unique PropUnique Uniform Rescue EM   \
       --readFilesCommand zcat   \
-      --runThreadN 5   \
+      --runThreadN "!{cpus}"   \
       --outSAMtype BAM Unsorted   \
       --outSAMattributes NH HI AS NM MD CR CY UR UY GX GN   \
       --outSAMunmapped Within   \
@@ -131,3 +195,25 @@ process align {
     '''
 }
 
+
+process merge_fq {
+
+  cpus {cpus}
+  container null
+  module "htslib/1.12"
+
+  input:
+    tuple val(name), path("in.*.fq.gz")
+
+  output:
+    file out
+
+  shell:
+    cpus = 10
+    out = "${name}.fq.gz"
+    '''
+      zcat in.*.fq.gz \
+      | bgzip --stdout --threads "!{cpus}" \
+      > "!{out}"
+    '''
+}
