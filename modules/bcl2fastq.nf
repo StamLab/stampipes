@@ -98,7 +98,7 @@ workflow BCL2DEMUX {
     | map { [it.lane, it] }
     | groupTuple(sort: 'hash')
     | map { it[1] }
-    .set { sample_info_by_lane }
+    | set { sample_info_by_lane }
 
     sample_info_by_lane
     | map { [params.samplesheet_header, it] }

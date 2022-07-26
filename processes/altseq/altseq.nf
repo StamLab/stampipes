@@ -152,7 +152,7 @@ workflow {
 process align {
 
   memory "108681M"
-  cpus cpus
+  cpus {cpus}
 
   input:
     path genome_dir

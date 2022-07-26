@@ -13,7 +13,7 @@ set -eo pipefail
 # TODO: Bump this before running for real.
 version=0.9.1
 
-#cd "$(dirname "$0")"
+cd "$(dirname "$0")"
 
 outdir="output_$version"
 sentinel_file="$outdir/process_complete.txt"
@@ -36,22 +36,11 @@ source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
 
 # TODO: REDO_ALIGNMENT handling
 
-
-# TODO:
-# Prepare for processing
-# Needs the flowcell to have a date set! Probably do this manually at the moment.
-# lims_put_by_url https://lims-staging.altius.org/api/flowcell_run/2518/prepare_for_processing/
-
-
 # Set up sample config
 sample_config=sample_config.tsv
 python "$STAMPIPES"/scripts/lims/get_processing.py -f "$FLOWCELL"
-(
-echo -e "lane\tname\tbarcode_index"
-cat processing.json \
-  | jq '.libraries[] | [(.lane | tostring), .barcode1.label_id, .barcode1.reverse_sequence] | join("\t")' -r \
-  | sort -u \
-)  > "${sample_config}"
+python "$STAMPIPES"/scripts/lims/create_altseq_sample_config.py processing.json --output "$sample_config"
+
 
 
 SEQ_DIR=$(ls -d -1 ${SEQUENCER_MOUNT}/*$FLOWCELL* | head -n1)
@@ -62,10 +51,10 @@ BARCODE_WHITELIST=/net/seq/data2/projects/prime_seq/barcodes-combined.txt
 
 # Run the pipeline
 NXF_VER=21.10.6 nextflow \
-  -c ./nextflow.config \
+  -c $STAMPIPES/nextflow.config \
   run "$STAMPIPES"/processes/altseq/altseq.nf \
   -with-trace \
-  -with-docker ubuntu \
+  -profile docker \
   -resume \
   --input_directory "$SEQ_DIR"  \
   --sample_config_tsv "$sample_config" \

@@ -191,6 +191,30 @@ if [[ -z "$nosleep" ]] ; then
   sleep 300
 fi
 
+# Check if read1length=0 -> that means alteseq
+# Handle specially
+flowcell_data=$(lims_get_all "flowcell_run/?label=$flowcell")
+read1length=$(echo $flowcell_data | jq -r .read1_length | head -n1)
+if [[  "$read1length" = "0" ]] ; then
+  echo "Alt-seq run detected"
+  date=$(echo $flowcell_data | jq -r .date_loaded | sed 's/-//g;s/^20//')
+  # analysis_dir not set yet, no alignment group
+  analysis_dir=$FLOWCELLS/FC${flowcell}_${date}_tag
+  mkdir -p "$analysis_dir"
+  runscript="$analysis_dir/run.bash"
+  (
+    echo "#!/bin/bash"
+    echo "export FLOWCELL=$flowcell"
+    echo "export STAMPIPES=$STAMPIPES"
+    # TODO: Remove once this data is on staging!
+    echo "export LIMS_API_URL=https://lims-staging.altius.org/api"
+    cat "$STAMPIPES"/processes/altseq/process_altseq.bash
+  ) > "$runscript"
+  echo "Run $runscript to start analysis!"
+ 
+  exit 0
+fi
+
 # Get and read the processing script
 python3 "$STAMPIPES/scripts/lims/get_processing.py" -f "$flowcell" -o "$json"
 run_type=$(     jq -r '.flowcell.run_type'          "$json" )
@@ -198,6 +222,8 @@ analysis_dir=$( jq -r '.alignment_group.directory'  "$json" )
 mask=$(         jq -r '.alignment_group.bases_mask' "$json" )
 run_type=$(     jq -r '.flowcell.run_type'          "$json" )
 has_umi=$(      jq -r '.libraries | map(.barcode1.umi) | any' "$json")
+
+
 
 if [ -z "$demux" ] ; then
   bcl_mask=$mask
