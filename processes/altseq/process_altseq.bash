@@ -38,7 +38,8 @@ source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
 
 # Set up sample config
 sample_config=sample_config.tsv
-python "$STAMPIPES"/scripts/lims/get_processing.py -f "$FLOWCELL"
+# TODO: Re-enable after production time-out is fixed
+# python "$STAMPIPES"/scripts/lims/get_processing.py -f "$FLOWCELL"
 python "$STAMPIPES"/scripts/lims/create_altseq_sample_config.py processing.json --output "$sample_config"
 
 
@@ -54,7 +55,7 @@ NXF_VER=21.10.6 nextflow \
   -c $STAMPIPES/nextflow.config \
   run "$STAMPIPES"/processes/altseq/altseq.nf \
   -with-trace \
-  -profile docker \
+  -profile docker,cluster \
   -resume \
   --input_directory "$SEQ_DIR"  \
   --sample_config_tsv "$sample_config" \

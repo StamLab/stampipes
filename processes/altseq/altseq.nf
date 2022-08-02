@@ -17,7 +17,9 @@ def parse_sample_config(sample_config_tsv) {
   def data = new CsvParser().parseCsv(sample_config_tsv, separator: "\t")
   def sample_info = []
   for (sample in data) {
-    sample_info.add( sample )
+    sample_info.add(
+      sample.columns.collectEntries { c, v -> [c, sample[v]] }
+    )
   } 
   return sample_info
 }
@@ -27,7 +29,7 @@ def validate_sample_config(sample_info) {
   sample_info.collect {
     assert it.lane > 0 : "Sample has no lane: ${it}"
     assert it.barcode_index.size() > 0 : "Sample has no barcode index: ${it}"
-    assert it.name : "Sample has name: ${it}"
+    assert it.name : "Sample has no name: ${it}"
   }
 }
 
@@ -52,16 +54,6 @@ workflow ALTSEQ {
       tiles,
     )
 
-    BCL2DEMUX.out
-    | flatMap { it.sort(); it.collate(2) }
-    | map { [
-      sample_info.find(s -> it[0].baseName.startsWith("${s.name}_S") ),
-        it[0],
-        it[1],
-    ]}
-    | filter { it[0] != null }
-    | set { fq_files }
-
     // Merge and publish fastq files
     bcl_fq_regex = /(.*)_S[0-9]+_(L[0-9]+)_(R[1-2])_.*/
     BCL2DEMUX.out
@@ -77,20 +69,21 @@ workflow ALTSEQ {
       "${it[0][0]}_${it[0][1]}",
       it[1].sort { a, b -> a[0] <=> b[0] } .collect{ x -> x[1] }
     ]}
-    | view { "sorted $it" }
     | merge_fq
     | publish
 
     merge_fq.out
-    // TODO: Use groupTuple with size:2?
-    // Would allow alignments to start sooner.
-    | toSortedList()
-    | flatMap { it.sort { a, b -> a.baseName <=> b.baseName } ; it.collate(2) }
-    | map { [
+    // Use groupTuple to group files in R1, R2 pairs
+    | map { [ it.baseName.replaceAll(/_R[12]/, "_RX"), it ] }
+    | groupTuple(size: 2, sort: { a, b -> { a.baseName <=> b.baseName } } )
+    | map { it[1] }
+    // Re-associate the metadata
+    | map {[
       sample_info.find(s -> it[0].baseName.startsWith("${s.name}_R") ),
         it[0],
         it[1],
     ]}
+    // Exclude Undetermined files
     | filter { it[0] != null }
     | set { merged_fq_files }
 
@@ -145,6 +138,7 @@ workflow {
   def sample_info = parse_sample_config(file(params.sample_config_tsv).text)
   validate_sample_config(sample_info)
 
+
   ALTSEQ(genome_dir, genome_fa, barcode_whitelist, "s_[1-4]_1234", params.input_directory, sample_info)
 }
 
@@ -153,6 +147,7 @@ process align {
 
   memory "108681M"
   cpus {cpus}
+  scratch false  // Was filling up tmp dirs
 
   input:
     path genome_dir
