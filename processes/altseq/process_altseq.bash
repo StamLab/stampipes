@@ -10,8 +10,7 @@ done
 
 set -eo pipefail
 
-# TODO: Bump this before running for real.
-version=0.9.1
+version=1.0.0
 
 cd "$(dirname "$0")"
 
