@@ -152,6 +152,7 @@ process bcl2fastq {
 
   container "dceoy/bcl2fastq@sha256:6d7233f2160721d6cb62f77a127d499597f4b35bb435cc8265d05f5bf54c7b94"
   cpus {cpus}
+  scratch false
 
   input:
     tuple path(illumina_dir), path(samplesheet), val(tiles)

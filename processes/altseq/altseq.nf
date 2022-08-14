@@ -196,6 +196,7 @@ process merge_fq {
   cpus {cpus}
   container null
   module "htslib/1.12"
+  scratch false
 
   input:
     tuple val(name), path("in.*.fq.gz")
