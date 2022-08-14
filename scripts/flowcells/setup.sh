@@ -207,7 +207,7 @@ if [[  "$read1length" = "0" ]] ; then
     echo "export FLOWCELL=$flowcell"
     echo "export STAMPIPES=$STAMPIPES"
     # TODO: Remove once this data is on staging!
-    echo "export LIMS_API_URL=https://lims-staging.altius.org/api"
+    echo "export LIMS_API_URL=https://lims.altius.org/api"
     cat "$STAMPIPES"/processes/altseq/process_altseq.bash
   ) > "$runscript"
   echo "Run $runscript to start analysis!"

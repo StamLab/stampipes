@@ -51,7 +51,7 @@ def populate_lib_to_pool():
     global lib_to_pool
     url_regex = re.compile("(\d+)")
     for pool in API.get_list_result(
-            url="https://lims-staging.altius.org/api/library_pool/",
+            url_addition="library_pool/",
             item_limit=10000):
         name = pool['object_name']
         for lib_url in pool['libraries']:
@@ -68,9 +68,9 @@ def get_pool_for_libs(lib_numbers):
     global lib_to_pool
     numbers = ",".join(str(n) for n in lib_numbers)
     pool = None
-    url = "https://lims-staging.altius.org/api/library/"
+    url_addition = "library/"
     for lib in API.get_list_result(
-        url=url,
+        url_addition=url_addition,
         item_limit=200,
         query_arguments={"number__in": numbers}
     ):
