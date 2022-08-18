@@ -191,30 +191,6 @@ if [[ -z "$nosleep" ]] ; then
   sleep 300
 fi
 
-# Check if read1length=0 -> that means alteseq
-# Handle specially
-flowcell_data=$(lims_get_all "flowcell_run/?label=$flowcell")
-read1length=$(echo $flowcell_data | jq -r .read1_length | head -n1)
-if [[  "$read1length" = "0" ]] ; then
-  echo "Alt-seq run detected"
-  date=$(echo $flowcell_data | jq -r .date_loaded | sed 's/-//g;s/^20//')
-  # analysis_dir not set yet, no alignment group
-  analysis_dir=$FLOWCELLS/FC${flowcell}_${date}_tag
-  mkdir -p "$analysis_dir"
-  runscript="$analysis_dir/run.bash"
-  (
-    echo "#!/bin/bash"
-    echo "export FLOWCELL=$flowcell"
-    echo "export STAMPIPES=$STAMPIPES"
-    # TODO: Remove once this data is on staging!
-    echo "export LIMS_API_URL=https://lims.altius.org/api"
-    cat "$STAMPIPES"/processes/altseq/process_altseq.bash
-  ) > "$runscript"
-  echo "Run $runscript to start analysis!"
- 
-  exit 0
-fi
-
 # Get and read the processing script
 python3 "$STAMPIPES/scripts/lims/get_processing.py" -f "$flowcell" -o "$json"
 run_type=$(     jq -r '.flowcell.run_type'          "$json" )
@@ -224,6 +200,36 @@ run_type=$(     jq -r '.flowcell.run_type'          "$json" )
 has_umi=$(      jq -r '.libraries | map(.barcode1.umi) | any' "$json")
 
 
+# Check if read1length=0 -> that means alteseq
+# Handle specially
+# TODO: Check this from processing.json
+flowcell_data=$(lims_get_all "flowcell_run/?label=$flowcell")
+read1length=$(echo $flowcell_data | jq -r .read1_length | head -n1)
+if [[  "$read1length" = "0" ]] ; then
+  echo "Alt-seq run detected"
+  mkdir -p "$analysis_dir"
+  cp processing.json "$analysis_dir/"
+  runscript="$analysis_dir/run.bash"
+  (
+    echo "#!/bin/bash"
+    echo "export FLOWCELL=$flowcell"
+    echo "export STAMPIPES=$STAMPIPES"
+    cat "$STAMPIPES"/processes/altseq/process_altseq.bash
+  ) > "$runscript"
+
+  # Create wrapper for cronjob to call
+  cat > run_bcl2fastq.sh <<__BCL2FASTQ__
+#!/bin/bash
+sbatch --cpus 1 \
+  --mem '2G'  \
+  --partition queue0 \
+  --job-name "altseq-$flowcell-supervisor" \
+  "$runscript"
+__BCL2FASTQ__
+  echo "Run $runscript to start analysis!"
+ 
+  exit 0
+fi
 
 if [ -z "$demux" ] ; then
   bcl_mask=$mask
