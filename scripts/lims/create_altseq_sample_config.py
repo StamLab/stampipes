@@ -38,12 +38,19 @@ def parser_setup():
     return parser
 
 
-def group_data(processing_info):
-    """ group_data tries to estimate what library pools each library belongs to """
+def group_data(processing_info) -> dict:
+    """
+    group_data tries to estimate what library pools each library belongs to
+    Returns dict of tuple keys, values are a list of library numbers
+    """
     output = defaultdict(list)
     for lib in processing_info['libraries']:
-        key = (lib['barcode1']['reverse_sequence'], lib['lane'])
-        output[key].append(lib['library'])
+        lib_number = lib['library']
+        key = (
+                lib['barcode1']['reverse_sequence'],
+                lib['lane'],
+            )
+        output[key].append(lib_number)
 
     return output
 
@@ -64,10 +71,13 @@ def populate_lib_to_pool():
 
 
 # Ugly hack lol
-def get_pool_for_libs(lib_numbers):
+# TODO: Add pool to processing_info endpoint, then we can remove this.
+def get_pools_for_libs(lib_numbers) -> set:
+    """ Returns dict of {pool: [lib_numbers]} """
     global lib_to_pool
+    pools = set()
+
     numbers = ",".join(str(n) for n in lib_numbers)
-    pool = None
     url_addition = "library/"
     for lib in API.get_list_result(
         url_addition=url_addition,
@@ -75,13 +85,11 @@ def get_pool_for_libs(lib_numbers):
         query_arguments={"number__in": numbers}
     ):
         id = int(lib['id'])
-        assert len(lib_to_pool[id]) == 1
-        if pool is None:
-            pool = lib_to_pool[id][0]
-        else:
-            assert lib_to_pool[id][0] == pool
+        assert len(lib_to_pool[id]) == 1, "Library LN%d should have exactly one pool" % lib['number']
+        pool = lib_to_pool[id][0]
+        pools.add(pool)
 
-    return pool
+    return pools
         
 
 def to_tsv(label, data):
@@ -90,13 +98,13 @@ def to_tsv(label, data):
         lines.append(
                 "\t".join([label + "_" + pool, str(lane), index])
         )
-    return "\n".join(lines)
+    return "\n".join(lines) + "\n"
 
 
 # def create_upload_script(label, data):
 #     
-#     lines = ["#!/bin/bash"]
 #     base = 'python3 "$STAMPIPES/scripts/lims/upload_data.py --attach_file_contenttype SequencingData.flowcelllane "
+#     lines = ["#!/bin/bash"]
 #     for (prefix, lane_ids) in data:
 #         for num in numbers:
 #             r1 = 
@@ -113,8 +121,9 @@ def main():
 
     output_data = []
     for group_key, numbers in grouped.items():
-        pool = get_pool_for_libs(numbers)
-        output_data.append( (pool, group_key[0], group_key[1], numbers) )
+        pools = get_pools_for_libs(numbers)
+        pool_name = "_and_".join(sorted(pools))
+        output_data.append( (pool_name, group_key[0], group_key[1], numbers) )
 
 
     tsv = to_tsv(label, output_data)
