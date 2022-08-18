@@ -15,12 +15,17 @@ version=1.0.0
 cd "$(dirname "$0")"
 
 outdir="output_$version"
-sentinel_file="$outdir/process_complete.txt"
+status_file="$outdir/status.json"
 
-if [[ -e "$sentinel_file" && -z "$REDO_ALIGNMENT" ]] ; then
-  echo "Processing already completed, exiting."
-  echo "To force re-run, set the env var 'REDO_ALIGNMENT=True' or remove $sentinel_file"
-  exit 0
+# TODO: improve REDO_ALIGNMENT handling - should we be manually removing the work dir?
+
+if [[ -e "$status_file" && -z "$REDO_ALIGNMENT" ]] ; then
+  # Check to see if the alignment is complete
+  if jq -e '.completed_on' "$status_file" ; then
+    echo "Processing already completed, exiting."
+    echo "To force re-run, set the env var 'REDO_ALIGNMENT=True' or remove $status_file"
+    exit 0
+  fi
 fi
 
 # Dependencies
@@ -32,8 +37,6 @@ module load python/3.5.1
 
 source "$PYTHON3_ACTIVATE"
 source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
-
-# TODO: REDO_ALIGNMENT handling
 
 # Set up sample config
 sample_config=sample_config.tsv
@@ -54,6 +57,7 @@ NXF_VER=21.10.6 nextflow \
   -c $STAMPIPES/nextflow.config \
   run "$STAMPIPES"/processes/altseq/altseq.nf \
   -with-trace \
+  -ansi-log false \
   -profile docker,cluster \
   -resume \
   --input_directory "$SEQ_DIR"  \
@@ -62,15 +66,30 @@ NXF_VER=21.10.6 nextflow \
   --genome_fa "$GENOME_FA" \
   --barcode_whitelist "$BARCODE_WHITELIST" \
   --outdir "$outdir" \
-  -ansi-log false
+  --skip_alignment
 
 
 # Upload fastq metadata
-python "$STAMPIPES/scripts/altseq/upload_fastq.py" \
+python "$STAMPIPES/scripts/altseq/upload_data.py" \
   "$sample_config" \
   processing.json \
   --output_file_directory "$outdir"
 
-if [[ ! -e "$sentinel_file" ]] ; then
-  echo "{ completed_on: $(date -Iseconds) }" > "$sentinel_file"
+# Create sentinel/status file
+if [[ -e "$status_file" ]] ; then
+  old_date=$(jq .completed_on << "$status_file")
+  old_status_file=${status_file/json/$old_date}.json
+  mv "$status_file" "$old_status_file"
 fi
+
+# TODO: What else do we want to capture here? It would be nice to at least
+# capture the command used and relevant env vars
+echo | jq . > "$status_file" <<EOF
+  {
+    "completed_on": "$(date -Iseconds)",
+    "version": "$version"
+  } 
+EOF
+
+# TODO: Enable this once we are running alignment
+# nextflow clean -f .

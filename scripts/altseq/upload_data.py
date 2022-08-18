@@ -60,8 +60,8 @@ def parser_setup():
     parser.add_argument("--output_file_directory", default=".")
 
 
-    parser.add_argument("--skip_md5_check", dest="skip_md5_check", action="store_true",
-        help="If file exists and path/size match, don't check md5sum.")
+    parser.add_argument("--skip_md5", dest="skip_md5", action="store_true",
+        help="Don't calculate md5sum")
 
     parser.set_defaults( **script_options )
     parser.set_defaults( quiet=False, debug=False )
@@ -226,11 +226,15 @@ class UploadLIMS(object):
 
         return True
 
-    def upload_file(self, path, contenttype_name, object_ids, file_purpose=None, file_type=None, skip_md5_check=False):
+    def upload_file(self, path, contenttype_name, object_ids, file_purpose=None, file_type=None, skip_md5=False):
         log.info("Gathering data...")
-        upload_data = self.get_file_upload_data(path, contenttype_name, file_purpose, file_type, skip_md5_check)
-        log.info("Running md5sum...")
-        upload_data['md5sum'] = md5sum_file(path)
+        upload_data = self.get_file_upload_data(path, contenttype_name, file_purpose, file_type, skip_md5)
+        if skip_md5:
+            log.info("Skipping md5sum")
+            upload_data['md5sum'] = '0'
+        else:
+            log.info("Running md5sum...")
+            upload_data['md5sum'] = md5sum_file(path)
 
         content_type_id = re.search("(\d+)/?$", upload_data['content_type']).group(1)
         purpose_id = re.search("(\d+)/?$", upload_data['purpose']).group(1)
@@ -347,9 +351,7 @@ class UploadLIMS(object):
                     lane_ids,
                     file_purpose=purpose,
                     file_type="fastq",
-                    skip_md5_check=False)
-
-                    
+                    skip_md5=True)
 
 
 

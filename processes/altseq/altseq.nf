@@ -11,6 +11,8 @@ params.sample_config_tsv = ""
 params.input_directory = ""
 params.star_exe = "${workflow.projectDir}/../../third_party/STAR"
 
+params.skip_alignment = false
+
 
 // Functions
 def parse_sample_config(sample_config_tsv) {
@@ -87,32 +89,35 @@ workflow ALTSEQ {
     | filter { it[0] != null }
     | set { merged_fq_files }
 
-    // Invoke STAR Solo
-    align(
-      genome_dir,
-      params.star_exe,
-      barcode_whitelist,
-      merged_fq_files,
-    )
+    if (!params.skip_alignment) {
 
-    // Sort the cram files
-    align.out.aligned_bam
-    | map { [
-        [
-          name: it[0].name,
-          id: it[0].name,
-          barcode_index: it[0].barcode_index,
-          lane: it[0].lane
-        ],
-        it[1],
-        genome_fa,
-      ] }
-    | sort_and_encode_cram
+      // Invoke STAR Solo
+      align(
+        genome_dir,
+        params.star_exe,
+        barcode_whitelist,
+        merged_fq_files,
+      )
 
-    // Publish CRAM files.
-    sort_and_encode_cram.out.cram
-    | map { ["${it[0].name}.sorted.cram", it[1]] }
-    | publish_and_rename
+      // Sort the cram files
+      align.out.aligned_bam
+      | map { [
+          [
+            name: it[0].name,
+            id: it[0].name,
+            barcode_index: it[0].barcode_index,
+            lane: it[0].lane
+          ],
+          it[1],
+          genome_fa,
+        ] }
+      | sort_and_encode_cram
+
+      // Publish CRAM files.
+      sort_and_encode_cram.out.cram
+      | map { ["${it[0].name}.sorted.cram", it[1]] }
+      | publish_and_rename
+    }
 }
 
 workflow {
