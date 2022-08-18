@@ -199,6 +199,38 @@ mask=$(         jq -r '.alignment_group.bases_mask' "$json" )
 run_type=$(     jq -r '.flowcell.run_type'          "$json" )
 has_umi=$(      jq -r '.libraries | map(.barcode1.umi) | any' "$json")
 
+
+# Check if read1length=0 -> that means alteseq
+# Handle specially
+# TODO: Check this from processing.json
+flowcell_data=$(lims_get_all "flowcell_run/?label=$flowcell")
+read1length=$(echo $flowcell_data | jq -r .read1_length | head -n1)
+if [[  "$read1length" = "0" ]] ; then
+  echo "Alt-seq run detected"
+  mkdir -p "$analysis_dir"
+  cp processing.json "$analysis_dir/"
+  runscript="$analysis_dir/run.bash"
+  (
+    echo "#!/bin/bash"
+    echo "export FLOWCELL=$flowcell"
+    echo "export STAMPIPES=$STAMPIPES"
+    cat "$STAMPIPES"/processes/altseq/process_altseq.bash
+  ) > "$runscript"
+
+  # Create wrapper for cronjob to call
+  cat > run_bcl2fastq.sh <<__BCL2FASTQ__
+#!/bin/bash
+sbatch --cpus 1 \
+  --mem '2G'  \
+  --partition queue0 \
+  --job-name "altseq-$flowcell-supervisor" \
+  "$runscript"
+__BCL2FASTQ__
+  echo "Run $runscript to start analysis!"
+ 
+  exit 0
+fi
+
 if [ -z "$demux" ] ; then
   bcl_mask=$mask
   mismatches=$(python3 $STAMPIPES/scripts/flowcells/max_mismatch.py --ignore_failed_lanes)
