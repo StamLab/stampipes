@@ -137,7 +137,6 @@ process encode_cram_no_ref {
 
   input:
     tuple val(meta), path(input_bam)
-    tuple val(meta), path(input_bam)
 
   output:
     tuple val(meta), path(output_cram_name), emit: cram
