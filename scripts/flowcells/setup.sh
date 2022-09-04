@@ -223,8 +223,11 @@ if [[  "$read1length" = "0" ]] ; then
 sbatch --cpus 1 \
   --mem '2G'  \
   --partition queue0 \
-  --job-name "altseq-$flowcell-supervisor" \
-  "$runscript"
+  --job-name "altseq-$flowcell-supervisor" <<EOF
+#!/bin/bash
+cd "$analysis_dir"
+bash "$runscript"
+EOF
 __BCL2FASTQ__
   echo "Run $runscript to start analysis!"
  
