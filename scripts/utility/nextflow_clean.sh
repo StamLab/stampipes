@@ -114,7 +114,7 @@ process_dir() {
     # https://stackoverflow.com/questions/7577052/bash-empty-array-expansion-with-set-u
     # shellcheck disable=SC2199
     [[ -z ${symlinks[@]+"${symlinks[@]}"} ]] &&
-      DIE_F "No input symlinks found. dir=%s" "$dir"
+      INFO_F "No input symlinks found. dir=%s" "$dir"
 
     # 3)
     for symlink in "${symlinks[@]}" ; do
@@ -142,7 +142,14 @@ process_dir() {
 
       # 3D) Create hard link to real target, replacing soft link
       local hardlink=$symlink
-      RUN_IF_FORCE ln -f --logical "$target" "$hardlink"
+      #if [[ -d "$target" ]] ; then
+      #  # TODO: This is probably slow, is there a faster way?
+      #  # e.g: remove link, create dir, then hardlink the contents?
+      #  RUN_IF_FORCE rm "$hardlink"
+      #  RUN_IF_FORCE cp -r "$target" "$hardlink"
+      #else
+        RUN_IF_FORCE ln -f --logical "$target" "$hardlink"
+      #fi
 
       # Triple-check, make sure the hard link and backup symlink point to the same place
       if [[ "$FORCE" == TRUE ]] ; then
