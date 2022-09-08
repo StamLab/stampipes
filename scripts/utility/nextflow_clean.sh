@@ -117,7 +117,7 @@ process_dir() {
       INFO_F "No input symlinks found. dir=%s" "$dir"
 
     # 3)
-    for symlink in "${symlinks[@]}" ; do
+    for symlink in ${symlinks[@]+"${symlinks[@]}"} ; do
       # 3A) Get symlink target
       local target
       target=$(readlink -f "$symlink" || true)
