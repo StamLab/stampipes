@@ -186,9 +186,9 @@ class ProcessSetUp(object):
     def setup_alignments(self, align_ids):
         for id, error in self.pool.map(self.setup_alignment, align_ids):
             if error:
-                logging.debug(f"ALN{id} result received, error: {error}")
+                logging.debug("ALN%d result received, error: %s" % (id, error))
             else:
-                logging.debug(f"ALN{id} result received, OK")
+                logging.debug("ALN%d result received, OK" % id)
 
     def setup_alignment(self, align_id):
 
@@ -203,7 +203,7 @@ class ProcessSetUp(object):
                 logging.info("Skipping completed alignment %d" % align_id)
                 return (align_id, None)
         except Exception as e:
-            logging.exception(f"Could not set up alignment {align_id}: ({e})")
+            logging.exception("Could not set up alignment %d}: (%s)" % (align_id, e))
             return (align_id, e)
 
     def get_lane_file(self, lane_id, purpose):
@@ -341,7 +341,7 @@ class ProcessSetUp(object):
                 return False
 
         script_file = os.path.join( script_directory, "%s-%s" % (alignment['sample_name'], self.qsub_scriptname) )
-        logging.info(f"Will write to {script_file}")
+        logging.info("Will write to %s" % script_file)
 
 
         # Set up & add environment variables
