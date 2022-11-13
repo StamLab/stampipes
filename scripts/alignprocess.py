@@ -184,17 +184,27 @@ class ProcessSetUp(object):
 
     # Run alignment setup in parallel
     def setup_alignments(self, align_ids):
-        self.pool.map(self.setup_alignment, align_ids)
+        for id, error in self.pool.map(self.setup_alignment, align_ids):
+            if error:
+                logging.debug("ALN%d result received, error: %s" % (id, error))
+            else:
+                logging.debug("ALN%d result received, OK" % id)
 
     def setup_alignment(self, align_id):
 
-        processing_info = self.get_align_process_info(align_id)
-        alignment = self.api_single_result("flowcell_lane_alignment/%d/" % (align_id))
+        try:
+            processing_info = self.get_align_process_info(align_id)
+            alignment = self.api_single_result("flowcell_lane_alignment/%d/" % (align_id))
 
-        if self.redo_completed or not alignment['complete_time']:
-            self.create_script(processing_info, alignment["id"])
-        else:
-            logging.info("Skipping completed alignment %d" % align_id)
+            if self.redo_completed or not alignment['complete_time']:
+                self.create_script(processing_info, alignment["id"])
+                return (align_id, None)
+            else:
+                logging.info("Skipping completed alignment %d" % align_id)
+                return (align_id, None)
+        except Exception as e:
+            logging.exception("Could not set up alignment %d}: (%s)" % (align_id, e))
+            return (align_id, e)
 
     def get_lane_file(self, lane_id, purpose):
         candidates = self.api_list_result("file/?content_type=40&purpose__slug=%s&object_id=%d" % (purpose, lane_id))
@@ -331,7 +341,7 @@ class ProcessSetUp(object):
                 return False
 
         script_file = os.path.join( script_directory, "%s-%s" % (alignment['sample_name'], self.qsub_scriptname) )
-        logging.info(script_file)
+        logging.info("Will write to %s" % script_file)
 
 
         # Set up & add environment variables
@@ -342,7 +352,10 @@ class ProcessSetUp(object):
         env_vars["GENOME"]      = alignment['genome_index']
         env_vars["ASSAY"]       = lane['assay']
         env_vars["READLENGTH"]  = processing_info['flowcell']['read_length']
-        env_vars["LIBRARY_KIT"] = '"' + processing_info['libraries'][0]['library_kit_method'] + '"'
+        if processing_info['libraries'] and processing_info['libraries'][0] and processing_info['libraries'][0]['library_kit_method']:
+            env_vars["LIBRARY_KIT"] = '"' + processing_info['libraries'][0]['library_kit_method'] + '"'
+        else:
+            env_vars["LIBRARY_KIT"] = None
 
         if processing_info['flowcell']['paired_end']:
             env_vars["PAIRED"] = "True"
