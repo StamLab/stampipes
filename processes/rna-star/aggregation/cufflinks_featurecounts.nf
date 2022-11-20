@@ -432,7 +432,7 @@ process anaquin {
   script:
   dilution = 0.0001
   collate_threads = 2
-  fastq_threds = 2
+  fastq_threads = 2
   """
   anaquin RnaAlign -rgtf "${sequins_ref}" -usequin "${input_bam}" -o anaquin_star
   bash \$STAMPIPES/scripts/rna-star/aggregate/anaquin_rnaalign_stats.bash anaquin_star/RnaAlign_summary.stats anaquin_star/RnaAlign_summary.stats.info
@@ -452,7 +452,7 @@ process anaquin {
     --threads "${collate_threads}" \
     temp_subsample.bam \
     tmp.collate \
-  | samtools fastq -1 subsample.fq1 -2 subsample.fq1 -0 /dev/null -s /dev/null \
+  | samtools fastq -1 subsample.fq1 -2 subsample.fq2 -0 /dev/null -s /dev/null \
       -n --threads "${fastq_threads}"
 
   # call kallisto on subsampled fastqs
