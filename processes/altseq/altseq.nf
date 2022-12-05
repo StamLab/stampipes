@@ -5,11 +5,13 @@ import com.xlson.groovycsv.CsvParser
 
 include { BCL2DEMUX } from "../../modules/bcl2fastq.nf"
 include { sort_and_encode_cram } from "../../modules/cram.nf"
-include { publish_and_rename; publish } from "../../modules/utility.nf"
 
 params.sample_config_tsv = ""
 params.input_directory = ""
 params.star_exe = "${workflow.projectDir}/../../third_party/STAR"
+
+params.outdir = "output"
+params.publishmode = "link"
 
 params.skip_alignment = false
 
@@ -72,7 +74,6 @@ workflow ALTSEQ {
       it[1].sort { a, b -> a[0] <=> b[0] } .collect{ x -> x[1] }
     ]}
     | merge_fq
-    | publish
 
     merge_fq.out
     // Use groupTuple to group files in R1, R2 pairs
@@ -115,8 +116,6 @@ workflow ALTSEQ {
 
       // Publish CRAM files.
       sort_and_encode_cram.out.cram
-      | map { ["${it[0].name}.sorted.cram", it[1]] }
-      | publish_and_rename
     }
 }
 
