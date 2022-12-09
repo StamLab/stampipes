@@ -12,7 +12,10 @@ environments/
 **/.nextflow*
 
 **/*html*
-**/*trace.txt*
+**/trace*txt*
+**/report*txt*
+
+**/dag*dot*
 
 
 *.fq

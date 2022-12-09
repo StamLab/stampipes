@@ -100,6 +100,10 @@ workflow ALTSEQ {
         merged_fq_files,
       )
 
+      // "Analyze" the results
+
+      align.out.solo_directory | analyze_solo_dir
+
       // Sort the cram files
       align.out.aligned_bam
       | map { [
@@ -113,9 +117,6 @@ workflow ALTSEQ {
           genome_fa,
         ] }
       | sort_and_encode_cram
-
-      // Publish CRAM files.
-      sort_and_encode_cram.out.cram
     }
 }
 
@@ -212,8 +213,24 @@ process merge_fq {
     cpus = 10
     out = "${name}.fq.gz"
     '''
-      zcat in.*.fq.gz \
-      | bgzip --stdout --threads "!{cpus}" \
-      > "!{out}"
+    zcat in.*.fq.gz \
+    | bgzip --stdout --threads "!{cpus}" \
+    > "!{out}"
+    '''
+}
+
+process analyze_solo_dir {
+  input:
+    tuple val(meta), path("Solo.out")
+
+  output:
+    tuple val(meta), file("output")
+
+  shell:
+    '''
+    for dir in Gene GeneFull GeneFull_Ex50pAS GeneFull_ExonOverIntron ; do
+      mkdir -p "output/$dir"
+      bash -x matrix2csv.sh  "Solo.out/$dir/filtered/" > "output/$dir/counts.csv"
+    done
     '''
 }
