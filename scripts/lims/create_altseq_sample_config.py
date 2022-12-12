@@ -7,24 +7,8 @@ import re
 
 from collections import defaultdict
 
-sys.path.insert(
-    1, os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "lims",
-        "stamlims_api"
-))
-
-from stamlims_api import rest
-
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 log = logging.getLogger(__name__)
-
-rest.DEFAULT_ITEM_LIMIT = 10000
-API = rest.setup_api({rest.RAISE_ON_ERROR_VAR: True})
-
-
-lib_to_pool = defaultdict(list)
 
 def parse_json(filename):
     with open(filename) as f:
@@ -54,86 +38,53 @@ def group_data(processing_info) -> dict:
 
     return output
 
-def populate_lib_to_pool():
-    global lib_to_pool
-    url_regex = re.compile("(\d+)")
-    for pool in API.get_list_result(
-            url_addition="library_pool/",
-            item_limit=10000):
-        name = pool['object_name']
-        for lib_url in pool['libraries']:
-            match = url_regex.search(lib_url)
-            if not match:
-                raise Exception("lib url %s didn't match" % lib_url)
-            lib_id = int(match.group(1))
-            lib_to_pool[lib_id].append(name)
-
-
-
-# Ugly hack lol
-# TODO: Add pool to processing_info endpoint, then we can remove this.
-def get_pools_for_libs(lib_numbers) -> set:
-    """ Returns dict of {pool: [lib_numbers]} """
-    global lib_to_pool
-    pools = set()
-
-    numbers = ",".join(str(n) for n in lib_numbers)
-    url_addition = "library/"
-    for lib in API.get_list_result(
-        url_addition=url_addition,
-        item_limit=200,
-        query_arguments={"number__in": numbers}
-    ):
-        id = int(lib['id'])
-        assert len(lib_to_pool[id]) == 1, "Library LN%d should have exactly one pool" % lib['number']
-        pool = lib_to_pool[id][0]
-        pools.add(pool)
-
-    return pools
-        
 
 def to_tsv(label, data):
-    lines = ["name\tlane\tbarcode_index"]
-    for (pool, index, lane, _numbers)  in sorted(data, key=lambda x:  (x[2],x[0])):
-        lines.append(
-                "\t".join([label + "_" + pool, str(lane), index])
-        )
+    lines = ["pool_name\tsample_name\tlane\tbarcode_index"]
+    for datum in sorted(data, key=lambda d: (d['lane'], d['pool_name'], d['sample_name'])):
+        lines.append("\t".join([
+            label + "_" + datum["pool_name"],
+            datum["sample_name"],
+            str(datum["lane"]),
+            datum["barcode_index"],
+        ] ))
     return "\n".join(lines) + "\n"
 
+def get_config_info(processing_data, ds_number: int):
+    pass
 
-# def create_upload_script(label, data):
-#     
-#     base = 'python3 "$STAMPIPES/scripts/lims/upload_data.py --attach_file_contenttype SequencingData.flowcelllane "
-#     lines = ["#!/bin/bash"]
-#     for (prefix, lane_ids) in data:
-#         for num in numbers:
-#             r1 = 
-#             lines.append(
-#                     base + " --attach_file_objectid %d --attach_file %s --attach-file-purpose  r1-fastq --attach-file-type fastq" % (num
+def construct_config_entries(data: dict) -> [dict]:
+    # Maps library number -> (pool_name, barcode1)
+    pool_lookup_table = {}
+    for (pool, values) in data["library_pools"].items():
+        value = (pool, values["barcode1"])
+        for lib_str in values['libraries']:
+            lib_num = int(lib_str.replace("LN", ""))  # Discard the 'LN' prefix
+            if lib_num in pool_lookup_table:
+                raise ValueError("Libnum in more than one pool, %s and %s" % (pool_lookup_table[lib_num], value))
+            pool_lookup_table[lib_num] = pool
+
+    results = []
+    for (library) in data['libraries']:
+        datum = {
+            "barcode_index" : library["barcode_index"],
+            "sample_name"  : library["samplesheet_name"],
+            "pool_name"  : pool_lookup_table[library["library"]],
+            "lane" : library["lane"],
+        }
+        results.append(datum)    
+    return results
 
 
 def main():
     poptions = parser_setup().parse_args()
     label = poptions.data["flowcell"]["label"]
-    grouped = group_data(poptions.data)
 
-    populate_lib_to_pool()
+    entries = construct_config_entries(poptions.data)
 
-    output_data = []
-    for group_key, numbers in grouped.items():
-        pools = get_pools_for_libs(numbers)
-        pool_name = "_and_".join(sorted(pools))
-        output_data.append( (pool_name, group_key[0], group_key[1], numbers) )
-
-
-    tsv = to_tsv(label, output_data)
+    tsv = to_tsv(label, entries)
     with open(poptions.output, 'w') as f:
         f.write(tsv)
-
-    # upload_data = []
-    # for library in output_data["libraries"]:
-    #     upload_data.append(library['id'], library['number'])
-    # upload_script = create_upload_script(label, output_data)
 
 if __name__ == "__main__":
     main()
