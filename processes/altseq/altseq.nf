@@ -33,7 +33,8 @@ def validate_sample_config(sample_info) {
   sample_info.collect {
     assert it.lane > 0 : "Sample has no lane: ${it}"
     assert it.barcode_index.size() > 0 : "Sample has no barcode index: ${it}"
-    assert it.name : "Sample has no name: ${it}"
+    assert it.pool_name : "Sample has no pool name: ${it}"
+    assert it.sample_name : "Sample has no sample name: ${it}"
   }
 }
 
@@ -51,27 +52,45 @@ workflow ALTSEQ {
 
   main:
 
+    // We demux at the library pool level.
+    // So here, we do some work to get just those pools
+    // We take the pool_name and just the first part of the barcode_index (the part before '-')
+    sample_info_for_bcl2fastq = sample_info.collect { info -> [
+      name: info.pool_name,
+      lane: info.lane,
+      barcode_index: info.barcode_index.split('-')[0],
+    ]}.unique() // And filter to just the unique ones
+
     // Run BCL2Fastq on all files
     BCL2DEMUX(
       input_dir,
-      sample_info,
+      sample_info_for_bcl2fastq,
       tiles,
     )
 
     // Merge and publish fastq files
-    bcl_fq_regex = /(.*)_S[0-9]+_(L[0-9]+)_(R[1-2])_.*/
     BCL2DEMUX.out
     | flatten()
-    | map {
-      match = (it.baseName =~ bcl_fq_regex)[0];
-      [ match[1,3], [match[2], it]]
+    | map { fq_file ->
+      // Extract the pool name, R1/R2, and the lane
+      // output is shaped like [[prefix, read], [lane, file]]
+      bcl_fq_regex = /(.*)_S[0-9]+_(L[0-9]+)_(R[1-2])_.*/
+      match = (fq_file.baseName =~ bcl_fq_regex)[0]
+      [ match[1,3], [match[2], fq_file]]
     }
-    | filter { it[0][0] != "Undetermined" }
+    | filter {
+      // We don't want to do further processing on Undetermined samples
+      it[0][0] != "Undetermined"
+    } 
+    // Now we group it together by pool name, lane, and read
     | groupTuple
-    // regroup 
-    | map {[
-      "${it[0][0]}_${it[0][1]}",
-      it[1].sort { a, b -> a[0] <=> b[0] } .collect{ x -> x[1] }
+    | map {
+      readname, files -> [
+        // Convert readname to string
+        "${readname[0]}_${readname[1]}",
+        //Make sure files are in order by lane
+        files.sort { lane, filename -> lane <=> lane }
+             .collect { lane, filename -> filename }
     ]}
     | merge_fq
 
@@ -79,15 +98,14 @@ workflow ALTSEQ {
     // Use groupTuple to group files in R1, R2 pairs
     | map { [ it.baseName.replaceAll(/_R[12]/, "_RX"), it ] }
     | groupTuple(size: 2, sort: { a, b -> { a.baseName <=> b.baseName } } )
-    | map { it[1] }
+    // drop prefix, no longer needed
+    | map { prefix, info -> info }
     // Re-associate the metadata
-    | map {[
-      sample_info.find(s -> it[0].baseName.startsWith("${s.name}_R") ),
-        it[0],
-        it[1],
+    | map {r1, r2 -> [
+      sample_info_for_bcl2fastq.find(s -> r1.baseName.startsWith("${s.name}_R") ),
+        r1,
+        r2,
     ]}
-    // Exclude Undetermined files
-    | filter { it[0] != null }
     | set { merged_fq_files }
 
     if (!params.skip_alignment) {
@@ -102,7 +120,20 @@ workflow ALTSEQ {
 
       // "Analyze" the results
 
-      align.out.solo_directory | analyze_solo_dir
+      // First, we pair up the analysis with the expected list of samples
+      // (This key will help us decode pool/barcode -> sample)
+      create_sample_configs(params.sample_config_tsv)
+      | flatten()
+      | map { fn -> [fn.baseName, fn] }
+      | set { per_pool_sample_configs }
+
+      align.out.solo_directory
+      | map { meta, solo_dir -> ["${meta.name}_lane${meta.lane}", meta, solo_dir ] }
+      | join(per_pool_sample_configs)
+      | map { key, meta, solodir, config -> [meta, config, solodir] }
+      | set {to_analyze}
+
+      analyze_solo_dir(to_analyze)
 
       // Sort the cram files
       align.out.aligned_bam
@@ -118,6 +149,11 @@ workflow ALTSEQ {
         ] }
       | sort_and_encode_cram
     }
+
+    // Debugging section - use `nextflow run -dump-channels` to write channel contents to terminal
+    merged_fq_files.dump(tag: "merged_fq_files", pretty: true)
+    per_pool_sample_configs.dump(tag: "per_pool", pretty: true)
+    to_analyze.dump(tag: "to_analyze", pretty: true)
 }
 
 workflow {
@@ -134,6 +170,7 @@ workflow {
 
 // test workflow
  workflow test {
+  println "Running test workflow..."
 
   def star_exe = file("${workflow.projectDir}/../../third_party/STAR")
   def genome_dir = file("/net/seq/data2/projects/prime_seq/cell_ranger_ref/star_2.7.10_genome_2022_gencode.v39/")
@@ -142,7 +179,6 @@ workflow {
 
   def sample_info = parse_sample_config(file(params.sample_config_tsv).text)
   validate_sample_config(sample_info)
-
 
   ALTSEQ(genome_dir, genome_fa, barcode_whitelist, "s_[1-4]_1234", params.input_directory, sample_info)
 }
@@ -153,6 +189,7 @@ process align {
   memory "108681M"
   cpus {cpus}
   scratch false  // Was filling up tmp dirs
+  tag "${meta.name}"
 
   input:
     path genome_dir
@@ -220,17 +257,47 @@ process merge_fq {
 }
 
 process analyze_solo_dir {
+  scratch false
+
   input:
-    tuple val(meta), path("Solo.out")
+    tuple val(meta), file(sample_config), path("Solo.out")
 
   output:
     tuple val(meta), file("output")
 
   shell:
     '''
+    sed 's/[ACTGN]*-//' < '!{sample_config}' > barcode.config
     for dir in Gene GeneFull GeneFull_Ex50pAS GeneFull_ExonOverIntron ; do
-      mkdir -p "output/$dir"
-      bash -x matrix2csv.sh  "Solo.out/$dir/filtered/" > "output/$dir/counts.csv"
+      outdir=output/$dir
+      allcountsfile=$outdir/allcounts.csv
+      mkdir -p "$outdir"
+      bash matrix2csv.sh  "Solo.out/$dir/filtered/" > "$allcountsfile"
+      cat barcode.config | while read name barcode ; do
+        cat "$allcountsfile" \
+        | awk -F, -vbarcode=$barcode -vname=$name \
+          '$1 == barcode { print $2 "," $3 "," $5 }' \
+          > "$outdir/$name.counts.csv"
+      done
+      analyze.py "Solo.out/$dir/CellReads.stats" "barcode.config" "$outdir"
     done
+    '''
+}
+
+process create_sample_configs {
+  scratch false
+  executor "local"
+  // TODO: Take sample_config as val
+  // That way we don't rely on column ordering
+  input:
+    path sample_config
+  output:
+    file("configs/*")
+
+  shell:
+    '''
+    mkdir configs
+    awk < '!{sample_config}' \
+    'NR > 1 { print $2 "\t" $4 > "configs/" $1 "_lane" $3 ".config"}'
     '''
 }

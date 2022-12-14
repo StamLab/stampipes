@@ -23,9 +23,6 @@ def parse_sample_config(sample_config_tsv) {
   for (sample in data) {
     sample_info.add( sample )
   } 
-  for (s in sample_info) {
-    println "sample is ${s}"
-  }
   return sample_info
 }
 
@@ -117,6 +114,7 @@ workflow BCL2DEMUX {
 // }
 
 process generate_samplesheet {
+  executor = "local"
 
   input:
     tuple val(header), val(sample_info)
@@ -124,6 +122,10 @@ process generate_samplesheet {
   output:
     file("Samplesheet.csv")
 
+  // TODO: This is silly. We create a bash script to just
+  // write a file.  However, despite my best efforts, I
+  // haven't figured out how to get this to work as an
+  // `exec` block.
   shell:
     settings = ""
     sheet_parts = [
@@ -136,7 +138,6 @@ process generate_samplesheet {
       *sample_info.collect { "${it.lane},${it.name},${it.name},${it.barcode_index}" }
     ]
     sheet = sheet_parts.join("\n")
-
 
     '''
     echo '!{sheet}' > Samplesheet.csv
