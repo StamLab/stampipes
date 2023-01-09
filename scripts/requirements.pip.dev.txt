@@ -1,0 +1,4 @@
+pytest   # Our test runner
+typing   # This is only needed for python 3.5 and below
+
+pip<20.0.0 # Pip newer than 19.X doesn't work on python 3.5
