@@ -218,7 +218,6 @@ process align {
       --soloUMIstart 13   \
       --soloUMIlen 16   \
       --soloCBwhitelist "!{barcode_whitelist}"   \
-      --soloCellFilter  EmptyDrops_CR 96 .99 10 45000 90000 100000 0.01 20000 0.01 10000   \
       --quantMode "TranscriptomeSAM"   \
       --soloFeatures Gene GeneFull GeneFull_ExonOverIntron GeneFull_Ex50pAS   \
       --soloMultiMappers Unique PropUnique Uniform Rescue EM   \
@@ -260,7 +259,7 @@ process analyze_solo_dir {
   scratch false
 
   input:
-    tuple val(meta), file(sample_config), path("Solo.out")
+    tuple val(meta), path(sample_config), path("Solo.out")
 
   output:
     tuple val(meta), file("output")
@@ -272,7 +271,7 @@ process analyze_solo_dir {
       outdir=output/$dir
       allcountsfile=$outdir/allcounts.csv
       mkdir -p "$outdir"
-      bash matrix2csv.sh  "Solo.out/$dir/filtered/" > "$allcountsfile"
+      bash matrix2csv.sh  "Solo.out/$dir/raw/" > "$allcountsfile"
       cat barcode.config | while read name barcode ; do
         cat "$allcountsfile" \
         | awk -F, -vbarcode=$barcode -vname=$name \
