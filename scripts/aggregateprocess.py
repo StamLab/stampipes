@@ -391,9 +391,12 @@ class ProcessSetUp(object):
         self.setup_aggregations([a['id'] for a in aggregations])
 
     def setup_aggregations(self, aggregation_ids):
+        # Deduplicate aggregations so we don't write the same one out twice
+        aggregation_ids = sorted(set(aggregation_ids))
+
         # The pool will "eat" exceptions, banishing them to the hopeless void
-        # This will log them instead, while not stopping other aggregations
-        # from setting up successfully
+        # This helper function will log them instead, while not stopping other
+        # aggregations from setting up successfully
         def try_setup(agg_id):
             try:
                 self.setup_aggregation(agg_id)
