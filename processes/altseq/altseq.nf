@@ -82,7 +82,7 @@ workflow ALTSEQ {
       // We don't want to do further processing on Undetermined samples
       it[0][0] != "Undetermined"
     } 
-    // Now we group it together by pool name, lane, and read
+    // Now we group it together by pool name, lane, and read 
     | groupTuple
     | map {
       readname, files -> [
@@ -118,7 +118,7 @@ workflow ALTSEQ {
         merged_fq_files,
       )
 
-      // "Analyze" the results
+      // Gather statistics and summarize the results
 
       // First, we pair up the analysis with the expected list of samples
       // (This key will help us decode pool/barcode -> sample)
@@ -133,7 +133,14 @@ workflow ALTSEQ {
       | map { key, meta, solodir, config -> [meta, config, solodir] }
       | set {to_analyze}
 
+      // Create pool-level stats and files
       analyze_solo_dir(to_analyze)
+
+      // Create flowcell stats
+      analyze_solo_dir.out.json_counts
+      | map {meta, counts -> counts}
+      | toSortedList
+      | merge_stats
 
       // Sort the cram files
       align.out.aligned_bam
@@ -151,9 +158,9 @@ workflow ALTSEQ {
     }
 
     // Debugging section - use `nextflow run -dump-channels` to write channel contents to terminal
-    merged_fq_files.dump(tag: "merged_fq_files", pretty: true)
-    per_pool_sample_configs.dump(tag: "per_pool", pretty: true)
-    to_analyze.dump(tag: "to_analyze", pretty: true)
+    //merged_fq_files.dump(tag: "merged_fq_files")
+    //per_pool_sample_configs.dump(tag: "per_pool")
+    //to_analyze.dump(tag: "to_analyze")
 }
 
 workflow {
@@ -263,6 +270,7 @@ process analyze_solo_dir {
 
   output:
     tuple val(meta), file("output")
+    tuple val(meta), file("output/counts.json"), emit: "json_counts"
 
   shell:
     '''
@@ -280,6 +288,7 @@ process analyze_solo_dir {
       done
       analyze.py "Solo.out/$dir/CellReads.stats" "barcode.config" "$outdir"
     done
+    generate_counts_json.py "Solo.out/GeneFull_Ex50pAS" "!{sample_config}" "!{meta.name}" > output/counts.json
     '''
 }
 
@@ -299,4 +308,17 @@ process create_sample_configs {
     awk < '!{sample_config}' \
     'NR > 1 { print $2 "\t" $4 > "configs/" $1 "_lane" $3 ".config"}'
     '''
+}
+
+process merge_stats {
+  scratch false
+  executor "local"
+  input:
+    path("*.input.json")
+  output:
+    path("flowcell_stats.json")
+  shell:
+  '''
+  jq --slurp --sort-keys -c . *.input.json > flowcell_stats.json
+  '''
 }

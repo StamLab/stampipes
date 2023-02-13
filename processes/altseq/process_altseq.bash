@@ -10,7 +10,7 @@ done
 
 set -eo pipefail
 
-version=1.0.0
+version=1.1.0-alpha1
 
 cd "$(dirname "$0")"
 
@@ -77,7 +77,7 @@ python "$STAMPIPES/scripts/altseq/upload_data.py" \
 
 # Create sentinel/status file
 if [[ -e "$status_file" ]] ; then
-  old_date=$(jq .completed_on << "$status_file")
+  old_date=$(jq .completed_on <<< "$status_file")
   old_status_file=${status_file/json/$old_date}.json
   mv "$status_file" "$old_status_file"
 fi
