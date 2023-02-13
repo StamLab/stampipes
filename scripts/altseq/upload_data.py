@@ -3,6 +3,7 @@
 Uploads all the results of alt-seq processing to LIMS
 """
 
+import pprint
 import re
 import csv
 import argparse
@@ -25,6 +26,8 @@ sys.path.insert(
 
 
 from stamlims_api import rest  # pylint: disable=wrong-import-position,import-error
+
+JSON_REPORT_CLASS_SLUG = "altseq-flowcell-report-starsolo"
 
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 LOG = logging.getLogger("upload_data.py")
@@ -243,11 +246,11 @@ class UploadLIMS:
             return None
         return self.api.post_single_result(*args, **kwargs)
 
-    # def patch(self, *args, **kwargs):
-    #     if self.dry_run:
-    #         LOG.info("Dry run, would have patch %s, %s", args, kwargs)
-    #         return None
-    #     return self.api.patch_single_result(*args, **kwargs)
+    def patch(self, *args, **kwargs):
+        if self.dry_run:
+            LOG.info("Dry run, would have patch %s, %s", args, kwargs)
+            return None
+        return self.api.patch_single_result(*args, **kwargs)
 
     # def get_flowcell_url_by_label(self, label):
     #     return self.get_single_result(
@@ -452,13 +455,56 @@ class UploadLIMS:
         """Gets the library by ID (NOT library number)"""
         return self.get_by_id("library", library_id)
 
+    def upload_flowcell_report(self, data):
+        flowcell_labels = set(pool["flowcell_label"] for pool in data)
+        assert len(flowcell_labels) == 1
+        flowcell_label = flowcell_labels.pop()
+
+        report_name = "Alt-seq stats: FC%s" % flowcell_label
+
+        flowcell_lims_info = self.get_single_result(
+            "flowcell_run/?label=%s" % flowcell_label)
+        content_type = flowcell_lims_info['object_content_type']
+        object_id = flowcell_lims_info['id']
+        json_report_class = self.get_single_result(
+            "json_report_class/", query={"slug": JSON_REPORT_CLASS_SLUG})
+
+        # See if report already exists
+        existing_reports = self.get("json_report/", query={
+            "object_id": object_id,
+            "content_type": content_type,
+            "report_class": json_report_class["id"],
+            "page_size": 2,
+        })["results"]
+
+        data_to_send = {
+                "object_id": object_id,
+                "content_type": content_type,
+                "report_class": json_report_class["id"],
+                "name": report_name,
+                "json_content": data,
+        }
+        if len(existing_reports) == 0:
+            self.post("json_report/", data=data_to_send)
+            # No report exists yet, upload a new one
+        elif len(existing_reports) == 1:
+            # Exactly one report, update it
+            data_to_send["id"] = existing_reports[0]["id"]
+            self.patch("json_report/", data=data_to_send)
+        else:
+            # Error! too many reports
+            LOG.critical("Too many JSON reports exist")
+            raise "Too many JSON reports exist, exiting"
+
+
     def upload_altseq_flowcell(self, sample_config, processing_dict, outdir):
         """
         Main function for this script.
         Given paths to the sample_config file, processing_dict, and outdir,
         upload to LIMS:
         1) Paths for fastq files for each lane
-        2) Stats for each alignment
+        # 2) Stats for each alignment
+        3) Flowcell-level pool stats
         """
         # (Filepath, purpose) -> [lane_ids]
         files_to_upload = defaultdict(list)
@@ -507,29 +553,36 @@ class UploadLIMS:
                 file_type="fastq",
             )
 
-        # Now upload counts.
-        # We can do this all as one call.
-        # (Assuming LIMS doesn't time out)
-        all_counts = []
-        for lib in processing_info:
-            if not len(lib["alignments"]) == 1:
-                LOG.critical("Lib must have exactly 1 aligment %s", lib)
-            align_id = lib["alignments"][0]["id"]
-            counts_file = os.path.join(
-                outdir,
-                lib["pool_name"],
-                "analysis",
-                "Gene",
-                "%s.stats.txt" % lib["sample_name"],
-            )
-            all_counts.append(build_counts(align_id, counts_file))
-        # print(json.dumps(all_counts))
-        self.post("stats/create/", all_counts)
+        # Commented out because we aren't making alignments for these...
+        # # Now upload counts.
+        # # We can do this all as one call.
+        # # (Assuming LIMS doesn't time out)
+        # all_counts = []
+        # for lib in processing_info:
+        #     if not len(lib["alignments"]) == 1:
+        #         LOG.critical("Lib must have exactly 1 aligment %s", lib)
+        #     align_id = lib["alignments"][0]["id"]
+        #     counts_file = os.path.join(
+        #         outdir,
+        #         lib["pool_name"],
+        #         "analysis",
+        #         "Gene",
+        #         "%s.stats.txt" % lib["sample_name"],
+        #     )
+        #     all_counts.append(build_counts(align_id, counts_file))
+        # # print(json.dumps(all_counts))
+        # self.post("stats/create/", all_counts)
+
+        with open(os.path.join(outdir, "flowcell_stats.json")) as json_file:
+            flowcell_data = json.loads(json_file.read())
+            self.upload_flowcell_report(flowcell_data)
 
 
 def main():
-    """This is the main body of the program that by default uses the arguments
-    from the command line."""
+    """
+    This is the main body of the program that uses the arguments from the
+    command line.
+    """
 
     parser = parser_setup()
     poptions = parser.parse_args()
