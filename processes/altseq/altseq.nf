@@ -122,7 +122,7 @@ workflow ALTSEQ {
 
       // First, we pair up the analysis with the expected list of samples
       // (This key will help us decode pool/barcode -> sample)
-      create_sample_configs(params.sample_config_tsv)
+      create_sample_configs(file(params.sample_config_tsv))
       | flatten()
       | map { fn -> [fn.baseName, fn] }
       | set { per_pool_sample_configs }

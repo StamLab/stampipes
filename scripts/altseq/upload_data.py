@@ -212,20 +212,20 @@ class UploadLIMS:
         return self._get_single_result(fetch_url, query, field)
 
     # Not currently used
-    # @lru_cache(maxsize=None)
-    # def _get_list_result(self, url, query=None):
-    #     return self.api.get_list_result(
-    #         url_addition=url,
-    #         query_arguments=query,
-    #         item_limit=1000000,
-    #         page_size=1000,
-    #     )
-    #
-    # def get_list_result(self, url, query=None):
-    #     if isinstance(query, dict) and not isinstance(query, HashableDict):
-    #         query = HashableDict(query)
-    #         LOG.debug("Query is now: %s", query)
-    #     return self._get_list_result(url, query)
+    @lru_cache(maxsize=None)
+    def _get_list_result(self, url, query=None):
+        return self.api.get_list_result(
+            url_addition=url,
+            query_arguments=query,
+            item_limit=1000000,
+            page_size=1000,
+        )
+
+    def get_list_result(self, url, query=None):
+        if isinstance(query, dict) and not isinstance(query, HashableDict):
+            query = HashableDict(query)
+            LOG.debug("Query is now: %s", query)
+        return self._get_list_result(url, query)
 
     def put(self, *args, **kwargs):
         """
@@ -430,10 +430,6 @@ class UploadLIMS:
         file_size = os.path.getsize(path)
         last_modified = datetime.datetime.fromtimestamp(os.path.getmtime(path))
 
-        # if exists:
-        # recorded_mtime = datetime.datetime.fromtimestamp(time.mktime(time.strptime( exists["file_last_modified"], "%Y-%m-%dT%H:%M:%S")))
-
-        # TODO: Make time-checking work!
         # Current issue: sub-second precision.
         data = {
             "path": path,
@@ -464,33 +460,34 @@ class UploadLIMS:
 
         flowcell_lims_info = self.get_single_result(
             "flowcell_run/?label=%s" % flowcell_label)
-        content_type = flowcell_lims_info['object_content_type']
+        content_type_id = flowcell_lims_info['object_content_type']
+        content_type = self.get_by_id("content_type", content_type_id)
         object_id = flowcell_lims_info['id']
         json_report_class = self.get_single_result(
             "json_report_class/", query={"slug": JSON_REPORT_CLASS_SLUG})
 
         # See if report already exists
-        existing_reports = self.get("json_report/", query={
+        existing_reports = self.get_list_result("json_report/", query={
             "object_id": object_id,
-            "content_type": content_type,
+            "content_type": content_type["id"],
             "report_class": json_report_class["id"],
             "page_size": 2,
-        })["results"]
+        })
 
         data_to_send = {
                 "object_id": object_id,
-                "content_type": content_type,
-                "report_class": json_report_class["id"],
+                "content_type": content_type["url"],
+                "report_class": json_report_class["url"],
                 "name": report_name,
-                "json_content": data,
+                "json_content": json.dumps(data),
         }
         if len(existing_reports) == 0:
             self.post("json_report/", data=data_to_send)
             # No report exists yet, upload a new one
         elif len(existing_reports) == 1:
             # Exactly one report, update it
-            data_to_send["id"] = existing_reports[0]["id"]
-            self.patch("json_report/", data=data_to_send)
+            url_to_patch = "json_report/%d/" % existing_reports[0]["id"]
+            self.patch(url_to_patch, data=data_to_send)
         else:
             # Error! too many reports
             LOG.critical("Too many JSON reports exist")
