@@ -350,6 +350,7 @@ class UploadLIMS:
         upload_data = self.get_file_upload_data(
             path, contenttype_name, file_purpose, file_type
         )
+        LOG.debug("Uploading file %s, to %d objects", path, len(object_ids))
         if self.skip_md5:
             LOG.info("Skipping md5sum")
             upload_data["md5sum"] = "0"
@@ -360,7 +361,7 @@ class UploadLIMS:
         content_type_id = re.search(r"(\d+)/?$", upload_data["content_type"]).group(1)
         purpose_id = re.search(r"(\d+)/?$", upload_data["purpose"]).group(1)
         for object_id in object_ids:
-            data = upload_data.update({"object_id": object_id})
+            upload_data.update({"object_id": object_id})
             exists = self.get_single_result(
                 "file/",
                 query={
@@ -371,7 +372,7 @@ class UploadLIMS:
             )
 
             if exists:
-                if exists == data:
+                if exists == upload_data:
                     LOG.info(
                         "No change to information for file %s, lane %d, not updating",
                         path,
@@ -382,14 +383,14 @@ class UploadLIMS:
                     LOG.info(
                         "Updating information for file %s: lane %d", path, object_id
                     )
-                    result = self.put(url=exists["url"], data=data)
+                    result = self.put(url=exists["url"], data=upload_data)
             else:
-                LOG.info("Uploading information for file %s: lane %d", path, object_id)
-                result = self.post("file/", data=data)
+                LOG.info("Uploading information for file %s: lane %d, data=%s", path, object_id, upload_data)
+                result = self.post("file/", data=upload_data)
 
             if not result:
                 LOG.error("Could not upload file %s for ID %d", path, object_id)
-                LOG.debug(data)
+                LOG.debug(upload_data)
             else:
                 LOG.debug(result)
 
@@ -520,9 +521,10 @@ class UploadLIMS:
 
         # TODO: Doesn't yet make use of the above augmented info
         for row in sample_config:
-            idx = row["barcode_index"]
+            (idx, _otheridx) = row["barcode_index"].split("-")
             lane = int(row["lane"])
             name = row["pool_name"]
+            LOG.debug("idx=%s, lane=%d, name=%s", idx, lane, name)
             # Get lane IDs for each file
             lane_ids = [
                 l["id"]
@@ -545,7 +547,7 @@ class UploadLIMS:
             self.upload_file(
                 path,
                 "SequencingData.flowcelllane",
-                lane_ids,
+                list(set(lane_ids)),
                 file_purpose=purpose,
                 file_type="fastq",
             )
