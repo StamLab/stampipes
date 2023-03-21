@@ -44,12 +44,7 @@ files=( \
 )
 
 dirs=( \
-    "anaquin_cufflinks"     \
-    "anaquin_kallisto"      \
-    "anaquin_kallisto_adv"  \
-    "anaquin_star"          \
     "kallisto_output"       \
-    "anaquin_subsample"     \
     "kallisto_output_adv"   \
 )
 

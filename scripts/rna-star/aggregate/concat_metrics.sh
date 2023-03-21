@@ -18,23 +18,4 @@ rm -f metrics.info
     cat ribosomal_counts.info | grep 'ribosomal'
     cat adapter_counts.info | grep 'adapter'
 
-    if [ -s anaquin_star/RnaAlign_summary.stats.info ]; then
-        cat anaquin_star/RnaAlign_summary.stats.info | grep 'sequins-dilution'
-        cat anaquin_star/RnaAlign_summary.stats.info | grep 'sequins-base-level-sensitivity'
-        cat anaquin_star/RnaAlign_summary.stats.info | grep 'sequins-base-level-precision'
-    fi
-
-    if [ -s anaquin_subsample/anaquin_kallisto/RnaExpression_isoforms.neatmix.tsv.info ]; then
-        cat anaquin_subsample/anaquin_kallisto/RnaExpression_isoforms.neatmix.tsv.info | grep 'neat-mixA-mean-spearman'
-    fi
-
-    if [ -s anaquin_subsample/anaquin_kallisto/RnaExpression_summary.stats.info ]; then
-        cat anaquin_subsample/anaquin_kallisto/RnaExpression_summary.stats.info | grep 'sequins-isoforms-log2-pearson-cor'
-        cat anaquin_subsample/anaquin_kallisto/RnaExpression_summary.stats.info | grep 'sequins-genes-slope'
-        cat anaquin_subsample/anaquin_kallisto/RnaExpression_summary.stats.info | grep 'sequins-genes-log2-pearson-cor'
-        cat anaquin_subsample/anaquin_kallisto/RnaExpression_summary.stats.info | grep 'sequins-percent-isoforms-found'
-        cat anaquin_subsample/anaquin_kallisto/RnaExpression_summary.stats.info | grep 'sequins-percent-genes-found'
-        cat anaquin_subsample/anaquin_kallisto/RnaExpression_summary.stats.info | grep 'sequins-detection-sensitivity-isoforms'
-        cat anaquin_subsample/anaquin_kallisto/RnaExpression_summary.stats.info | grep 'sequins-detection-sensitivity-genes'
-    fi
 } > metrics.info

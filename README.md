@@ -19,7 +19,6 @@ Modules
 
 The current modules to load for working the pipeline are:
 
-* `anaquin/2.0.1`
 * `bcl2fastq/1.8.4`
 * `bcl2fastq2/2.15.0.4`
 * `bedops/2.4.35-typical`

@@ -88,11 +88,6 @@ echo "R:"
 R --version | grep "R version"
 fi
 
-if [[ `command -v anaquin` ]]; then
-echo "Anaquin:"
-anaquin | grep 'Version'
-fi
-
 if [[ `command -v tabix` ]]; then
 echo "Tabix/BGZIP:"
 which tabix | sed -e 's/.*htslib\///g' | sed -e 's/\/bin\/tabix//g'
