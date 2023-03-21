@@ -67,7 +67,7 @@ workflow RNA_AGG {
 
   kallisto(fastq, kallisto_index, sequins_iso_mix)
   kallisto_advanced(fastq, kallisto_index, sequins_iso_mix)
-  anaquin(bam_to_use, sequins_ref, kallisto_index, neat_mix_A, sequins_iso_mix)
+  // anaquin(bam_to_use, sequins_ref, kallisto_index, neat_mix_A, sequins_iso_mix)
 
   // QC Metrics
   insert_sizes(bam_to_use)
@@ -276,7 +276,7 @@ process density {
 process cufflinks {
 
   publishDir params.outdir, mode: params.publishmode
-  module "cufflinks/2.2.1", "R/3.2.5", "anaquin/2.0.1"
+  module "cufflinks/2.2.1", "R/3.2.5"
 
   input:
     path input_bam
@@ -285,7 +285,7 @@ process cufflinks {
 
 
   output:
-    tuple path("genes.fpkm_tracking"), path("isoforms.fpkm_tracking"), path("anaquin_cufflinks/*")
+    tuple path("genes.fpkm_tracking"), path("isoforms.fpkm_tracking")
     path "skipped.gtf"
     path "transcripts.gtf"
 
@@ -304,11 +304,11 @@ process cufflinks {
     mv genes.fpkm_tracking.sort genes.fpkm_tracking
     mv isoforms.fpkm_tracking.sort isoforms.fpkm_tracking
 
-    # quantification with anaquin Rna Expression
-    anaquin RnaExpression -o anaquin_cufflinks -rmix "$sequins_iso_mix" -usequin transcripts.gtf -mix A \
-    || (echo "NA" > anaquin_cufflinks/RnaExpression_genes.tsv \
-     && echo "NA" > anaquin_cufflinks/RnaExpression_isoforms.tsv \
-     && echo "NA" > anaquin_cufflinks/RnaExpression_summary.stats)
+    # # quantification with anaquin Rna Expression
+    # anaquin RnaExpression -o anaquin_cufflinks -rmix "$sequins_iso_mix" -usequin transcripts.gtf -mix A \
+    # || (echo "NA" > anaquin_cufflinks/RnaExpression_genes.tsv \
+    #  && echo "NA" > anaquin_cufflinks/RnaExpression_isoforms.tsv \
+    #  && echo "NA" > anaquin_cufflinks/RnaExpression_summary.stats)
     """
 
 }
@@ -359,7 +359,7 @@ process feature_counts {
 process kallisto {
 
   publishDir params.outdir, mode: params.publishmode
-  module "kallisto/0.43.1", "anaquin/2.0.1"
+  module "kallisto/0.43.1"
 
   input:
     tuple path(r1_fq), path(r2_fq)
@@ -367,7 +367,6 @@ process kallisto {
     path sequins_iso_mix
 
   output:
-    path "anaquin_kallisto/*"
     path "kallisto_output/*"
     path "kallisto.log"
 
@@ -375,17 +374,17 @@ process kallisto {
     """
     kallisto quant -i "${kallisto_index}" -o kallisto_output "${r1_fq}" "${r2_fq}" 2> kallisto.log
 
-    anaquin RnaExpression -o anaquin_kallisto -rmix "${sequins_iso_mix}" -usequin kallisto_output/abundance.tsv -mix A \
-    || (echo "NA" > anaquin_kallisto/RnaExpression_genes.tsv \
-     && echo "NA" > anaquin_kallisto/RnaExpression_isoforms.tsv \
-     && echo "NA" > anaquin_kallisto/RnaExpression_summary.stats)
+    #anaquin RnaExpression -o anaquin_kallisto -rmix "${sequins_iso_mix}" -usequin kallisto_output/abundance.tsv -mix A \
+    #|| (echo "NA" > anaquin_kallisto/RnaExpression_genes.tsv \
+    # && echo "NA" > anaquin_kallisto/RnaExpression_isoforms.tsv \
+    # && echo "NA" > anaquin_kallisto/RnaExpression_summary.stats)
     """
 }
 
 process kallisto_advanced {
   
   publishDir params.outdir, mode: params.publishmode
-  module "kallisto/0.43.1", "anaquin/2.0.1"
+  module "kallisto/0.43.1"
 
   input:
     tuple path(r1_fq), path(r2_fq)
@@ -393,7 +392,6 @@ process kallisto_advanced {
     path sequins_iso_mix
 
   output:
-    path "anaquin_kallisto_adv/*"
     path "kallisto_output_adv/*"
     path "kallisto_adv.log"
 
@@ -401,10 +399,10 @@ process kallisto_advanced {
     """
     kallisto quant --bias -b 100 --rf-stranded -i "${kallisto_index}" -o kallisto_output_adv "${r1_fq}" "${r2_fq}" 2> kallisto_adv.log
 
-    anaquin RnaExpression -o anaquin_kallisto_adv -rmix "${sequins_iso_mix}" -usequin kallisto_output_adv/abundance.tsv -mix A \
-    || (echo "NA" > anaquin_kallisto_adv/RnaExpression_genes.tsv \
-     && echo "NA" > anaquin_kallisto_adv/RnaExpression_isoforms.tsv \
-     && echo "NA" > anaquin_kallisto_adv/RnaExpression_summary.stats)
+    # anaquin RnaExpression -o anaquin_kallisto_adv -rmix "${sequins_iso_mix}" -usequin kallisto_output_adv/abundance.tsv -mix A \
+    # || (echo "NA" > anaquin_kallisto_adv/RnaExpression_genes.tsv \
+    #  && echo "NA" > anaquin_kallisto_adv/RnaExpression_isoforms.tsv \
+    #  && echo "NA" > anaquin_kallisto_adv/RnaExpression_summary.stats)
     """
 }
 
