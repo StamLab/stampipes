@@ -113,6 +113,7 @@ workflow ALTSEQ {
       // Invoke STAR Solo
       align(
         genome_dir,
+        genome_fa,
         params.star_exe,
         barcode_whitelist,
         merged_fq_files,
@@ -142,19 +143,6 @@ workflow ALTSEQ {
       | toSortedList
       | merge_stats
 
-      // Sort the cram files
-      align.out.aligned_bam
-      | map { [
-          [
-            name: it[0].name,
-            id: it[0].name,
-            barcode_index: it[0].barcode_index,
-            lane: it[0].lane
-          ],
-          it[1],
-          genome_fa,
-        ] }
-      | sort_and_encode_cram
     }
 
     // Debugging section - use `nextflow run -dump-channels` to write channel contents to terminal
@@ -200,21 +188,33 @@ process align {
 
   input:
     path genome_dir
+    path reference_fa
     path star_exe
     path barcode_whitelist
     tuple val(meta), path(fq1), path(fq2)
 
 
   output:
-    tuple val(meta), file("Aligned.out.bam"), emit: aligned_bam
+    tuple val(meta), file("Aligned.out.cram"), file("Aligned.out.cram.crai"), emit: aligned_cram
     tuple val(meta), file("Solo.out"), emit: solo_directory
+    tuple val(meta), file("Log.out"), file("Log.final.out"), emit: logs
 
   shell:
     cpus = 5
+    cram_fmt_options = [
+      "version=3.0",
+      "level=7",
+      "lossy_names=0",
+      ].join(",")
+    bam_fifo = "Aligned.out.bam"
     '''
+    set -e
     tmpdir=$(mktemp -d)
+    echo "Tmpdir is: ${tmpdir}"
+    mkfifo "!{bam_fifo}"
     "./!{star_exe}"   \
       --genomeDir "!{genome_dir}"   \
+      --genomeLoad LoadAndRemove \
       --readFilesIn "!{fq2}" "!{fq1}"   \
       --soloType CB_UMI_Simple   \
       --soloCellReadStats Standard   \
@@ -225,16 +225,39 @@ process align {
       --soloUMIstart 13   \
       --soloUMIlen 16   \
       --soloCBwhitelist "!{barcode_whitelist}"   \
-      --quantMode "TranscriptomeSAM"   \
-      --soloFeatures Gene GeneFull GeneFull_ExonOverIntron GeneFull_Ex50pAS   \
-      --soloMultiMappers Unique PropUnique Uniform Rescue EM   \
+      --soloFeatures GeneFull_Ex50pAS   \
+      --soloMultiMappers Unique PropUnique Uniform Rescue EM \
       --readFilesCommand zcat   \
       --runThreadN "!{cpus}"   \
       --outSAMtype BAM Unsorted   \
-      --outSAMattributes NH HI AS NM MD CR CY UR UY GX GN   \
+      --outBAMcompression 0 \
+      --outSAMattributes NH HI AS NM MD CR CY UR UY GX GN \
       --outSAMunmapped Within   \
       --limitOutSJcollapsed 5000000   \
-      --outTmpDir "$tmpdir/STARSolo"
+      --outTmpDir "$tmpdir/STARSolo" \
+      &  # Launch in background, so we can convert to cram from pipe
+
+    samtools sort \
+      --reference "!{reference_fa}" \
+      --output-fmt-option "!{cram_fmt_options}" \
+      --threads "!{cpus}" \
+      -@ "!{cpus}" \
+      -o Aligned.out.cram \
+      --write-index \
+      -m 2G \
+      -M \
+      "!{bam_fifo}"
+
+
+    wait # probably not necessary
+    rm -rf "$tmpdir" # FIXME: This doesn't get called if STAR crashes or if NF cancels
+    if [[ $(wc -l Solo.out/GeneFull_Ex50pAS/CellReads.stats) -le 2 ]] ; then
+      echo -e "CellReads.stats does not contain enough output.\n" \
+              "This may be caused by running out of /tmp space.\n" \
+              "Alternately, it could be that no matching barcodes were found.\n" \
+              >&2 
+      exit 1
+    fi
     '''
 }
 
@@ -275,7 +298,7 @@ process analyze_solo_dir {
   shell:
     '''
     sed 's/[ACTGN]*-//' < '!{sample_config}' > barcode.config
-    for dir in Gene GeneFull GeneFull_Ex50pAS GeneFull_ExonOverIntron ; do
+    for dir in GeneFull_Ex50pAS ; do
       outdir=output/$dir
       allcountsfile=$outdir/allcounts.csv
       mkdir -p "$outdir"
