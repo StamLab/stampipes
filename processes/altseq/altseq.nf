@@ -195,8 +195,9 @@ process align {
 
 
   output:
-    tuple val(meta), file("Aligned.out.cram"), emit: aligned_cram
+    tuple val(meta), file("Aligned.out.cram"), file("Aligned.out.cram.crai"), emit: aligned_cram
     tuple val(meta), file("Solo.out"), emit: solo_directory
+    tuple val(meta), file("Log.out"), file("Log.final.out"), emit: logs
 
   shell:
     cpus = 5
@@ -224,13 +225,13 @@ process align {
       --soloUMIstart 13   \
       --soloUMIlen 16   \
       --soloCBwhitelist "!{barcode_whitelist}"   \
-      --quantMode "TranscriptomeSAM"   \
       --soloFeatures GeneFull_Ex50pAS   \
-      --soloMultiMappers Unique PropUnique Uniform Rescue EM   \
+      --soloMultiMappers Unique PropUnique Uniform Rescue EM \
       --readFilesCommand zcat   \
       --runThreadN "!{cpus}"   \
       --outSAMtype BAM Unsorted   \
-      --outSAMattributes NH HI AS NM MD CR CY UR UY GX GN   \
+      --outBAMcompression 0 \
+      --outSAMattributes NH HI AS NM MD CR CY UR UY GX GN \
       --outSAMunmapped Within   \
       --limitOutSJcollapsed 5000000   \
       --outTmpDir "$tmpdir/STARSolo" \
