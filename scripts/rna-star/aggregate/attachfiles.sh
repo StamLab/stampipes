@@ -25,7 +25,7 @@ function attach_agg_file () {
 attach_aggregation --attach_directory "$PWD/.." --attach_file_purpose aggregation-directory
 
 # alignments
-attach_agg_file merged.genome.cram all-alignments-bam cram
+attach_agg_file dupsmarked.cram all-alignments-bam cram
 attach_agg_file merged.transcriptome.cram transcriptome-alignments cram
 
 # cufflinks
