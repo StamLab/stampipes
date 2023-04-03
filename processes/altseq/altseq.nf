@@ -225,7 +225,7 @@ process align {
       --soloUMIstart 13   \
       --soloUMIlen 16   \
       --soloCBwhitelist "!{barcode_whitelist}"   \
-      --soloFeatures GeneFull_Ex50pAS   \
+      --soloFeatures Gene GeneFull_Ex50pAS   \
       --soloMultiMappers Unique PropUnique Uniform Rescue EM \
       --readFilesCommand zcat   \
       --runThreadN "!{cpus}"   \
