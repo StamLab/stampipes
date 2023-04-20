@@ -337,11 +337,11 @@ process merge_stats {
   scratch false
   executor "local"
   input:
-    path("*.input.json")
+    path("input.???.json")
   output:
     path("flowcell_stats.json")
   shell:
   '''
-  jq --slurp --sort-keys -c . *.input.json > flowcell_stats.json
+  jq --slurp --sort-keys -c . input.*.json > flowcell_stats.json
   '''
 }
