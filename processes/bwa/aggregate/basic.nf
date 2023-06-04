@@ -913,6 +913,7 @@ process cram {
 
 process starch_to_bigbed {
   publishDir "${params.outdir}"
+  label "modules"
 
   input:
   file starch_in from onepercent_peaks
