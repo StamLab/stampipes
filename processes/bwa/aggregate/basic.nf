@@ -917,17 +917,18 @@ process starch_to_bigbed {
 
   input:
   file starch_in from onepercent_peaks
+  file chrom_sizes_bed from file(params.chrom_sizes)
 
   output:
   file('peaks/nuclear.peaks.fdr0.001.bb')
 
   script:
   outfile = starch_in.name.replace("starch", "bb")
-  chrom_sizes="/net/seq/data/genomes/human/GRCh38/noalts-sequins/GRCh38_no_alts.chrom_sizes"
   """
+  cut -f1,3 "$chrom_sizes_bed" > chrom_sizes
   mkdir -p peaks
   unstarch "${starch_in}" | cut -f1-4 > temp.bed
-  bedToBigBed temp.bed "$chrom_sizes" "peaks/$outfile"
+  bedToBigBed temp.bed chrom_sizes "peaks/$outfile"
   rm temp.bed
   """
 }
