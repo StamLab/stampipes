@@ -3,15 +3,21 @@ nextflow.enable.dsl=2
 // Workflows
 workflow {
 
+  def meta = [:]
+  def ref_files = file("${params.genome_dir}/*")
+
   STAR_solo(
     [
+      meta,
       tokenize_read_files(params.r1), tokenize_read_files(params.r2),
-      params.barcodes_r1, params.barcodes_r2, params.barcodes_r3,
-      [78, 8],
-      [48, 8],
-      [10, 8],
+      params.barcode_r1_list, params.barcode_r2_list, params.barcode_r3_list,
+      [params.barcode_r1_pos, params.barcode_r1_len],
+      [params.barcode_r2_pos, params.barcode_r2_len],
+      [params.barcode_r3_pos, params.barcode_r3_len],
+      [params.umi_pos, params.umi_len],
+      ref_files,
+      params.genome_fasta,
     ],
-    file("${params.genome_dir}/*")
   )
 
 }
@@ -42,15 +48,18 @@ process STAR_solo {
 
   input:
     tuple(
+      val(meta),
       path(r1), path(r2), // r1 and r2 may each receive multiple files
       path(r1_barcodes), path(r2_barcodes), path(r3_barcodes),
-      val(r1_barcode_pos), val(r2_barcode_pos), val(r3_barcode_pos)
+      val(r1_barcode_pos), val(r2_barcode_pos), val(r3_barcode_pos),
+      val(umi_barcode_pos),
+      path("ref/*"),
+      path(genome_fasta),
     )
-    path("ref/*")
 
   output:
-    path "output/Aligned.out.cram*", emit: cram
-    path "output/Solo.out", emit: solo_analysis
+    tuple(val(meta), path("output/Aligned.out.cram*"), emit: cram)
+    tuple(val(meta), path("output/Solo.out"), emit: solo_analysis)
 
 
   script:
@@ -59,12 +68,7 @@ process STAR_solo {
     bc1_position = pos_to_str(*r1_barcode_pos)
     bc2_position = pos_to_str(*r2_barcode_pos)
     bc3_position = pos_to_str(*r3_barcode_pos)
-    umi_position = pos_to_str(0, 10)
-
-    //bc1_position = pos_to_str(78, 8)
-    //bc2_position = pos_to_str(48, 8)
-    //bc3_position = pos_to_str(10, 8)
-    //umi_position = pos_to_str(0, 10)
+    umi_position = pos_to_str(*umi_barcode_pos)
 
     // TODO: Determine from environment?
     bam_sort_RAM = 32_000_000_000
@@ -98,7 +102,7 @@ process STAR_solo {
     --limitOutSJcollapsed 5000000 &
 
     samtools sort \
-      --reference  /net/seq/data2/projects/prime_seq/cell_ranger_ref/GRCh38-2022-Altius-gencode.v39-build/Homo_sapiens.GRCh38.dna.primary_assembly.fa.modified \
+      --reference  "${genome_fasta}" \
       -o output/Aligned.out.cram \
       --output-fmt-option "version=3.0,level=7" \
       --threads "${num_threads}" \
