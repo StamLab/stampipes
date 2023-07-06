@@ -11,7 +11,7 @@ pygobject==3.26.1
 pysam==0.14.1
 pyxdg==0.25
 scikit-learn==0.19.1
-scipy==1.1.0
+scipy==1.10.0
 SecretStorage==2.3.1
 six==1.11.0
 sklearn==0.0
