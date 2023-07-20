@@ -1,6 +1,11 @@
 nextflow.enable.dsl=2
 
-// Workflows
+params.outdir = "output"
+
+/// Workflows
+
+/// Default workflow
+/// Processes a single sample
 workflow {
 
   def meta = [:]
@@ -44,7 +49,8 @@ def pos_to_str(start, length) {
 process STAR_solo {
 
   module 'STAR/2.7.9a'
-  publishDir "test-out"
+  publishDir params.outdir
+  cpus 10
 
   input:
     tuple(
@@ -58,8 +64,8 @@ process STAR_solo {
     )
 
   output:
-    tuple(val(meta), path("output/Aligned.out.cram*"), emit: cram)
-    tuple(val(meta), path("output/Solo.out"), emit: solo_analysis)
+    tuple(val(meta), path("Aligned.out.cram*"), emit: cram)
+    tuple(val(meta), path("Solo.out"), emit: solo_analysis)
 
 
   script:
@@ -79,8 +85,8 @@ process STAR_solo {
     num_threads = 10
 
     """
-    mkdir -p output
-    mkfifo output/Aligned.out.bam
+    set -e
+    mkfifo Aligned.out.bam
     STAR \
     --genomeDir "ref" \
     --readFilesIn "${r1_files}" "${r2_files}" \
@@ -95,22 +101,22 @@ process STAR_solo {
     --limitBAMsortRAM "${bam_sort_RAM}" \
     --outSAMtype BAM Unsorted \
     --outSAMattributes NH HI AS nM CR CY UR UY sM \
-    --outBAMcompression -1 \
+    --outBAMcompression 0 \
     - outBAMsortingThreadN "${num_threads}" \
     --readFilesCommand zcat \
-    --outFileNamePrefix output/ \
+    --outFileNamePrefix ./ \
     --limitOutSJcollapsed 5000000 &
 
     samtools sort \
       --reference  "${genome_fasta}" \
-      -o output/Aligned.out.cram \
+      -o Aligned.out.cram \
       --output-fmt-option "version=3.0,level=7" \
       --threads "${num_threads}" \
       --write-index \
       -T "tmpsort" \
-      output/Aligned.out.bam &
+      Aligned.out.bam &
 
     wait
-    rm output/Aligned.out.bam
+    rm Aligned.out.bam
     """
 }
