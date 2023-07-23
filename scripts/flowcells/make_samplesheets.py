@@ -37,7 +37,7 @@ def get_barcode_assignments(data: dict, reverse_barcode1: bool, reverse_barcode2
     libs_to_pools = dict()
     for (pool_name, pool_data) in pools.items():
         for lib_str in pool_data["libraries"]:
-            lib_num = int(lib_str.replace("LN", ""))
+            lib_num = int(re.sub("[A-Z]", "", lib_str))
             if lib_num in libs_to_pools:
                 raise Exception("library {} in more than one pool".format(lib_str))
             libs_to_pools[lib_num] = (pool_name,
@@ -231,7 +231,7 @@ def make_samplesheet_body(barcode_assignments: "[dict]") -> str:
 
 def main(args=sys.argv):
     parser = parser_setup()
-    poptions = parser.parse_args(args)
+    poptions = parser.parse_args()
 
     process_json = open(poptions.processing)
     data = json.load(process_json)
