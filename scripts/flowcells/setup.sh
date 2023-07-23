@@ -1,5 +1,6 @@
 #!/bin/bash
 # shellcheck disable=SC1090
+# shellcheck disable=SC2162
 
 set -o errexit
 set -o pipefail
@@ -63,6 +64,50 @@ while getopts ":hvdxf:" opt ; do
     esac
 done
 
+# Long command definitions
+# The quadruple-backslash syntax on this is messy and gross.
+# It works, though, and the output is readable.
+# read -d '' always exits with status 1, so we ignore error
+# We split threads equally between processing and loading+writing.
+set +e
+read -d '' regular_bcl_command  << _REG_BCL_CMD_
+    PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
+    bcl2fastq \\\\
+      --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
+      --use-bases-mask "$bcl_mask" \\\\
+      --output-dir "$fastq_dir" \\\\
+      --barcode-mismatches "$mismatches" \\\\
+      --writing-threads        0                       \\\\
+      --loading-threads        \\\$SLURM_CPUS_PER_TASK \\\\
+      --processing-threads     \\\$SLURM_CPUS_PER_TASK
+_REG_BCL_CMD_
+
+read -d '' novaseq_bcl_command  << _NOVA_BCL_CMD_
+    PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
+    for samplesheet in \$PWD/SampleSheet.withmask*csv ; do
+      bcl_mask=\$(sed 's/.*withmask\\.//;s/\\.csv//' <<< \$samplesheet)
+      fastq_dir=\$(sed 's/,/-/g' <<< "fastq-withmask-\$bcl_mask")
+      bcl2fastq \\\\
+        --input-dir          "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
+        --use-bases-mask     "$bcl_mask"                                  \\\\
+        --output-dir         "${illumina_dir}/\$fastq_dir"                \\\\
+        --barcode-mismatches "$mismatches"                                \\\\
+        --output-dir         "${illumina_dir}"                            \\\\
+        --sample-sheet       "${illumina_dir}/\$samplesheet"              \\\\
+        --writing-threads    0                                            \\\\
+        --loading-threads    \\\$SLURM_CPUS_PER_TASK                      \\\\
+        --processing-threads \\\$SLURM_CPUS_PER_TASK
+    done
+_NOVA_BCL_CMD_
+
+read -d '' novaseq_link_command  <<'_NOVA_LINK_CMD_'
+for fq_dir in fastq* ;
+  [[ -d $fq_dir ]] || continue
+  python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i "$fq_folder" -o Demultiplexed -p processing.json
+done
+_NOVA_LINK_CMD_
+set -e
+
 if [ -z "$flowcell" ] ; then
     echo "No flowcell label specified"
     flowcell=$(basename "$PWD" | cut -f4 -d_ | cut -c2-10)
@@ -110,32 +155,6 @@ make_hiseq_samplesheet(){
 
   }
 
-make_novaseq_samplesheet(){
-  lanecount=$1
-  name=Stamlab
-  date=$(date '+%m/%d/%Y')
-  cat <<__SHEET__
-[Header]
-Investigator Name,$name
-Project Name,$name
-Experiment Name,$name
-Date,$date
-Workflow,GenerateFASTQ
-
-[Settings]
-
-[Data]
-Lane,SampleID,SampleName,index,index2
-__SHEET__
-for i in $(seq $lanecount) ; do
-  echo "$i,none,none,GGGGGGGG,GGGGGGGG"
-done
-
-if [ -z "$demux" ] ; then
-  # This bit of cryptic magic generates the samplesheet part.
-  jq -r '.libraries[] | select(.failed == false) | [(.lane|tostring), .samplesheet_name,.samplesheet_name,.barcode1.reverse_sequence, .barcode2.reverse_sequence,""] | join(",") ' "$json" 
-fi
-}
 
 make_nextseq_samplesheet(){
   name=Stamlab
@@ -247,152 +266,65 @@ if [ -z "$demux" ] ; then
 else # Set some options for manual demultiplexing
   bcl_mask=$(tr Nn Ii <<< $mask)
   mismatches="0,0"
-  dmx_mismatches=$(python3 $STAMPIPES/scripts/flowcells/max_mismatch.py --ignore_failed_lanes | cut -c1 )
+  dmx_mismatches=$(python3 $STAMPIPES/scripts/flowcells/max_mismatch.py --ignore_failed_lanes --allow_collisions | cut -c1 )
 fi
 
 case $run_type in
 
 "Novaseq 6000 S1")
     echo "Novaseq 6000: S1 (non-pooled)"
+    unset demux
     parallel_env="-pe threads 6"
-    link_command=""
+    link_command=$novaseq_link_command
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
     queue="hpcz-2"
-    make_novaseq_samplesheet 2 > SampleSheet.csv
+    python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
-
-    set +e
-    read -d '' unaligned_command  << _U_
-    PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
-    bcl2fastq \\\\
-      --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
-      --use-bases-mask "$bcl_mask" \\\\
-      --output-dir "$fastq_dir" \\\\
-      --barcode-mismatches "$mismatches" \\\\
-      --loading-threads        \\\$(( SLURM_CPUS_PER_TASK / 2 )) \\\\
-      --writing-threads        \\\$(( SLURM_CPUS_PER_TASK / 2 )) \\\\
-      --processing-threads     \\\$(( SLURM_CPUS_PER_TASK ))
-_U_
-    set -e
+    unaligned_command=$novaseq_bcl_command
 ;;
 
 "Novaseq 6000 S2")
     echo "Novaseq 6000: S2 (non-pooled)"
+    unset demux
     parallel_env="-pe threads 6"
-    link_command=""
+    link_command=$novaseq_link_command
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
     queue="hpcz-2"
-    make_novaseq_samplesheet 2 > SampleSheet.csv
+    python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
-
-    # The quadruple-backslash syntax on this is messy and gross.
-    # It works, though, and the output is readable.
-    # read -d '' always exits with status 1, so we ignore error
-
-    # The NSLOTS lines are for scaling the various threads (2 per slot).
-    # WARNING: Does not work for threads < 4
-    # Table:
-    # NSLOTS  l w d p   total
-    # 4       1 1 2 4 = 8
-    # 5       1 1 2 5 = 9
-    # 6       2 2 3 6 = 13
-    # 7       2 2 3 7 = 14
-    # 8       2 2 4 8 = 16
-    set +e
-    read -d '' unaligned_command  << _U_
-    PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
-    bcl2fastq \\\\
-      --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
-      --use-bases-mask "$bcl_mask" \\\\
-      --output-dir "$fastq_dir" \\\\
-      --barcode-mismatches "$mismatches" \\\\
-      --loading-threads        \\\$(( SLURM_CPUS_PER_TASK / 2 )) \\\\
-      --writing-threads        \\\$(( SLURM_CPUS_PER_TASK / 2 )) \\\\
-      --processing-threads     \\\$(( SLURM_CPUS_PER_TASK ))
-_U_
-    set -e
+    unaligned_command=$novaseq_bcl_command
 
 ;;
 "Novaseq 6000 S4")
     echo "Novaseq 6000: S4 (non-pooled)"
+    unset demux
     parallel_env="-pe threads 6"
-    link_command=""
+    link_command=$novaseq_link_command
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
     queue="hpcz-2"
-    make_novaseq_samplesheet 4 > SampleSheet.csv
+    python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
-
-    # The quadruple-backslash syntax on this is messy and gross.
-    # It works, though, and the output is readable.
-    # read -d '' always exits with status 1, so we ignore error
-
-    # The NSLOTS lines are for scaling the various threads (2 per slot).
-    # WARNING: Does not work for threads < 4
-    # Table:
-    # NSLOTS  l w d p   total
-    # 4       1 1 2 4 = 8
-    # 5       1 1 2 5 = 9
-    # 6       2 2 3 6 = 13
-    # 7       2 2 3 7 = 14
-    # 8       2 2 4 8 = 16
-    set +e
-    read -d '' unaligned_command  << _U_
-    PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
-    bcl2fastq \\\\
-      --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
-      --use-bases-mask "$bcl_mask" \\\\
-      --output-dir "$fastq_dir" \\\\
-      --barcode-mismatches "$mismatches" \\\\
-      --loading-threads        \\\$(( SLURM_CPUS_PER_TASK / 2 )) \\\\
-      --writing-threads        \\\$(( SLURM_CPUS_PER_TASK / 2 )) \\\\
-      --processing-threads     \\\$(( SLURM_CPUS_PER_TASK ))
-_U_
-    set -e
+    unaligned_command=$novaseq_bcl_command
 
 ;;
 "Novaseq 6000 SP")
     echo "Novaseq 6000: SP (non-pooled)"
+    unset demux
     parallel_env="-pe threads 6"
-    link_command=""
+    link_command=$novaseq_link_command
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
     queue="hpcz-2"
-    make_novaseq_samplesheet 4 > SampleSheet.csv
+    python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
-
-    # The quadruple-backslash syntax on this is messy and gross.
-    # It works, though, and the output is readable.
-    # read -d '' always exits with status 1, so we ignore error
-
-    # The NSLOTS lines are for scaling the various threads (2 per slot).
-    # WARNING: Does not work for threads < 4
-    # Table:
-    # NSLOTS  l w d p   total
-    # 4       1 1 2 4 = 8
-    # 5       1 1 2 5 = 9
-    # 6       2 2 3 6 = 13
-    # 7       2 2 3 7 = 14
-    # 8       2 2 4 8 = 16
-    set +e
-    read -d '' unaligned_command  << _U_
-    PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
-    bcl2fastq \\\\
-      --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
-      --use-bases-mask "$bcl_mask" \\\\
-      --output-dir "$fastq_dir" \\\\
-      --barcode-mismatches "$mismatches" \\\\
-      --loading-threads        \\\$(( SLURM_CPUS_PER_TASK / 2 )) \\\\
-      --writing-threads        \\\$(( SLURM_CPUS_PER_TASK / 2 )) \\\\
-      --processing-threads     \\\$(( SLURM_CPUS_PER_TASK ))
-_U_
-    set -e
+    unaligned_command=$novaseq_bcl_command
 
 ;;
 "NextSeq 500")
@@ -406,33 +338,7 @@ _U_
     queue="queue0"
     make_nextseq_samplesheet > SampleSheet.csv
     bcl_tasks=1
-
-    # The quadruple-backslash syntax on this is messy and gross.
-    # It works, though, and the output is readable.
-    # read -d '' always exits with status 1, so we ignore error
-
-    # The NSLOTS lines are for scaling the various threads (2 per slot).
-    # WARNING: Does not work for threads < 4
-    # Table:
-    # NSLOTS  l w d p   total
-    # 4       1 1 2 4 = 8
-    # 5       1 1 2 5 = 9
-    # 6       2 2 3 6 = 13
-    # 7       2 2 3 7 = 14
-    # 8       2 2 4 8 = 16
-    set +e
-    read -d '' unaligned_command  << _U_
-    bcl2fastq \\\\
-      --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
-      --use-bases-mask "$bcl_mask" \\\\
-      --output-dir "$fastq_dir" \\\\
-      --barcode-mismatches "$mismatches" \\\\
-      --loading-threads        \\\$(( SLURM_CPUS_PER_TASK / 4 )) \\\\
-      --writing-threads        \\\$(( SLURM_CPUS_PER_TASK / 4 )) \\\\
-      --demultiplexing-threads \\\$(( SLURM_CPUS_PER_TASK / 2 )) \\\\
-      --processing-threads     \\\$(( SLURM_CPUS_PER_TASK ))
-_U_
-    set -e
+    unaligned_command=$regular_bcl_command
     ;;
 "HiSeq 4000")
     echo "Hiseq 4000 run detected"
@@ -444,32 +350,7 @@ _U_
     queue="queue0"
     make_nextseq_samplesheet > SampleSheet.csv
     bcl_tasks=1-8
-
-    # The quadruple-backslash syntax on this is messy and gross.
-    # It works, though, and the output is readable.
-    # read -d '' always exits with status 1, so we ignore error
-
-    # The NSLOTS lines are for scaling the various threads (2 per slot).
-    # WARNING: Does not work for threads < 4
-    # Table:
-    # NSLOTS  l w d p   total
-    # 4       1 1 2 4 = 8
-    # 5       1 1 2 5 = 9
-    # 6       2 2 3 6 = 13
-    # 7       2 2 3 7 = 14
-    # 8       2 2 4 8 = 16
-    set +e
-    read -d '' unaligned_command  << _U_
-    bcl2fastq \\\\
-      --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
-      --use-bases-mask "$bcl_mask" \\\\
-      --output-dir "$fastq_dir" \\\\
-      --barcode-mismatches "$mismatches" \\\\
-      --loading-threads        \\\$(( SLURM_CPUS_PER_TASK / 4 )) \\\\
-      --writing-threads        \\\$(( SLURM_CPUS_PER_TASK / 4 )) \\\\
-      --demultiplexing-threads \\\$(( SLURM_CPUS_PER_TASK / 2 )) \\\\
-      --processing-threads     \\\$(( SLURM_CPUS_PER_TASK ))
-_U_
+    unaligned_command=$regular_bcl_command
   ;;
 "MiniSeq High Output Kit DNase")
     # Identical to nextseq processing
@@ -482,19 +363,7 @@ _U_
     queue="queue0"
     make_nextseq_samplesheet > SampleSheet.csv
     bcl_tasks=1
-    set +e
-    read -d '' unaligned_command  << _U_
-    bcl2fastq \\\\
-      --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
-      --use-bases-mask "$bcl_mask" \\\\
-      --output-dir "$fastq_dir" \\\\
-      --barcode-mismatches "$mismatches" \\\\
-      --loading-threads        \\\$(( SLURM_CPUS_PER_TASK / 4 )) \\\\
-      --writing-threads        \\\$(( SLURM_CPUS_PER_TASK / 4 )) \\\\
-      --demultiplexing-threads \\\$(( SLURM_CPUS_PER_TASK / 2 )) \\\\
-      --processing-threads     \\\$(( SLURM_CPUS_PER_TASK ))
-_U_
-    set -e
+    unaligned_command=$regular_bcl_command
     ;;
 "MiniSeq Mid Output Kit GUIDEseq")
     # Identical to nextseq processing
@@ -605,6 +474,8 @@ if [ -n "$demux" ] ; then
   # obsolete now?
   demux_cmd="$STAMPIPES/scripts/flowcells/demux_flowcell.sh -i $fastq_dir -o $copy_from_dir -p $json -q $queue -m $dmx_mismatches"
   link_command="#Demuxing happened, no linking to do"
+elif [[ "$bc_flag" == "--novaseq" ]] ; then
+  copy_from_dir="$(pwd)/Demultiplexed/"
 fi
 
 flowcell_id=$( curl \
@@ -665,12 +536,12 @@ __FASTQ__
 __BCL2FASTQ__
 
 else
-
+# Not miniseq
 cat > run_bcl2fastq.sh <<__BCL2FASTQ__
 #!/bin/bash
 
 source $MODULELOAD
-module load bcl2fastq2/2.17.1.14
+module load bcl2fastq2/2.20.0.422
 source $PYTHON3_ACTIVATE
 source $STAMPIPES/scripts/lims/api_functions.sh
 
@@ -734,14 +605,14 @@ __PART2__
 
 __BCL2FASTQ__
 
-cat > run_bcl2fastq_2.sh <<__BCL2FASTQ__
+cat > run_bcl2fastq_2.sh <<__BCL2FASTQ2__
 # !/bin/bash
 source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
-source $MODULELOAD
-module load bcl2fastq2/2.17.1.14
-source $PYTHON3_ACTIVATE
-source $STAMPIPES/scripts/lims/api_functions.sh
+source "$MODULELOAD"
+source "$PYTHON3_ACTIVATE"
+source "$STAMPIPES/scripts/lims/api_functions.sh"
 
+if [[ -n "$demux" ]] ; then
 # demultiplex
 if [ -d "$fastq_dir.L001" ] ; then
   inputfiles=(\$(find $fastq_dir.L00[1-9] -name "*Undetermined_*fastq.gz" -size +0 ))
@@ -773,6 +644,7 @@ __DEMUX__
    )
    DEMUX_JOBIDS="\$DEMUX_JOBIDS,\$jobid"
 done
+fi
 
 if [[ -n \$DEMUX_JOBIDS ]]; then
    dmx_dependency=\$(echo \$DEMUX_JOBIDS | sed -e 's/,/,afterok:/g' | sed -e 's/^,afterok/--dependency=afterok/g')
@@ -782,6 +654,7 @@ fi
 copy_jobid=\$(sbatch --export=ALL -J "c-$flowcell" \$dmx_dependency -o "c-$flowcell.o%A" -e "c-$flowcell.e%A" --partition=$queue --cpus-per-task=1 --ntasks=1 --mem-per-cpu=1000 --parsable --oversubscribe <<'__COPY__'
 #!/bin/bash
 source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
+$link_command
 
 # copy files
 mkdir -p "$analysis_dir"
@@ -807,14 +680,13 @@ rsync -avP "$samplesheet" "$analysis_dir"
         fi
         destination=\$destination/\$dir
         mkdir -p "\$destination"
-        rsync -a "\$dir/" "\$destination/"
+        rsync -aL "\$dir/" "\$destination/"
     done
 )
 
 
 # create fastqc and collation scripts
 cd "$analysis_dir"
-$link_command
 # Remove existing scripts if they exist (to avoid appending)
 rm -f fastqc.bash collate.bash run.bash
 
