@@ -25,7 +25,8 @@ def parser_setup():
     parser.add_argument("-p", "--processing", dest="processing",
             help="The JSON file to read barcodes from")
     parser.add_argument("--ignore_failed_lanes", dest="ignore_failed_lanes", action="store_true", default=False,
-            help="Ignore failed lanes when calculating max mismatch.")
+    parser.add_argument("--allow_collisions", dest="allow_collisions", action="store_true", default=False,
+            help="Don't exit with error even if collisions are found (workaround)")
 
     parser.set_defaults( **script_options )
     return parser
@@ -129,7 +130,7 @@ def main(args = sys.argv):
 
     mismatch_level = get_max_mismatch_level( lanes, len(mask) )
 
-    if not mismatch_level:
+    if not mismatch_level and not poptions.allow_collisions:
         sys.stderr.write("No allowable mismatch levels found, barcode collision?\n")
         sys.exit(1)
 
