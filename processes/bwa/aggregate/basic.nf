@@ -472,7 +472,7 @@ process multimapping_density {
   > mm_density.starch
 
   # Bigwig
-  "/home/solexa/stampipes/scripts/bwa/starch_to_bigwig.bash" \
+  "\$STAMPIPES/scripts/bwa/starch_to_bigwig.bash" \
     mm_density.starch \
     mm_density.bw \
     "!{fai}" \
@@ -495,7 +495,7 @@ process multimapping_density {
              print $1 "\t" $2 "\t" $3 "\t" $4 "\t" n }' \
     | starch - > normalized.mm_density.starch
 
-  "$STAMPIPES/scripts/bwa/starch_to_bigwig.bash" \
+  "\$STAMPIPES/scripts/bwa/starch_to_bigwig.bash" \
     normalized.mm_density.starch \
     normalized.mm_density.bw \
     "!{fai}" \
@@ -908,5 +908,27 @@ process cram {
     --threads "${params.cramthreads}" \
     --write-index \
     -o "${cramfile}"
+  """
+}
+
+process starch_to_bigbed {
+  publishDir "${params.outdir}"
+  label "modules"
+
+  input:
+  file starch_in from onepercent_peaks
+  file chrom_sizes_bed from file(params.chrom_sizes)
+
+  output:
+  file('peaks/nuclear.peaks.fdr0.001.bb')
+
+  script:
+  outfile = starch_in.name.replace("starch", "bb")
+  """
+  cut -f1,3 "$chrom_sizes_bed" > chrom_sizes
+  mkdir -p peaks
+  unstarch "${starch_in}" | cut -f1-4 > temp.bed
+  bedToBigBed temp.bed chrom_sizes "peaks/$outfile"
+  rm temp.bed
   """
 }

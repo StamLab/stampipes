@@ -65,14 +65,15 @@ RUN apt-get install -y \
     g++ \
     git \
     libbz2-dev \
+    libcurl4-openssl-dev \
     liblzma-dev \
     make \
     ncurses-dev \
     wget \
     zlib1g-dev
-RUN wget --quiet https://github.com/samtools/samtools/releases/download/1.7/samtools-1.7.tar.bz2 \
-      && tar xf samtools-1.7.tar.bz2 \
-      && cd samtools-1.7 \
+RUN wget --quiet https://github.com/samtools/samtools/releases/download/1.12/samtools-1.12.tar.bz2 \
+      && tar xf samtools-1.12.tar.bz2 \
+      && cd samtools-1.12 \
       && make install
 
 #####################
@@ -151,9 +152,8 @@ RUN wget --quiet https://github.com/arq5x/bedtools2/releases/download/v2.25.0/be
 from build-base as build-preseq
 RUN apt-get install -y \
       libgsl-dev
-RUN git clone --recurse-submodules https://github.com/smithlabcode/preseq.git \
+RUN git clone --recurse-submodules -b v2.0.1 --single-branch https://github.com/smithlabcode/preseq.git \
    && cd preseq \
-   && git checkout v2.0.1 \
    && make
 
 
@@ -168,8 +168,9 @@ RUN apt-get install -y \
       bc \
       bowtie \
       build-essential \
-      libboost-dev \
       coreutils \
+      gawk \
+      libboost-dev \
       libgsl-dev \
       littler \
       openjdk-8-jre \
