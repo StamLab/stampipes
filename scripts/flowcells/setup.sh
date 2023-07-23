@@ -64,50 +64,6 @@ while getopts ":hvdxf:" opt ; do
     esac
 done
 
-# Long command definitions
-# The quadruple-backslash syntax on this is messy and gross.
-# It works, though, and the output is readable.
-# read -d '' always exits with status 1, so we ignore error
-# We split threads equally between processing and loading+writing.
-set +e
-read -d '' regular_bcl_command  << _REG_BCL_CMD_
-    PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
-    bcl2fastq \\\\
-      --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
-      --use-bases-mask "$bcl_mask" \\\\
-      --output-dir "$fastq_dir" \\\\
-      --barcode-mismatches "$mismatches" \\\\
-      --writing-threads        0                       \\\\
-      --loading-threads        \\\$SLURM_CPUS_PER_TASK \\\\
-      --processing-threads     \\\$SLURM_CPUS_PER_TASK
-_REG_BCL_CMD_
-
-read -d '' novaseq_bcl_command  << _NOVA_BCL_CMD_
-    PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
-    for samplesheet in \$PWD/SampleSheet.withmask*csv ; do
-      bcl_mask=\$(sed 's/.*withmask\\.//;s/\\.csv//' <<< \$samplesheet)
-      fastq_dir=\$(sed 's/,/-/g' <<< "fastq-withmask-\$bcl_mask")
-      bcl2fastq \\\\
-        --input-dir          "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
-        --use-bases-mask     "$bcl_mask"                                  \\\\
-        --output-dir         "${illumina_dir}/\$fastq_dir"                \\\\
-        --barcode-mismatches "$mismatches"                                \\\\
-        --output-dir         "${illumina_dir}"                            \\\\
-        --sample-sheet       "${illumina_dir}/\$samplesheet"              \\\\
-        --writing-threads    0                                            \\\\
-        --loading-threads    \\\$SLURM_CPUS_PER_TASK                      \\\\
-        --processing-threads \\\$SLURM_CPUS_PER_TASK
-    done
-_NOVA_BCL_CMD_
-
-read -d '' novaseq_link_command  <<'_NOVA_LINK_CMD_'
-for fq_dir in fastq* ;
-  [[ -d $fq_dir ]] || continue
-  python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i "$fq_folder" -o Demultiplexed -p processing.json
-done
-_NOVA_LINK_CMD_
-set -e
-
 if [ -z "$flowcell" ] ; then
     echo "No flowcell label specified"
     flowcell=$(basename "$PWD" | cut -f4 -d_ | cut -c2-10)
@@ -223,8 +179,12 @@ mask=$(         jq -r '.alignment_group.bases_mask' "$json" )
 run_type=$(     jq -r '.flowcell.run_type'          "$json" )
 has_umi=$(      jq -r '.libraries | map(.barcode1.umi) | any' "$json")
 
+# Novaseq runs always use native bcl2fastq demuxing
+if [[ $run_type =~ Novaseq ]] ; then
+  unset demux
+fi
 
-# Check if read1length=0 -> that means alteseq
+# Check if read1length=0 -> that means altseq
 # Handle specially
 # TODO: Check this from processing.json
 flowcell_data=$(lims_get_all "flowcell_run/?label=$flowcell")
@@ -260,7 +220,7 @@ fi
 
 if [ -z "$demux" ] ; then
   bcl_mask=$mask
-  mismatches=$(python3 $STAMPIPES/scripts/flowcells/max_mismatch.py --ignore_failed_lanes)
+  mismatches=$(python3 $STAMPIPES/scripts/flowcells/max_mismatch.py --ignore_failed_lanes --allow_collisions)
   if [ "$has_umi" == "true" ] ; then
     echo "---WARNING---"
     echo "Flowcell contains UMI samples, but -d param was not specified"
@@ -271,8 +231,58 @@ if [ -z "$demux" ] ; then
 else # Set some options for manual demultiplexing
   bcl_mask=$(tr Nn Ii <<< $mask)
   mismatches="0,0"
-  dmx_mismatches=$(python3 $STAMPIPES/scripts/flowcells/max_mismatch.py --ignore_failed_lanes --allow_collisions | cut -c1 )
+  dmx_mismatches=$(python3 $STAMPIPES/scripts/flowcells/max_mismatch.py --ignore_failed_lanes | cut -c1 )
 fi
+
+# Long command definitions
+# The quadruple-backslash syntax on this is messy and gross.
+# It works, though, and the output is readable.
+# read -d '' always exits with status 1, so we ignore error
+# We split threads equally between processing and loading+writing.
+set +e
+read -d '' regular_bcl_command  << _REG_BCL_CMD_
+    PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
+    bcl2fastq \\\\
+      --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
+      --use-bases-mask "$bcl_mask" \\\\
+      --output-dir "$fastq_dir" \\\\
+      --barcode-mismatches "$mismatches" \\\\
+      --writing-threads        0                       \\\\
+      --loading-threads        \\\$SLURM_CPUS_PER_TASK \\\\
+      --processing-threads     \\\$SLURM_CPUS_PER_TASK
+_REG_BCL_CMD_
+
+read -d '' novaseq_bcl_command  << _NOVA_BCL_CMD_
+    PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
+    for samplesheet in \$PWD/SampleSheet.withmask*csv ; do
+      bcl_mask=\$(sed 's/.*withmask\\.//;s/\\.csv//' <<< \$samplesheet)
+      fastq_dir=\$(sed 's/,/-/g' <<< "fastq-withmask-\$bcl_mask")
+      bcl2fastq \\\\
+        --input-dir          "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
+        --output-dir         "${illumina_dir}/\$fastq_dir"                \\\\
+        --use-bases-mask     "$bcl_mask"                                  \\\\
+        --barcode-mismatches "$mismatches"                                \\\\
+        --sample-sheet       "${illumina_dir}/\$samplesheet"              \\\\
+        --writing-threads    0                                            \\\\
+        --loading-threads    \\\$SLURM_CPUS_PER_TASK                      \\\\
+        --processing-threads \\\$SLURM_CPUS_PER_TASK
+    done
+_NOVA_BCL_CMD_
+
+read -d '' novaseq_link_command  <<'_NOVA_LINK_CMD_'
+for fq_dir in fastq-withmask-* ;
+  [[ -d $fq_dir ]] || continue
+  python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i "$fq_dir" -o Demultiplexed -p processing.json
+done
+_NOVA_LINK_CMD_
+set -e
+
+if [ -z "$flowcell" ] ; then
+    echo "No flowcell label specified"
+    flowcell=$(basename "$PWD" | cut -f4 -d_ | cut -c2-10)
+    echo "Guessing $flowcell..."
+fi
+
 
 case $run_type in
 
@@ -724,7 +734,6 @@ sbatch --export=ALL -J "collate-$flowcell" \$copy_dependency -o "collate-$flowce
 source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
 
 cd "$analysis_dir"
-$link_command
 # Remove existing scripts if they exist (to avoid appending)
 rm -f fastqc.bash collate.bash run_alignments.bash run_aggregations.bash
 
