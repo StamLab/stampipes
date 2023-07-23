@@ -10,7 +10,7 @@ done
 
 set -eo pipefail
 
-version=1.0.0
+version=1.1.0-alpha3
 
 cd "$(dirname "$0")"
 
@@ -45,12 +45,18 @@ sample_config=sample_config.tsv
 python "$STAMPIPES"/scripts/lims/create_altseq_sample_config.py processing.json --output "$sample_config"
 
 
-
 SEQ_DIR=$(ls -d -1 ${SEQUENCER_MOUNT}/*$FLOWCELL* | head -n1)
 
 GENOME_DIR=/net/seq/data2/projects/prime_seq/cell_ranger_ref/star_2.7.10_genome_2022_gencode.v39/
 GENOME_FA=/net/seq/data2/projects/prime_seq/cell_ranger_ref/GRCh38-2022-Altius-gencode.v39-build/Homo_sapiens.GRCh38.dna.primary_assembly.fa.modified
 BARCODE_WHITELIST=/net/seq/data2/projects/prime_seq/barcodes-combined.txt
+
+WORKROOT=${WORKROOT:-/net/seq/scratch}
+if ! [[ -d "$WORKROOT" ]] ; then
+  echo "WORKROOT '$WORKROOT' does not exist, using '$PWD'"
+  WORKROOT=$PWD
+fi
+WORKDIR=$WORKROOT/$USER/altseq/FC$FLOWCELL/work/
 
 # Run the pipeline
 NXF_VER=21.10.6 nextflow \
@@ -60,13 +66,13 @@ NXF_VER=21.10.6 nextflow \
   -ansi-log false \
   -profile docker,cluster \
   -resume \
+  -work-dir "$WORKDIR" \
   --input_directory "$SEQ_DIR"  \
   --sample_config_tsv "$sample_config" \
   --genome_dir "$GENOME_DIR" \
   --genome_fa "$GENOME_FA" \
   --barcode_whitelist "$BARCODE_WHITELIST" \
-  --outdir "$outdir" \
-  --skip_alignment
+  --outdir "$outdir"
 
 
 # Upload fastq metadata
@@ -77,7 +83,7 @@ python "$STAMPIPES/scripts/altseq/upload_data.py" \
 
 # Create sentinel/status file
 if [[ -e "$status_file" ]] ; then
-  old_date=$(jq .completed_on << "$status_file")
+  old_date=$(jq .completed_on <<< "$status_file")
   old_status_file=${status_file/json/$old_date}.json
   mv "$status_file" "$old_status_file"
 fi

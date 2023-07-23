@@ -1,0 +1,20 @@
+[tool.pyright]
+include = ["scripts"]
+exclude = ["**/__pycache__"]
+#ignore = ["src/oldstuff"]
+defineConstant = { STAMPIPES = "/home/nelsonjs/code/stampipes" }
+#stubPath = "src/stubs"
+#venv = "env367"
+
+reportMissingImports = true
+reportMissingTypeStubs = false
+
+pythonVersion = "3.6"
+pythonPlatform = "Linux"
+
+executionEnvironments = [
+  #{ root = "src/web", pythonVersion = "3.5", pythonPlatform = "Windows", extraPaths = [ "src/service_libs" ] },
+  #{ root = "src/sdk", pythonVersion = "3.0", extraPaths = [ "src/backend" ] },
+  #{ root = "src/tests", extraPaths = ["src/tests/e2e", "src/sdk" ]},
+  #{ root = "src" }
+]

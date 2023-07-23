@@ -25,7 +25,9 @@ def parser_setup():
     parser.add_argument("-p", "--processing", dest="processing",
             help="The JSON file to read barcodes from")
     parser.add_argument("--ignore_failed_lanes", dest="ignore_failed_lanes", action="store_true", default=False,
-            help="Ignore failed lanes when calculating max mismatch.")
+                        help="Ignore failed lanes when calculating max mismatch.")
+    parser.add_argument("--allow_collisions", dest="allow_collisions", action="store_true", default=False,
+            help="Don't exit with error even if collisions are found (workaround)")
 
     parser.set_defaults( **script_options )
     return parser
@@ -83,7 +85,7 @@ def apply_mask(mask, barcode_string):
     barcodes = [ orig_barcodes[i][:l] for (i, l) in enumerate(mask) ]
     return barcodes
 
-def create_lane_set(libraries, mask, ignore_failed_lanes):
+def create_lane_set(libraries, mask, ignore_failed_lanes, allow_collision=False):
     lanes = {}
     for library in libraries:
         lane = library['lane']
@@ -96,8 +98,9 @@ def create_lane_set(libraries, mask, ignore_failed_lanes):
         if lane not in lanes:
             lanes[lane] = set()
         if barcodes in lanes[lane]:
-            sys.stderr.write("Collision on lane %d, barcode %s\n" % ( lane, ','.join(barcodes)))
-            sys.exit(1)
+            if not allow_collision:
+                sys.stderr.write("Collision on lane %d, barcode %s\n" % ( lane, ','.join(barcodes)))
+                sys.exit(1)
         lanes[lane].add(barcodes)
     return lanes
 
@@ -125,11 +128,11 @@ def main(args = sys.argv):
         print("1")
         sys.exit(0)
 
-    lanes = create_lane_set(data['libraries'], mask, poptions.ignore_failed_lanes)
+    lanes = create_lane_set(data['libraries'], mask, poptions.ignore_failed_lanes, poptions.allow_collisions)
 
     mismatch_level = get_max_mismatch_level( lanes, len(mask) )
 
-    if not mismatch_level:
+    if not mismatch_level and not poptions.allow_collisions:
         sys.stderr.write("No allowable mismatch levels found, barcode collision?\n")
         sys.exit(1)
 

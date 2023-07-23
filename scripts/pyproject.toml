@@ -1,0 +1,21 @@
+[tool.black]
+target-version = ['py35']
+
+
+
+[tool.pylint.format]
+max-line-length = 88
+[tool.pylint.basic]
+# Allow 1 or 2 character names for variables
+variable-rgx = "^[a-z][a-z0-9]*((_[a-z0-9]+)*)?$"
+argument-rgx = "^[a-z][a-z0-9]*((_[a-z0-9]+)*)?$"
+
+
+# This section requires https://pypi.org/project/Flake8-pyproject/
+[tool.flake8]
+max-line-length = 88
+# Example config below
+# ignore = ['E231', 'E241']
+# per-file-ignores = [
+#   '__init__.py:F401',
+# ]

@@ -1,4 +1,4 @@
-VERSION=1.1
+VERSION=1.2
 OUT_DIR=output_$VERSION
 mkdir -p "$OUT_DIR"
 

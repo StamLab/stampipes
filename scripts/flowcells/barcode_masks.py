@@ -115,7 +115,7 @@ def main():
     json_data = json.load(process_json)
     process_json.close()
 
-    detect_collisions(json_data)
+    #detect_collisions(json_data)
     print(" ".join(get_barcode_masks(json_data)))
 
 
