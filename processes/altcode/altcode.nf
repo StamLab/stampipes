@@ -25,6 +25,9 @@ workflow {
     ],
   )
 
+  STAR_solo.out.solo_analysis
+  | convert_to_hda5
+
 }
 
 // Helper functions
@@ -48,9 +51,9 @@ def pos_to_str(start, length) {
 /// This process creates the Aligned.out.cram file and STARsolo analysis results
 process STAR_solo {
 
-  module 'STAR/2.7.9a'
   publishDir params.outdir
   cpus 10
+  memory "50 GB"
 
   input:
     tuple(
@@ -69,7 +72,6 @@ process STAR_solo {
 
 
   script:
-    // TODO: How do we dynamically determine this?
     // barcode_positions = "0_10_0_17 0_48_0_55 0_78_0_85"
     bc1_position = pos_to_str(*r1_barcode_pos)
     bc2_position = pos_to_str(*r2_barcode_pos)
@@ -85,9 +87,10 @@ process STAR_solo {
     num_threads = 10
 
     """
-    set -e
+    set -o monitor
     mkfifo Aligned.out.bam
-    STAR \
+
+    (STAR \
     --genomeDir "ref" \
     --readFilesIn "${r1_files}" "${r2_files}" \
     --soloType CB_UMI_Complex \
@@ -96,16 +99,16 @@ process STAR_solo {
     --soloUMIposition "${umi_position}" \
     --soloCBmatchWLtype 1MM \
     --soloUMIdedup 1MM_All \
-    --soloFeatures Gene GeneFull SJ \
+    --soloFeatures Gene GeneFull SJ GeneFull_Ex50pAS GeneFull_ExonOverIntron \
     --runThreadN "${num_threads}" \
     --limitBAMsortRAM "${bam_sort_RAM}" \
     --outSAMtype BAM Unsorted \
     --outSAMattributes NH HI AS nM CR CY UR UY sM \
     --outBAMcompression 0 \
-    - outBAMsortingThreadN "${num_threads}" \
+    --outBAMsortingThreadN "${num_threads}" \
     --readFilesCommand zcat \
     --outFileNamePrefix ./ \
-    --limitOutSJcollapsed 5000000 &
+    --limitOutSJcollapsed 5000000 || kill 0) &
 
     samtools sort \
       --reference  "${genome_fasta}" \
@@ -114,9 +117,32 @@ process STAR_solo {
       --threads "${num_threads}" \
       --write-index \
       -T "tmpsort" \
-      Aligned.out.bam &
+      Aligned.out.bam
 
     wait
     rm Aligned.out.bam
+    compress_mtx_files.sh ./Solo.out "${num_threads}"
     """
+}
+
+process convert_to_hda5 {
+  cpus 10
+  memory "10 GB"
+  publishDir params.outdir
+
+  input: 
+    tuple(val(meta), path(directory))
+
+  output:
+    tuple(val(meta), path(directory))
+
+  shell:
+  '''
+  for dir_name in $(find -L "!{directory}" -name matrix.mtx.gz \
+    | grep -v "SJ/raw" \
+    | xargs --no-run-if-empty dirname) ; do
+    mtx_to_h5.py "$dir_name" "$dir_name/matrix.h5ad" &
+  done
+  wait
+  '''
 }
