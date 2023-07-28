@@ -51,7 +51,7 @@ def pos_to_str(start, length) {
 /// This process creates the Aligned.out.cram file and STARsolo analysis results
 process STAR_solo {
 
-  publishDir params.outdir
+  publishDir params.outdir, mode: "copy"
   cpus 10
   memory "50 GB"
 
@@ -128,7 +128,7 @@ process STAR_solo {
 process convert_to_hda5 {
   cpus 10
   memory "10 GB"
-  publishDir params.outdir
+  publishDir params.outdir, mode: "copy"
 
   input: 
     tuple(val(meta), path(directory))
@@ -138,10 +138,11 @@ process convert_to_hda5 {
 
   shell:
   '''
+  set -m
   for dir_name in $(find -L "!{directory}" -name matrix.mtx.gz \
     | grep -v "SJ/raw" \
     | xargs --no-run-if-empty dirname) ; do
-    mtx_to_h5.py "$dir_name" "$dir_name/matrix.h5ad" &
+    (mtx_to_h5.py "$dir_name" "$dir_name/matrix.h5ad" || kill 0 ) &
   done
   wait
   '''
