@@ -76,3 +76,26 @@ nextflow run \
     -workdir "$WORKDIR" \
     -profile cluster \
     -resume
+
+## Upload fastq metadata
+#python "$STAMPIPES/scripts/altseq/upload_data.py" \
+  #"$sample_config" \
+  #processing.json \
+  #--output_file_directory "$outdir"
+
+# Create sentinel/status file
+if [[ -e "$status_file" ]] ; then
+  old_date=$(jq .completed_on <<< "$status_file")
+  old_status_file=${status_file/json/$old_date}.json
+  mv "$status_file" "$old_status_file"
+fi
+
+# TODO: What else do we want to capture here? It would be nice to at least
+# capture the command used and relevant env vars
+echo | jq . > "$status_file" <<EOF
+  {
+    "completed_on": "$(date -Iseconds)",
+    "version": "$version"
+  } 
+EOF
+
