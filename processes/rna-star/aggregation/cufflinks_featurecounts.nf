@@ -91,6 +91,7 @@ workflow RNA_AGG {
 process merge_transcriptome_bam {
 
   module "samtools/1.12"
+  scratch false
   input:
     // Assume sorted by coord
     file("in*.bam")
@@ -111,6 +112,7 @@ process merge_transcriptome_bam {
 
 process merge_genome_bam {
   module "samtools/1.12"
+  scratch false
   input:
     // Assume sorted by coord
     file("in*.bam")
@@ -169,6 +171,7 @@ process mark_duplicate_reads {
   label 'high_mem'
 
   module "jdk/2.8.1", "picard/2.8.1", "samtools/1.12"
+  scratch false
 
   input:
     path genomebam
@@ -194,6 +197,9 @@ process mark_duplicate_reads {
 process bam_to_fastq {
   publishDir params.outdir, mode: params.publishmode
   module "samtools/1.12"
+
+  cpus 3
+  scratch false
   
   input:
     path input_bam
@@ -411,6 +417,8 @@ process anaquin {
 
   module "samtools/1.12", "anaquin/2.0.1", "kallisto/0.43.1", "R/3.2.5"
   publishDir params.outdir, mode: params.publishmode
+
+  errorStrategy { task.exitStatus == 143 ? 'retry' : 'ignore' }
 
   input:
     path input_bam
