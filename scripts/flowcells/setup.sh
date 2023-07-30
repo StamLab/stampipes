@@ -254,13 +254,13 @@ _REG_BCL_CMD_
 
 read -d '' novaseq_bcl_command  << _NOVA_BCL_CMD_
     PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
-    for samplesheet in \$PWD/SampleSheet.withmask*csv ; do
+    for samplesheet in SampleSheet.withmask*csv ; do
       bcl_mask=\$(sed 's/.*withmask\\.//;s/\\.csv//' <<< \$samplesheet)
       fastq_dir=\$(sed 's/,/-/g' <<< "fastq-withmask-\$bcl_mask")
       bcl2fastq \\\\
         --input-dir          "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
         --output-dir         "${illumina_dir}/\$fastq_dir"                \\\\
-        --use-bases-mask     "$bcl_mask"                                  \\\\
+        --use-bases-mask     "\$bcl_mask"                                 \\\\
         --barcode-mismatches "$mismatches"                                \\\\
         --sample-sheet       "${illumina_dir}/\$samplesheet"              \\\\
         --writing-threads    0                                            \\\\
