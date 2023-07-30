@@ -205,8 +205,8 @@ if [[  "$read1length" = "0" ]] ; then
   cat > run_bcl2fastq.sh <<__BCL2FASTQ__
 #!/bin/bash
 sbatch --cpus 1 \
-  --mem '2G'  \
-  --partition queue0 \
+  --mem '4G'  \
+  --partition hpcz-2 \
   --job-name "altseq-$flowcell-supervisor" <<EOF
 #!/bin/bash
 cd "$analysis_dir"
