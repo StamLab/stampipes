@@ -1,12 +1,13 @@
 /// This file is only for "utility" processes that are extremely generic.
 
 params.outdir = "output"
-params.publishmode = "copy"
+params.publishmode = "link"
 
 process publish_and_rename {
 
   publishDir params.outdir, mode: params.publishmode
   executor "local"
+  container null
 
   input:
     tuple val(filename), path("__infile__")
@@ -21,6 +22,7 @@ process publish_and_rename {
 
 process publish {
   publishDir params.outdir, mode: params.publishmode
+  container null
 
   executor "local"
 
@@ -38,6 +40,7 @@ process publish {
 process publish_with_meta {
   publishDir params.outdir, mode: params.publishmode
   executor "local"
+  container null
 
   input:
     tuple val(meta), path(filename)

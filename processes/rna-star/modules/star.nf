@@ -10,6 +10,7 @@ process star {
   publishDir params.outdir, enabled: params.publish
 
   label 'high_mem'
+  //memory "256 GB"
 
   input:
     tuple path(r1_fq), path(r2_fq)
@@ -21,9 +22,10 @@ process star {
   script:
     mode = "str_PE"
     threads = params.star_threads
-    // Ten gigabyte fastq files will need more RAM to sort
-    is_giant = r1_fq.size() > 10_000_000_000
-    sort_ram = is_giant ? 60_000_000_000 : 30_000_000_000 
+    // Four-gigabyte fastq files will need more RAM to sort
+    is_giant = r1_fq.size() > 3_000_000_000
+    sort_ram = is_giant ? 200_000_000_000 : 30_000_000_000 
+    sj_limit = is_giant ? "--limitOutSJcollapsed 5000000" : ""
     """
     # TODO: Update this??
     echo -e '@CO\tANNID:gencode.basic.tRNA.annotation.gtf.gz' > commentslong.txt
@@ -47,7 +49,7 @@ process star {
       --limitBAMsortRAM ${sort_ram} \
       --outSAMtype BAM SortedByCoordinate \
       --quantMode TranscriptomeSAM \
-      --outSAMheaderCommentFile commentslong.txt \
+      --outSAMheaderCommentFile commentslong.txt ${sj_limit}\
       --outSAMheaderHD '@HD' 'VN:1.4' 'SO:coordinate'
       # TODO: add stranded options
     """

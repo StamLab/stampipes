@@ -73,6 +73,9 @@ def create_links(
     If dry_run is passed, will print them instead of creating them
     """
 
+    # Skip processing the lane if it's not getting aligned
+    if not lane.get("alignments"):
+        return False
     sample_name = lane["alignments"][0]["sample_name"]
     short_name = lane["samplesheet_name"]
 

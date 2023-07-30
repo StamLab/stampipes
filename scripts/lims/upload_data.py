@@ -479,13 +479,13 @@ class UploadLIMS(object):
         file_size = os.path.getsize(path)
         last_modified = datetime.datetime.fromtimestamp(os.path.getmtime(path))
 
-        #if exists:
-        #recorded_mtime = datetime.datetime.fromtimestamp(time.mktime(time.strptime( exists["file_last_modified"], "%Y-%m-%dT%H:%M:%S")))
-
-        # TODO: Make time-checking work!
-        # Current issue: sub-second precision.
-        if skip_md5_check and exists and exists["size_bytes"] == file_size :#and last_modified == recorded_mtime:
-            log.info("File exists and matches recorded size, skipping %s" % path)
+        if skip_md5_check and exists and exists["size_bytes"] == file_size:
+            recorded_mtime = datetime.datetime.fromtimestamp(time.mktime(time.strptime(
+                exists["file_last_modified"], "%Y-%m-%dT%H:%M:%S")))
+            # Allow for sloppiness in NFS timestamps
+            difference = recorded_mtime - last_modified
+            if timedelta(minutes=-1) <= difference <= timedelta(minutes=1):
+                log.info("File exists and matches recorded size, skipping %s" % path)
             return
 
         md5sum = md5sum_file(path)
