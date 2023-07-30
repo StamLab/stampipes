@@ -6,6 +6,7 @@ process fastp_adapter_trim {
   // 0.23.0 enables deterministic results, which is crucial
   module 'fastp/0.21.0'
   cpus 3
+  scratch false
 
   input:
     tuple path(r1), path(r2), val(adapterP5), val(adapterP7)
@@ -33,6 +34,8 @@ process fastp_adapter_trim {
 
 /// Our custom in-house adapter-trimming script
 process adapter_trim {
+  cpus 3
+  scratch false
   input:
     tuple path(r1), path(r2), val(adapterP5), val(adapterP7)
 

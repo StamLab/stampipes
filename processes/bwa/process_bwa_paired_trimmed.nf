@@ -92,6 +92,7 @@ process split_r2_fastq {
 process trim_adapters {
 
   cpus params.threads
+  scratch false
 
   input:
   file split_r1
@@ -125,6 +126,7 @@ process trim_adapters {
  */
 process trim_to_length {
 
+  scratch false
   input:
   set file(r1), file(r2) from trimmed
 
@@ -148,6 +150,7 @@ process trim_to_length {
 
 process add_umi_info {
 
+  scratch false
   input:
   set file(r1), file(r2) from trimmed_fastq
 
@@ -183,6 +186,7 @@ process add_umi_info {
  */
 process fastq_counts {
 
+  scratch false
   input:
   file(r1) from file(params.r1)
   file(r2) from file(params.r2)
@@ -253,6 +257,8 @@ process align {
  */
 process filter_bam {
 
+  scratch false
+
   input:
   file unfiltered_bam
   file nuclear_chroms from file(nuclear_chroms)
@@ -275,6 +281,7 @@ process filter_bam {
 process sort_bam {
 
   cpus params.threads
+  scratch false
 
   input:
   file filtered_bam
@@ -285,7 +292,7 @@ process sort_bam {
   script:
   """
   samtools sort \
-    -l 0 -m 1G -@ "${params.threads}" "$filtered_bam" \
+    -l 0 -m 2G -@ "${params.threads}" "$filtered_bam" \
     > sorted.bam
   """
 }
@@ -294,6 +301,8 @@ process sort_bam {
  * Step 3: Merge alignments into one big ol' file
  */
 process merge_bam {
+  scratch false
+
   input:
   file 'sorted_bam_*' from sorted_bam.collect()
 
@@ -359,6 +368,7 @@ if (params.UMI)
 
 process filter_bam_to_unique {
 
+  scratch false
   input:
   file marked_bam
 
@@ -381,6 +391,7 @@ uniquely_mapping_bam.into { bam_for_insert; bam_for_spot; bam_for_density }
  */
 process bam_counts {
 
+  scratch false
 
   input:
   file(sorted_bam) from marked_bam_for_counts
@@ -561,6 +572,7 @@ process total_counts {
 process cram {
   publishDir params.outdir
   cpus params.cramthreads / 2
+  scratch false
 
   // TODO: put in config
   module "samtools/1.12"

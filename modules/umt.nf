@@ -2,6 +2,7 @@
 
 /// A generic script to move the UMT from a read name to the RX tag in a BAM file
 process move_umt {
+  scratch false
   input:
     path(input_bam)
   output:
@@ -18,6 +19,7 @@ process move_umt {
 /// UMT-trimming for Takara Pico v3 kits
 process takara_trim_umt {
 
+  scratch false
   input:
     tuple path("in.r1.fq.gz"), path("in.r2.fq.gz")
     val readlength

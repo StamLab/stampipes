@@ -25,6 +25,7 @@ process encode_cram {
   container "quay.io/biocontainers/samtools:1.12--h9aed4be_1"
 
   cpus Math.ceil(params.cram_compression_threads / 2)
+  scratch false
 
   input:
     tuple val(meta), path(input_bam), path(reference)
@@ -134,6 +135,7 @@ process encode_cram_no_ref {
   container "quay.io/biocontainers/samtools:1.12--h9aed4be_1"
 
   cpus Math.ceil(params.cram_compression_threads / 2)
+  scratch false
 
   input:
     tuple val(meta), path(input_bam)
