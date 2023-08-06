@@ -3,6 +3,7 @@ import os
 import sys
 import argparse
 import logging
+import re
 import requests
 import collections
 
@@ -149,6 +150,19 @@ class ProcessSetUp(object):
 
         processing_info = self.get_lane_process_info(lane_id)
 
+        pool_name = None
+        try:
+            lib_number = processing_info["libraries"][0]["library"]
+            library_info = self.api.get_single_result(url_addition="library/?number=%d/" % lib_number)
+            pools = library_info["librarypools"]
+            if pools:
+                pool_name = pools[0]["object_name"]
+                logging.debug("Setting up script for pool %s", pool_name)
+        except:
+            pass
+
+        # Check if in pool
+
         self.create_script(processing_info)
 
     def add_script(self, script_file, lane_id, flowcell_label, sample_name):
@@ -169,7 +183,7 @@ class ProcessSetUp(object):
 
         return open(self.script_template, 'r').read()
 
-    def create_script(self, processing_info):
+    def create_script(self, processing_info, pool=None):
 
         lane = processing_info["libraries"][0]
 
@@ -181,6 +195,12 @@ class ProcessSetUp(object):
         alt_dir = lane.get("project_share_directory", "")
         if alt_dir:
             fastq_directory = os.path.join(alt_dir, "fastq", "Project_%s" % lane["project"], "Sample_%s" % lane["samplesheet_name"])
+
+        if pool:
+            flowcell_dir = re.sub(r"/Project.*", "", lane["directory"])
+            if alt_dir:
+                flowcell_dir=alt_dir
+            fastq_directory = os.path.join(flowcell_dir, "fastq", "Project_%s" % lane["project"], "LibraryPool_%s" % pool)
 
         barcode = "NoIndex" if lane['barcode_index'] is None else lane['barcode_index']
         try:

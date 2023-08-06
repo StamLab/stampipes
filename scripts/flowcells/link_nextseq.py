@@ -66,7 +66,7 @@ def parser_setup():
 
 
 def create_links(
-        lane, read, input_basedir, output_basedir, dry_run=False, undetermined=False
+        lane, read, input_basedir, output_basedir, dry_run=False, undetermined=False, is_pool=False,
     ):
     """
     Create the links between the input directories and output dir
@@ -84,10 +84,11 @@ def create_links(
             output_basedir, "Undetermined_indices", "Sample_lane1"
         )
     else:
+        prefix = "LibraryPool" if is_pool else "Sample"
         output_dir = os.path.join(
             output_basedir,
             "Project_%s" % lane["project"],
-            "Sample_%s" % lane["samplesheet_name"],
+            "%s_%s" % (prefix, lane["samplesheet_name"]),
         )
 
     short_name = re.sub(r"_", "-", short_name)
@@ -146,8 +147,19 @@ def main():
     }
     for read in ["R1", "R2"]:
         create_links(
-            undet_lane, read, input_dir, poptions.output_dir, poptions.dry_run, True
+            undet_lane, read, input_dir, poptions.output_dir, poptions.dry_run, undetermined=True
         )
+
+    for pool in data["library_pools"].keys():
+        lane = {
+            "samplesheet_name": pool,
+            "alignments": [{"sample_name": pool}],
+            "project": "Lab",
+        }
+        for read in ["R1", "R2"]:
+            create_links(
+                lane, read, input_dir, poptions.output_dir, poptions.dry_run, is_pool=True
+            )
 
 
 # This is the main body of the program that only runs when running this script

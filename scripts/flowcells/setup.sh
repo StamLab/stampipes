@@ -270,7 +270,7 @@ read -d '' novaseq_bcl_command  << _NOVA_BCL_CMD_
 _NOVA_BCL_CMD_
 
 read -d '' novaseq_link_command  <<'_NOVA_LINK_CMD_'
-for fq_dir in fastq-withmask-* ;
+for fq_dir in fastq-withmask-* ; do
   [[ -d $fq_dir ]] || continue
   python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i "$fq_dir" -o Demultiplexed -p processing.json
 done
@@ -691,6 +691,12 @@ rsync -avP "$samplesheet" "$analysis_dir"
         else
             destination=\$destination/fastq
         fi
+        destination=\$destination/\$dir
+        mkdir -p "\$destination"
+        rsync -aL "\$dir/" "\$destination/"
+    done
+    for dir in Project*/LibraryPool* ; do
+        destination=$analysis_dir
         destination=\$destination/\$dir
         mkdir -p "\$destination"
         rsync -aL "\$dir/" "\$destination/"
