@@ -1,9 +1,6 @@
 Bootstrap: docker
 From: mambaorg/micromamba:1.4.9
 
-# %setup
-#   cat /home/nelsonjs/code/stampipes-altcode-dev/processes/altcode/scanpy.environment.yml > ${APPTAINER_ROOTFS}/env.yaml
-
 %files
   $STAMPIPES/processes/altcode/scanpy.environment.yaml /env.yaml
  
