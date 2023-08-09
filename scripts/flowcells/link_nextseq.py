@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+from collections import defaultdict
 
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
@@ -150,16 +151,31 @@ def main():
             undet_lane, read, input_dir, poptions.output_dir, poptions.dry_run, undetermined=True
         )
 
-    for pool in data["library_pools"].keys():
-        lane = {
-            "samplesheet_name": pool,
-            "alignments": [{"sample_name": pool}],
-            "project": "Lab",
-        }
-        for read in ["R1", "R2"]:
-            create_links(
-                lane, read, input_dir, poptions.output_dir, poptions.dry_run, is_pool=True
-            )
+    # Set up conversion table
+    libs_to_lanes = defaultdict(set)
+    for lane in data["libraries"]:
+        libs_to_lanes[lane['library']].add(lane['lane'])
+
+    for (pool, info) in data["library_pools"].items():
+        barcode = info["barcode1"]
+        if info.get("barcode2"):
+            barcode = "%s_%s" % (barcode, info["barcode2"])
+        lane_nums = set()
+        for lib in info["libraries"]:
+            lib_num = int(re.sub(r'[^\d]+', '', lib))
+            lane_nums.update( libs_to_lanes[lib_num] )
+
+        for lane_num in sorted(lane_nums):
+            out_name = "%s_%s_L00%d" % (pool, barcode, lane_num)
+            lane = {
+                "samplesheet_name": pool,
+                "alignments": [{"sample_name": out_name}],
+                "project": "Lab",
+            }
+            for read in ["R1", "R2"]:
+                create_links(
+                    lane, read, input_dir, poptions.output_dir, poptions.dry_run, is_pool=True
+                )
 
 
 # This is the main body of the program that only runs when running this script
