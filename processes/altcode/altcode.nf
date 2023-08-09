@@ -26,7 +26,7 @@ workflow {
   )
 
   STAR_solo.out.solo_analysis
-  | convert_to_hda5
+  | convert_to_h5ad
 
 }
 
@@ -125,7 +125,7 @@ process STAR_solo {
     """
 }
 
-process convert_to_hda5 {
+process convert_to_h5ad {
   cpus 10
   memory "10 GB"
   publishDir params.outdir, mode: "copy"
