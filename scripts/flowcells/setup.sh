@@ -696,6 +696,7 @@ rsync -avP "$samplesheet" "$analysis_dir"
         rsync -aL "\$dir/" "\$destination/"
     done
     for dir in Project*/LibraryPool* ; do
+        [[ -d \$dir ]] || continue
         destination=$analysis_dir
         destination=\$destination/\$dir
         mkdir -p "\$destination"
@@ -778,11 +779,14 @@ python3 "$STAMPIPES/scripts/alignprocess.py" \
   --qsub-queue queue0                        \
   --outfile run_alignments.bash
 
+python3 "$STAMPIPES/scripts/poolprocess.py" --flowcell "$flowcell" --outfile run_pools.bash
+
 # Set up of flowcell aggregations
 curl -X POST "$LIMS_API_URL/flowcell_run/$flowcell_id/autoaggregate/" -H "Authorization: Token \$LIMS_API_TOKEN"
 
 # Run alignments
 bash run_alignments.bash
+bash run_pools.bash
 
 __COLLATE__
 
