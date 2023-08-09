@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -eo pipefail
 
 version=1.0.0-alpha1
 cd "$(dirname "$0")"
@@ -73,7 +73,7 @@ nextflow run \
     -params-file "$params" \
     -ansi-log false \
     -with-trace \
-    -workdir "$WORKDIR" \
+    -work-dir "$WORKDIR" \
     -profile cluster \
     -resume
 
