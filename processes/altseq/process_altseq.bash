@@ -10,7 +10,7 @@ done
 
 set -eo pipefail
 
-version=1.1.0-alpha4
+version=1.1.0
 
 cd "$(dirname "$0")"
 
