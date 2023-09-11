@@ -673,7 +673,7 @@ $link_command
 mkdir -p "$analysis_dir"
 rsync -avP "$illumina_dir/InterOp" "$analysis_dir/"
 rsync -avP "$illumina_dir/RunInfo.xml" "$analysis_dir/"
-rsync -avP "$samplesheet" "$analysis_dir"
+rsync -avP "$illumina_dir"/SampleSheet*.csv "$analysis_dir/"
 
 # Copy each sample by itself, checking to see if we have a project_share_directory set
 # This is very important to keep customer data separate from internal data.
