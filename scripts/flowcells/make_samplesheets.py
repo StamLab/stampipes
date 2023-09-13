@@ -9,6 +9,10 @@ import textwrap
 
 from collections import defaultdict
 
+# requires BioPython which seems to be in our environment
+# but only to reverse complement which we could figure out
+# another way to do
+from Bio.Seq import Seq
 
 # Usage: $0 -p processing.json
 
@@ -16,6 +20,7 @@ SCRIPT_OPTIONS = {
     "processing": "processing.json",
     "reverse_barcode1": False,
     "reverse_barcode2": False,
+    "filename": "SampleSheet.withmask.{mask}.csv",
 }
 
 def parser_setup():
@@ -26,6 +31,8 @@ def parser_setup():
                         help="Use reverse sequence for barcode1")
     parser.add_argument("--reverse_barcode2", dest="reverse_barcode2", action="store_true",
                         help="Use reverse sequence for barcode2")
+    parser.add_argument("--filename",
+                        help="The template to use for filename, with the {mask} formatting")
     parser.set_defaults(**SCRIPT_OPTIONS)
     return parser
 
@@ -68,12 +75,25 @@ def get_barcode_assignments(data: dict, reverse_barcode1: bool, reverse_barcode2
             pool_assignment_set.add(
                 (libdata.get("lane"), *libs_to_pools[lib_num])
             )
+
+    # a quick little inner function to reverse complement
+    # a sequence and return the string of that
+    def reverse_complement(sequence: str) -> str:
+        seq = Seq(sequence)
+        return str(seq.reverse_complement())
+
     # Turn set of tuples into list of dicts
     pool_assignments = [{
         "lane": a[0],
         "sample": a[1],
-        "barcode1": a[2],
-        "barcode2": a[3],
+        # Okay so we're trying to do the same with these as we do with
+        # the library barcodes including following the reverse instructions
+        # and these come reversed in the processing.json
+        # eventually we might want to change the processing.json to have both versions at hand
+        # like we do for libraries
+        # and remove the dependency on biopython
+        "barcode1": a[2] if reverse_barcode1 else reverse_complement(a[2]),
+        "barcode2": a[3] if reverse_barcode2 else reverse_complement(a[3]),
         } for a in pool_assignment_set]
 
     return assignments + pool_assignments
@@ -182,7 +202,7 @@ def adjust_mask_for_lengths(mask_parts, len1, len2):
     return new_mask
 
 
-def write_samplesheets(name, date, root_mask, assignments):
+def write_samplesheets(name, filename_template, date, root_mask, assignments):
     """ Write out the sample sheets """
     mask_parts = parse_mask(root_mask)
     max_bclen1 = 0
@@ -210,7 +230,8 @@ def write_samplesheets(name, date, root_mask, assignments):
         header = make_samplesheet_header(name, date)
         body = make_samplesheet_body(assigns)
         samplesheet_contents = header + body
-        filename = "SampleSheet.withmask.{}.csv".format(mask_to_str(new_mask))
+        filename = filename_template.format(mask=mask_to_str(new_mask))
+        print("Writing {filename} with {new_mask}".format(filename=filename, new_mask=mask_to_str(new_mask)))
         with open(filename, "w") as f:
             f.write(samplesheet_contents)
 
@@ -243,6 +264,7 @@ def main(args=sys.argv):
                                           )
     mask = data["alignment_group"]["bases_mask"]
     write_samplesheets(name="Altius",
+                       filename_template=poptions.filename,
                        date=str(datetime.date.today()),
                        root_mask=mask,
                        assignments=assignments)
