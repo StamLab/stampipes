@@ -1,3 +1,4 @@
+#import csv
 import json
 import os
 import sys
@@ -12,11 +13,16 @@ try:
 except ImportError:
     from futures import ThreadPoolExecutor
 
-log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+# Globals for storing our mapping (saves LIMS hits)
+POOL_KEY_TO_LIB_IDS = defaultdict(list)  # {(pool_id, lane_number): [lib_id]}
+LIB_ID_TO_LANE_IDS = defaultdict(list)   # {lib_id:                 [lane_ids]}
+LANE_ID_TO_ALN_IDS = defaultdict(list)   # {lane_id:                [aln_ids]}
+
+LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 STAMPIPES = os.getenv('STAMPIPES', '~/stampipes')
 
-script_options = {
+SCRIPT_OPTIONS = {
     "quiet": False,
     "debug": False,
     "base_api_url": None,
@@ -39,53 +45,55 @@ def parser_setup():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-q", "--quiet", dest="quiet", action="store_true",
-        help="Don't print info messages to standard out.")
+                        help="Don't print info messages to standard out.")
     parser.add_argument("-d", "--debug", dest="debug", action="store_true",
-        help="Print all debug messages to standard out.")
+                        help="Print all debug messages to standard out.")
 
     parser.add_argument("-a", "--api", dest="base_api_url",
-        help="The base API url, if not the default live LIMS.")
+                        help="The base API url, if not the default live LIMS.")
     parser.add_argument("-t", "--token", dest="token",
-        help="Your authentication token.  Required.")
+                        help="Your authentication token.  Required.")
 
     #parser.add_argument("--alignment", dest="align_ids", type=int, action="append",
     #    help="Run for this particular alignment.")
     parser.add_argument("--flowcell", dest="flowcell_label",
-        help="Run for this particular flowcell label.")
+                        help="Run for this particular flowcell label.")
     parser.add_argument("--pool", dest="pool",
-        help="Run for this particular pool.")
+                        help="Run for this particular pool.")
     #parser.add_argument("--tag", dest="tag",
     #    help="Run for alignments tagged here.")
     #parser.add_argument("--project", dest="project",
     #    help="Run for alignments in this project.")
 
     parser.add_argument("--script_template", dest="script_template",
-        help="The script template to use.")
+                        help="The script template to use.")
     parser.add_argument("--qsub_priority", dest="qsub_priority", type=int,
-        help="The priority to give scripts we are submitting.")
+                        help="The priority to give scripts we are submitting.")
 
     parser.add_argument("-o", "--outfile", dest="outfile",
-        help="Append commands to run this alignment to this file.")
+                        help="Append commands to run this alignment to this file.")
     parser.add_argument("-b", "--sample-script-basename", dest="sample_script_basename",
-        help="Name of the script that goes after the sample name.")
+                        help="Name of the script that goes after the sample name.")
     parser.add_argument("--qsub-prefix", dest="qsub_prefix",
-        help="Name of the qsub prefix in the qsub job name.  Use a . in front to make it non-cluttery.")
+                        help="Name of the qsub prefix in the qsub job name.  Use a . in front to make it non-cluttery.")
     parser.add_argument("--qsub-queue", dest="qsub_queue",
-        help="Name of the SLURM partition")
+                        help="Name of the SLURM partition")
     parser.add_argument("-n", "--dry-run", dest="dry_run", action="store_true",
-        help="Take no action, only print messages.")
+                        help="Take no action, only print messages.")
     parser.add_argument("--no-mask", dest="no_mask", action="store_true",
-        help="Don't use any barcode mask.")
-    parser.add_argument("--redo_completed", dest="redo_completed", help="Redo alignments marked as completed.",
-        action="store_true")
+                        help="Don't use any barcode mask.")
+    parser.add_argument("--redo_completed", dest="redo_completed", action="store_true",
+                        help="Redo alignments marked as completed.")
     #parser.add_argument("--auto_aggregate", dest="auto_aggregate", help="Script created will also run auto-aggregations after alignments finished.",
         #action="store_true")
-    parser.add_argument("--align_base_dir", dest="align_base_dir", help="Create the alignment directory in this directory")
+    parser.add_argument("--align_base_dir", dest="align_base_dir",
+                        help="Create the alignment directory in this directory")
 
-    parser.add_argument("--listout", dest="simple_output", help="Write only a list of alignments to run, rather than a script to submit them", action="store_true")
+    parser.add_argument("--listout", dest="simple_output", action="store_true",
+                        help="Write only a list of alignments to run, rather than a script to submit them")
 
-    parser.set_defaults( **script_options )
-    parser.set_defaults( quiet=False, debug=False )
+    parser.set_defaults(**SCRIPT_OPTIONS)
+    parser.set_defaults(quiet=False, debug=False)
 
     return parser
 
@@ -182,12 +190,21 @@ class ProcessSetUp(object):
         return info
 
     # Run alignment setup in parallel
-    def setup_alignments(self, align_ids):
-        for id, error in self.pool.map(self.setup_alignment, align_ids):
-            if error:
-                logging.debug("ALN%d result received, error: %s" % (id, error))
-            else:
-                logging.debug("ALN%d result received, OK" % id)
+    def setup_alignments(self, align_ids, parallel=True):
+        all_okay = True
+        if parallel:
+            for id, error in self.pool.map(self.setup_alignment, align_ids):
+                if error:
+                    logging.error("ALN%d result received, error: %s" % (id, error))
+                    all_okay = False
+                else:
+                    logging.debug("ALN%d result received, OK" % id)
+            if not all_okay:
+                logging.critical("Errors during setup, exiting")
+        # Sequential version, helpful for debugging
+        else:
+            for aln_id in align_ids:
+                self.setup_alignment(aln_id)
 
     def setup_alignment(self, align_id):
 
@@ -245,9 +262,13 @@ class ProcessSetUp(object):
             return int(re.findall(r'\d+', url)[-1])
 
         # Storage for the 3 layers of mapping between alignments and pools
-        pool_key_to_lib_ids = defaultdict(list)  # {(pool_id, lane_number): [lib_id]}
-        lib_id_to_lane_ids = defaultdict(list)   # {lib_id:                 [lane_ids]}
-        lane_id_to_aln_ids = defaultdict(list)   # {lane_id:                [aln_ids]}
+        global POOL_KEY_TO_LIB_IDS
+        global LIB_ID_TO_LANE_IDS
+        global LANE_ID_TO_ALN_IDS
+
+        POOL_KEY_TO_LIB_IDS = defaultdict(list)  # {(pool_id, lane_number): [lib_id]}
+        LIB_ID_TO_LANE_IDS = defaultdict(list)   # {lib_id:                 [lane_ids]}
+        LANE_ID_TO_ALN_IDS = defaultdict(list)   # {lane_id:                [aln_ids]}
 
         library_info = set()
         for lane in self.api_list_result("flowcell_lane/?flowcell__label=%s&page_size=1000" % flowcell_label):
@@ -255,7 +276,7 @@ class ProcessSetUp(object):
             lane_lane = lane['lane']
             library_info.add((lib_url, lane_lane))
             lib_id = extract_id_from_url(lib_url)
-            lib_id_to_lane_ids[lib_id].append(lane['id'])
+            LIB_ID_TO_LANE_IDS[lib_id].append(lane['id'])
 
         # Set of poolnums + lane
         pool_info = set()
@@ -264,19 +285,19 @@ class ProcessSetUp(object):
             for pool in lib_info['librarypools']:
                 pool_info.add((pool["number"], info[1]))
                 key = (pool["id"], info[1])
-                pool_key_to_lib_ids[key].append(lib_info['id'])
+                POOL_KEY_TO_LIB_IDS[key].append(lib_info['id'])
 
         all_alignments = self.api_list_result("flowcell_lane_alignment/?lane__flowcell__label=%s&page_size=1000" % flowcell_label)
         for aln in all_alignments:
             lane_id = extract_id_from_url(aln['lane'])
-            lane_id_to_aln_ids[lane_id].append(aln['id'])
+            LANE_ID_TO_ALN_IDS[lane_id].append(aln['id'])
 
         # Find the minimum alignment ID for each pool/lane combination
-        lowest_aln_for_pool = {pool_key: None for pool_key in pool_key_to_lib_ids.keys()}
-        for (pool_key, lib_ids) in pool_key_to_lib_ids.items():
+        lowest_aln_for_pool = {pool_key: None for pool_key in POOL_KEY_TO_LIB_IDS.keys()}
+        for (pool_key, lib_ids) in POOL_KEY_TO_LIB_IDS.items():
             for lib_id in lib_ids:
-                for lane_id in lib_id_to_lane_ids[lib_id]:
-                    for aln_id in lane_id_to_aln_ids[lane_id]:
+                for lane_id in LIB_ID_TO_LANE_IDS[lib_id]:
+                    for aln_id in LANE_ID_TO_ALN_IDS[lane_id]:
                         cur_aln = lowest_aln_for_pool[pool_key]
                         logging.debug("%s, %d, %d, %d < %d?",
                                       pool_key, lib_id, lane_id, aln_id, cur_aln)
@@ -365,7 +386,7 @@ class ProcessSetUp(object):
             logging.error("Alignment %d has no flowcell directory for flowcell %s" % (align_id, processing_info['flowcell']['label']))
             return False
 
-        lib_info = self.api_single_result("library/?number=%d" % processing_info["libraries"][0]["library"])["results"][0]
+        lib_info = self.api_single_result("library/?number__in=%d" % processing_info["libraries"][0]["library"])["results"][0]
         logging.debug("lib info is %s", lib_info)
         pool_name = lib_info["librarypools"][0]["object_name"]
         logging.debug("pool is %s", pool_name)
@@ -495,6 +516,153 @@ class ProcessSetUp(object):
         outfile.write(self.get_script_template(process_template))
         outfile.close()
 
+        # Create the config file as well
+        self.create_sample_config(processing_info, alignment, script_directory)
+
+    def create_sample_config(self, processing_info, alignment, script_directory):
+        alignment_id = int(alignment["id"])
+
+        def get_libraries_in_pool(alignment_id):
+
+            # Get all lane ids
+            # Go up to the pool then down to the lanes
+            # Note: This is inefficient but probably doesnt matter in practice
+            lanes = []
+            lanes_with_align = set()
+            for (lane_id, aln_ids) in LANE_ID_TO_ALN_IDS.items():
+                if alignment_id in aln_ids:
+                    lanes_with_align.add(lane_id)
+            assert len(lanes_with_align) == 1, "Alignment must have exactly 1 lane"
+            align_lane_id = lanes_with_align.pop()
+
+            libs_with_align = set()
+            for (lib_id, lane_ids) in LIB_ID_TO_LANE_IDS.items():
+                if align_lane_id in lane_ids:
+                    libs_with_align.add(lib_id), "Lane must have exactly 1 library"
+            assert len(libs_with_align) == 1
+            align_lib_id = libs_with_align.pop()
+
+            pools_with_align = set()
+            for (pool_key, lib_ids) in POOL_KEY_TO_LIB_IDS.items():
+                if align_lib_id in lib_ids:
+                    pools_with_align.add(pool_key)
+            # TODO: This is broken because the pool can be in more than one lane!!!
+            assert len(pools_with_align) == 1, "Lib must have exactly one pool"
+            align_poolkey = pools_with_align.pop()
+
+            library_ids = set(POOL_KEY_TO_LIB_IDS[align_poolkey])
+            return library_ids
+
+        lib_ids = get_libraries_in_pool(alignment_id)
+
+        def build_library_info(lib_id, flowcell_label):
+            # FIXME: This route doesn't work right now for some reason
+            #lib_info = self.api_single_result("library/%d/" % lib_id)
+            lib_info = self.api_list_result("library/?number__in=%d" % lib_id)[0]
+            barcode = ""
+            bc1 = lib_info["barcode1__sequence"]
+            bc2 = lib_info["barcode2__sequence"]
+            if bc1 is not None:
+                barcode += bc1
+            if bc2 is not None:
+                barcode += bc2
+
+            sample_info = self.api_single_result(url=lib_info["sample"])
+            tc_info = self.api_single_result(url=sample_info["tissue_culture"])
+            project_info = self.api_single_result(url=sample_info["project"])
+
+            taggedobject_infos = self.api_list_result("tagged_object/?object_id=%d&content_type=%d"
+                                             % (lib_info["id"], lib_info["object_content_type"]))
+            cycle = None
+            for taggedobject_info in taggedobject_infos:
+                # TODO: It may be better to check membership in the Insights tag
+                if taggedobject_info["tag_slug"].startswith("megamap-run-mmap"):
+                    if cycle is None:
+                        tag_slug = str(taggedobject_info["tag_slug"])
+                        match = re.search(r"\d+$", tag_slug)
+                        if match:
+                            cycle = int(match.group())
+                        else:
+                            logging.error("problem tag slug is '%s'" % tag_slug)
+                    else:
+                        logging.warning("Multiple megamap tags for LN%d", lib_info["number"])
+
+            def build_effector_info(effectortopool):
+                eff = effectortopool["assemble_effector"]
+                return {
+                    "chromosome": eff["chromosome"],
+                    "start": eff["start"],
+                    "end": eff["end"],
+                    "strand": eff["strand"],
+                    "working_name": eff["working_name"],
+
+                    "n_terminus": {
+                        "name": eff["effector__n_terminus__name"],
+                        "nucleotide": eff["effector__n_terminus__nucleotide"],
+                        "functional_domain": eff["effector__n_functional_domain__name"],
+                    },
+                    "c_terminus": {
+                        "name": eff["effector__c_terminus__name"],
+                        "nucleotide": eff["effector__c_terminus__nucleotide"],
+                        "functional_domain": eff["effector__c_functional_domain__name"],
+                    },
+                    "concentration": eff["concentration"],
+                    "ratio_260to280": eff["ratio_260to280"],
+                    "ivt_mrna_concentration": eff["ivt_mrna_concentration"],
+                    "repeat_array__target_recognition_sequence": "CTCTTTCACAGCTCGCG",
+                    "target_recognition_sequence": "TCTCTTTCACAGCTCGCGT",
+                    "wells": [
+                        {
+                            "plate_name": well["plate__name"],
+                            "plane_id": well["plate_id"],
+                            "well": well["label"],
+                        }
+                        for well in eff["plate_wells"]
+                    ]
+                }
+
+            pool_info = []
+            for effector_pool in tc_info["effector_pools"]:
+                effector_pool_info = self.api_single_result(url=effector_pool["url"])
+                pool_info.append({
+                    "effector_pool": effector_pool_info["object_name"],
+                    "name": effector_pool_info["name"],
+                    "purpose": effector_pool_info["purpose__name"],
+                    "effectors": [
+                        build_effector_info(efftopool)
+                        for efftopool in effector_pool_info["effectortopool_set"]
+                    ],
+                })
+
+            info = {
+                "barcode": barcode,
+                "library": "LN%d" % lib_info["number"],
+                "sublibrary": lib_info["sub_library"],
+                "sample": "DS%d" % lib_info["sample_number"],
+                "tc": "TC%d" % tc_info["number"],
+                "cell_type": tc_info["sample_taxonomy__name"],
+                "project": project_info["name"],
+                "flowcell": flowcell_label,
+                "cycle": cycle,
+                "effector_pools": pool_info,
+            }
+            return info
+
+
+        flowcell_label = "FC%s" % processing_info["flowcell"]["label"]
+        libraries = []
+        for lib_id in lib_ids:
+            libraries.append(build_library_info(lib_id, flowcell_label))
+
+        data = {"libraries": libraries}
+        # do stuff
+        with open("%s/pool_info.json" % script_directory, "w") as out:
+            json.dump(data, out, indent=2, sort_keys=True)
+            #writer = csv.DictWriter(out, fieldnames=fieldnames, dialect="excel-tab", restval="")
+            #writer.writeheader()
+            #for row in rows:
+                #writer.writerow(row)
+
 
 def main(args = sys.argv):
     """This is the main body of the program that by default uses the arguments
@@ -504,12 +672,12 @@ from the command line."""
     poptions = parser.parse_args()
 
     if poptions.quiet:
-        logging.basicConfig(level=logging.WARNING, format=log_format)
+        logging.basicConfig(level=logging.WARNING, format=LOG_FORMAT)
     elif poptions.debug:
-        logging.basicConfig(level=logging.DEBUG, format=log_format)
+        logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
     else:
         # Set up the logging levels
-        logging.basicConfig(level=logging.INFO, format=log_format)
+        logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
         logging.getLogger("requests").setLevel(logging.WARNING)
 
     if not poptions.base_api_url and "LIMS_API_URL" in os.environ:
