@@ -1,6 +1,7 @@
 nextflow.enable.dsl=2
 
 params.outdir = "output"
+params.metadata = ""
 
 /// Workflows
 
@@ -26,6 +27,7 @@ workflow {
   )
 
   STAR_solo.out.solo_analysis
+  | map { [it[0], it[1], file(params.metadata)] }
   | convert_to_h5ad
 
 }
@@ -131,7 +133,7 @@ process convert_to_h5ad {
   publishDir params.outdir, mode: "copy"
 
   input: 
-    tuple(val(meta), path(directory))
+    tuple(val(meta), path(directory), path(metadata))
 
   output:
     tuple(val(meta), path(directory))
@@ -142,7 +144,7 @@ process convert_to_h5ad {
   for dir_name in $(find -L "!{directory}" -name matrix.mtx.gz \
     | grep -v "SJ/raw" \
     | xargs --no-run-if-empty dirname) ; do
-    (mtx_to_h5.py "$dir_name" "$dir_name/matrix.h5ad" || kill 0 ) &
+    (mtx_to_h5.py "$dir_name" "$dir_name/matrix.h5ad" --metadata "!{metadata}" || kill 0 ) &
   done
   wait
   '''

@@ -50,6 +50,7 @@ WORKDIR=$WORKROOT/$USER/altseq/FC$FLOWCELL/work/
 params=params.yaml
 cat >$params <<PARAMS_YAML
 outdir: "$outdir"
+metadata: "pool_info.json"
 r1: "$R1_FASTQ"
 r2: "$R2_FASTQ"
 genome_dir: "$STAR_GENOME_DIR"
