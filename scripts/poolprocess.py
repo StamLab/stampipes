@@ -58,8 +58,8 @@ def parser_setup():
     #    help="Run for this particular alignment.")
     parser.add_argument("--flowcell", dest="flowcell_label",
                         help="Run for this particular flowcell label.")
-    parser.add_argument("--pool", dest="pool",
-                        help="Run for this particular pool.")
+    #parser.add_argument("--pool", dest="pool",
+    #                    help="Run for this particular pool.")
     #parser.add_argument("--tag", dest="tag",
     #    help="Run for alignments tagged here.")
     #parser.add_argument("--project", dest="project",
@@ -299,11 +299,15 @@ class ProcessSetUp(object):
                 for lane_id in LIB_ID_TO_LANE_IDS[lib_id]:
                     for aln_id in LANE_ID_TO_ALN_IDS[lane_id]:
                         cur_aln = lowest_aln_for_pool[pool_key]
-                        logging.debug("%s, %d, %d, %d < %d?",
+                        logging.debug("%s, %d, %d, %d < %s?",
                                       pool_key, lib_id, lane_id, aln_id, cur_aln)
                         if cur_aln is None or cur_aln > aln_id:
                             lowest_aln_for_pool[pool_key] = aln_id
 
+        logging.debug("POOL_KEY_TO_LIB_IDS %s", POOL_KEY_TO_LIB_IDS)
+        logging.debug("LIB_ID_TO_LANE_IDS %s", LIB_ID_TO_LANE_IDS)
+        logging.debug("LANE_ID_TO_ALN_IDS %s", LANE_ID_TO_ALN_IDS)
+        logging.debug("ALN IDS %s", lowest_aln_for_pool.values())
         return list(lowest_aln_for_pool.values())
 
 
@@ -364,7 +368,8 @@ class ProcessSetUp(object):
         return open(script_path, 'r').read()
 
     def create_script(self, processing_info, align_id):
-
+        logging.debug("Creating script for ALN%d", align_id)
+        assert len(processing_info["libraries"]) == 1
         lane = processing_info["libraries"][0]
         alignment = [a for a in lane["alignments"] if a["id"] == align_id][0]
 
@@ -386,7 +391,9 @@ class ProcessSetUp(object):
             logging.error("Alignment %d has no flowcell directory for flowcell %s" % (align_id, processing_info['flowcell']['label']))
             return False
 
-        lib_info = self.api_single_result("library/?number__in=%d" % processing_info["libraries"][0]["library"])["results"][0]
+        lib_info_response = self.api_single_result("library/?number=%d" % lane["library"])["results"]
+        assert len(lib_info_response) == 1
+        lib_info = lib_info_response[0]
         logging.debug("lib info is %s", lib_info)
         pool_name = lib_info["librarypools"][0]["object_name"]
         logging.debug("pool is %s", pool_name)
@@ -521,6 +528,7 @@ class ProcessSetUp(object):
 
     def create_sample_config(self, processing_info, alignment, script_directory):
         alignment_id = int(alignment["id"])
+        logging.debug("Creating sample config for ALN%d", alignment_id)
 
         def get_libraries_in_pool(alignment_id):
 
@@ -549,16 +557,17 @@ class ProcessSetUp(object):
             # TODO: This is broken because the pool can be in more than one lane!!!
             assert len(pools_with_align) == 1, "Lib must have exactly one pool"
             align_poolkey = pools_with_align.pop()
+            logging.debug("Alignment ALN%d - poolkey %s", alignment_id, align_poolkey)
 
             library_ids = set(POOL_KEY_TO_LIB_IDS[align_poolkey])
+            logging.debug("Lib IDs in poolkey %s: %s", align_poolkey, library_ids)
             return library_ids
 
         lib_ids = get_libraries_in_pool(alignment_id)
 
         def build_library_info(lib_id, flowcell_label):
             # FIXME: This route doesn't work right now for some reason
-            #lib_info = self.api_single_result("library/%d/" % lib_id)
-            lib_info = self.api_list_result("library/?number__in=%d" % lib_id)[0]
+            lib_info = self.api_single_result("library/%d/" % lib_id)
             barcode = ""
             bc1 = lib_info["barcode1__sequence"]
             bc2 = lib_info["barcode2__sequence"]
@@ -576,7 +585,7 @@ class ProcessSetUp(object):
             cycle = None
             for taggedobject_info in taggedobject_infos:
                 # TODO: It may be better to check membership in the Insights tag
-                if taggedobject_info["tag_slug"].startswith("megamap-run-mmap"):
+                if taggedobject_info["tag_slug"].startswith("megamap-run-mmap") or taggedobject_info["tag_slug"].startswith("epicapdev-run-ecd"):
                     if cycle is None:
                         tag_slug = str(taggedobject_info["tag_slug"])
                         match = re.search(r"\d+$", tag_slug)
@@ -585,7 +594,7 @@ class ProcessSetUp(object):
                         else:
                             logging.error("problem tag slug is '%s'" % tag_slug)
                     else:
-                        logging.warning("Multiple megamap tags for LN%d", lib_info["number"])
+                        logging.warning("Multiple tags for LN%d", lib_info["number"])
 
             def build_effector_info(effectortopool):
                 eff = effectortopool["assemble_effector"]
@@ -634,12 +643,45 @@ class ProcessSetUp(object):
                     ],
                 })
 
+            def extract_lenti_from_tc_notes(notes):
+                def match_notes(regex):
+                    match = re.search(regex, notes, re.MULTILINE | re.IGNORECASE)
+                    if match is None:
+                        return None
+                    return match.group(1)
+                # Example notes field below:
+                # Talen Number: TL120935
+                # Original TALE name: IL2RA-TL52068-Z
+                # LentiTALE: Lenti-KRAB
+                # MOI Estimate: 1.4
+                # Virus volume: 100
+                # Lenti-X Content: 15%
+                talen_number = match_notes(r"Talen Number: (TL\d+)\s*")
+                talen_name = match_notes(r"Original TALE name: (.+?)\s*$")
+                lentitale = match_notes(r"LentiTALE: (.+?)\s*$")
+                moi_estimate = match_notes(r"MOI Estimate: (.+?)\s*$")
+                virus_volume = match_notes(r"Virus volume: (\d+)\s*$")
+                lenti_x_content = match_notes(r"Lenti-X Content: (.+?)\s*$")
+
+                return {
+                    "talen_number": talen_number,
+                    "talen_name": talen_name,
+                    "lentitale": lentitale,
+                    "moi_estimate": moi_estimate,
+                    "virus_volume": virus_volume,
+                    "lenti_x_content": lenti_x_content,
+                }
+
             info = {
                 "barcode": barcode,
+                "barcode1": bc1,
+                "barcode2": bc2,
                 "library": "LN%d" % lib_info["number"],
                 "sublibrary": lib_info["sub_library"],
                 "sample": "DS%d" % lib_info["sample_number"],
                 "tc": "TC%d" % tc_info["number"],
+                "tc_notes": tc_info["notes"],
+                "lentitale_from_tc_notes": extract_lenti_from_tc_notes(tc_info["notes"]),
                 "cell_type": tc_info["sample_taxonomy__name"],
                 "project": project_info["name"],
                 "flowcell": flowcell_label,

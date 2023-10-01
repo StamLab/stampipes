@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 
-version=1.0.0-alpha1
+version=1.0.0-alpha2
 cd "$(dirname "$0")"
 
 # Temporarily hardcoded!
