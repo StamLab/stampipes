@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Uploads all the results of alt-seq processing to LIMS
+Uploads alt-code fastq files to LIMS
 """
 
 import pprint

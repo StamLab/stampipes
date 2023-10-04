@@ -4,7 +4,7 @@ root_directory=${1:-.}
 threads=${2:-10}
 
 #shellcheck disable=SC2037
-name_query=( '(' -name matrix.mtx -o -name barcodes.tsv -o -name features.tsv ')' )
+name_query=( '(' -name '*.mtx' -o -name barcodes.tsv -o -name features.tsv ')' )
 
 # Gzip regular files
 find "$root_directory" -type f \

@@ -9,6 +9,20 @@ params.metadata = ""
 /// Processes a single sample
 workflow {
 
+  def find_matrices_in_dir = { m, dir -> 
+    def mtx_files = []
+    dir.eachFileRecurse { f -> 
+      // Find mtx.gz files, excluding the SJ folder
+      if (f.name.endsWith(".mtx.gz") && !(f.parent.parent.name == "SJ")) {
+        def parent_path = f.parent
+        def relative_path = dir.parent.toUri().relativize( parent_path.toUri() ).toString()
+        // Record the file, barcode file, feature file, and the relative path to store the output in
+        mtx_files.push([m, file(params.metadata), f, file("${f.parent}/barcodes.tsv.gz"), file("${f.parent}/features.tsv.gz"), relative_path])
+      }
+    }
+    return mtx_files
+  }
+
   def meta = [:]
   def ref_files = file("${params.genome_dir}/*")
 
@@ -27,7 +41,7 @@ workflow {
   )
 
   STAR_solo.out.solo_analysis
-  | map { [it[0], it[1], file(params.metadata)] }
+  | flatMap { find_matrices_in_dir(it[0], it[1]) }
   | convert_to_h5ad
 
 }
@@ -102,6 +116,7 @@ process STAR_solo {
     --soloCBmatchWLtype 1MM \
     --soloUMIdedup 1MM_All \
     --soloFeatures Gene GeneFull SJ GeneFull_Ex50pAS GeneFull_ExonOverIntron \
+    --soloMultiMappers Unique PropUnique Uniform Rescue EM \
     --runThreadN "${num_threads}" \
     --limitBAMsortRAM "${bam_sort_RAM}" \
     --outSAMtype BAM Unsorted \
@@ -128,24 +143,25 @@ process STAR_solo {
 }
 
 process convert_to_h5ad {
-  cpus 10
-  memory "10 GB"
-  publishDir params.outdir, mode: "copy"
+  cpus 1
+  memory "2 GB"
+  publishDir params.outdir, mode: "copy", saveAs: {f -> "$out_dir/$f"}
 
   input: 
-    tuple(val(meta), path(directory), path(metadata))
+    tuple(val(meta), path(metadata_file), path(matrix), path(barcodes), path(features), val(out_dir))
 
   output:
-    tuple(val(meta), path(directory))
+    tuple(val(meta), path(out_file))
 
   shell:
+  out_file = "${matrix.simpleName}.h5ad"
+  // scanpy requires specific file names
   '''
-  set -m
-  for dir_name in $(find -L "!{directory}" -name matrix.mtx.gz \
-    | grep -v "SJ/raw" \
-    | xargs --no-run-if-empty dirname) ; do
-    (mtx_to_h5.py "$dir_name" "$dir_name/matrix.h5ad" --metadata "!{metadata}" || kill 0 ) &
-  done
-  wait
+  mkdir -p tmp
+  cp "!{matrix}" tmp/matrix.mtx.gz
+  cp "!{barcodes}" tmp/barcodes.tsv.gz
+  cp "!{features}" tmp/features.tsv.gz
+  mtx_to_h5.py tmp "!{out_file}"  --metadata "!{metadata_file}" 
+  rm -r tmp
   '''
 }
