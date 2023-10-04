@@ -566,7 +566,6 @@ class ProcessSetUp(object):
         lib_ids = get_libraries_in_pool(alignment_id)
 
         def build_library_info(lib_id, flowcell_label):
-            # FIXME: This route doesn't work right now for some reason
             lib_info = self.api_single_result("library/%d/" % lib_id)
             barcode = ""
             bc1 = lib_info["barcode1__sequence"]
@@ -672,6 +671,27 @@ class ProcessSetUp(object):
                     "lenti_x_content": lenti_x_content,
                 }
 
+            def sample_plate_wells(sample_info):
+                def info_to_data(well_info):
+                    match = re.match(r"(.*) ([A-Z0-9]{2})", well_info["object_name"])
+                    well_data = {
+                        "plate_name": match.group(1),
+                        "well_label": well_info["label"],
+                        "plate_id": well_info["plate_id"],
+                        "object_label": well_info["content_object_label"],
+                    }
+                    if well_info["parent"]:
+                        parent_info = self.api_single_result(url=well_info["parent"])
+                        well_data["well_parent"] = info_to_data(parent_info)
+                    return well_data
+                wells = []
+                for well in sample_info["plate_wells"]:
+                    well_info = self.api_single_result("plate_well/%d/" % well["id"])
+                    well_data = info_to_data(well_info)
+                    wells.append(well_data)
+                return wells
+
+
             info = {
                 "barcode": barcode,
                 "barcode1": bc1,
@@ -683,6 +703,7 @@ class ProcessSetUp(object):
                 "tc_notes": tc_info["notes"],
                 "lentitale_from_tc_notes": extract_lenti_from_tc_notes(tc_info["notes"]),
                 "cell_type": tc_info["sample_taxonomy__name"],
+                "sample_plate_wells": sample_plate_wells(sample_info),
                 "project": project_info["name"],
                 "flowcell": flowcell_label,
                 "cycle": cycle,
