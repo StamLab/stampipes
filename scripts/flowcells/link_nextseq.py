@@ -93,9 +93,8 @@ def create_links(
         )
 
     short_name = re.sub(r"_", "-", short_name)
-    input_dir = input_basedir
     input_wildcard = os.path.join(
-        input_dir, "%s_S*_L00?_%s_???.fastq.gz" % (short_name, read)
+        input_basedir, "%s_S*_%s_???.fastq.gz" % (short_name, read)
     )
 
     if not dry_run and not os.path.isdir(output_dir):
@@ -163,7 +162,7 @@ def main():
         lane_nums = set()
         for lib in info["libraries"]:
             lib_num = int(re.sub(r'[^\d]+', '', lib))
-            lane_nums.update( libs_to_lanes[lib_num] )
+            lane_nums.update(libs_to_lanes[lib_num])
 
         for lane_num in sorted(lane_nums):
             out_name = "%s_%s_L00%d" % (pool, barcode, lane_num)
