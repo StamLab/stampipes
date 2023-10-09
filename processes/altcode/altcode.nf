@@ -68,8 +68,9 @@ def pos_to_str(start, length) {
 process STAR_solo {
 
   publishDir params.outdir, mode: "copy"
-  cpus 10
-  memory "50 GB"
+  cpus 30
+  memory "80 GB"
+  //scratch false
 
   input:
     tuple(
@@ -100,32 +101,36 @@ process STAR_solo {
     r1_files = join_list_commas(r1)
     r2_files = join_list_commas(r2)
 
-    num_threads = 10
+    num_threads = 30
 
     """
     set -o monitor
     mkfifo Aligned.out.bam
 
     (STAR \
-    --genomeDir "ref" \
-    --readFilesIn "${r1_files}" "${r2_files}" \
-    --soloType CB_UMI_Complex \
-    --soloCBposition "${bc3_position}" "${bc2_position}" "${bc1_position}" \
-    --soloCBwhitelist "${r3_barcodes}" "${r2_barcodes}" "${r1_barcodes}" \
-    --soloUMIposition "${umi_position}" \
-    --soloCBmatchWLtype 1MM \
-    --soloUMIdedup 1MM_All \
-    --soloFeatures Gene GeneFull SJ GeneFull_Ex50pAS GeneFull_ExonOverIntron \
-    --soloMultiMappers Unique PropUnique Uniform Rescue EM \
-    --runThreadN "${num_threads}" \
-    --limitBAMsortRAM "${bam_sort_RAM}" \
-    --outSAMtype BAM Unsorted \
-    --outSAMattributes NH HI AS nM CR CY UR UY sM \
-    --outBAMcompression 0 \
-    --outBAMsortingThreadN "${num_threads}" \
-    --readFilesCommand zcat \
-    --outFileNamePrefix ./ \
-    --limitOutSJcollapsed 5000000 || kill 0) &
+      --soloCellReadStats Standard \
+      --clip3pAdapterSeq AAAAAAAAAA \
+      --clip3pAdapterMMp 0.1 \
+      --genomeDir "ref" \
+      --readFilesIn "${r1_files}" "${r2_files}" \
+      --soloType CB_UMI_Complex \
+      --soloCBposition "${bc3_position}" "${bc2_position}" "${bc1_position}" \
+      --soloCBwhitelist "${r3_barcodes}" "${r2_barcodes}" "${r1_barcodes}" \
+      --soloUMIposition "${umi_position}" \
+      --soloCBmatchWLtype 1MM \
+      --soloUMIdedup 1MM_All \
+      --soloFeatures Gene GeneFull SJ GeneFull_Ex50pAS GeneFull_ExonOverIntron \
+      --soloMultiMappers Unique PropUnique Uniform Rescue EM \
+      --runThreadN "${num_threads}" \
+      --limitBAMsortRAM "${bam_sort_RAM}" \
+      --outSAMtype BAM Unsorted \
+      --outSAMattributes NH HI AS nM CR CY UR UY sM \
+      --outBAMcompression 0 \
+      --outBAMsortingThreadN "${num_threads}" \
+      --readFilesCommand zcat \
+      --outFileNamePrefix ./ \
+      --limitOutSJcollapsed 5000000 \
+    || kill 0) &
 
     samtools sort \
       --reference  "${genome_fasta}" \
@@ -144,7 +149,7 @@ process STAR_solo {
 
 process convert_to_h5ad {
   cpus 1
-  memory "2 GB"
+  memory "10 GB"
   publishDir params.outdir, mode: "copy", saveAs: {f -> "$out_dir/$f"}
 
   input: 
