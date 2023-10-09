@@ -622,7 +622,7 @@ class ProcessSetUp(object):
                     "wells": [
                         {
                             "plate_name": well["plate__name"],
-                            "plane_id": well["plate_id"],
+                            "plate_id": well["plate_id"],
                             "well": well["label"],
                         }
                         for well in eff["plate_wells"]
