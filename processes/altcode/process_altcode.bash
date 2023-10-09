@@ -55,7 +55,7 @@ r1: "$R1_FASTQ"
 r2: "$R2_FASTQ"
 genome_dir: "$STAR_GENOME_DIR"
 genome_fasta: "$GENOME_FA"
-barcode_r1_list: "$STAMPIPES_DATA/altcode/barcodes_r1_v2_48.txt"
+barcode_r1_list: "$STAMPIPES_DATA/altcode/barcodes_r1_v2_96.txt"
 barcode_r2_list: "$STAMPIPES_DATA/altcode/barcodes_r2.txt"
 barcode_r3_list: "$STAMPIPES_DATA/altcode/barcodes_r3.txt"
 barcode_r1_pos: $R1_BARCODE_POS
