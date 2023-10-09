@@ -40,10 +40,11 @@ source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
 
 WORKROOT=${WORKROOT:-/net/seq/scratch}
 if ! [[ -d "$WORKROOT" ]] ; then
-  echo "WORKROOT '$WORKROOT' does not exist, using '$PWD'"
-  WORKROOT=$PWD
+  echo "WORKROOT '$WORKROOT' does not exist, using '$PWD/work'"
+  WORKROOT=$PWD/work
+else
+  WORKDIR=$WORKROOT/$USER/altseq/FC$FLOWCELL/ALN$ALIGNMENT_ID/work/
 fi
-WORKDIR=$WORKROOT/$USER/altseq/FC$FLOWCELL/work/
 
 
 # Write parameter file
@@ -100,3 +101,4 @@ echo | jq . > "$status_file" <<EOF
   } 
 EOF
 
+nextflow clean -but last -force
