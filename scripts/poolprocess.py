@@ -250,6 +250,7 @@ class ProcessSetUp(object):
         logging.debug("align ids: %s", align_ids)
         #alignments = self.api_list_result("flowcell_lane_alignment/?lane__flowcell__label=%s&page_size=1000" % flowcell_label)
         self.setup_alignments(align_ids)
+        self.add_stats_upload(flowcell_label)
 
     def get_alignment_ids(self, flowcell_label: str) -> [int]:
         """
@@ -358,6 +359,26 @@ class ProcessSetUp(object):
             fullname = "%s%s-%s-ALIGN#%d" % (self.qsub_prefix,sample_name,processing_info['flowcell']['label'],align_id)
             outfile.write("jobid=$(sbatch --export=ALL -J %s -o %s.o%%A -e %s.e%%A --partition=%s --cpus-per-task=1 --ntasks=1 --mem-per-cpu=%d --parsable --oversubscribe <<__ALIGNPROC__\n#!/bin/bash\nbash %s\n__ALIGNPROC__\n)\nPROCESSING=\"$PROCESSING,$jobid\"\n\n" % (fullname, fullname, fullname, self.qsub_queue, ram_megabytes, script_file))
         outfile.close()
+
+
+    def add_stats_upload(self, flowcell_label):
+        job_name = ".upload-altcode-%s" % flowcell_label
+        template = textwrap.dedent(
+            """\
+            cd "$FLOWCELLS"/FC{label}_*
+            sentinel_dependencies=$(echo $PROCESSING | sed -e 's/,/,afterany:/g' | sed -e 's/^,afterany/--dependency=afterany/g')
+            sbatch --export=ALL -J {job_name} -o {job_name}.o%A -e {job_name}.e%A --partition={queue} --cpus-per-task=1 --ntasks=1 $sentinel_dependencies --mem-per-cpu=1000 --parsable --oversubscribe <<__UPLOAD_POOL_DATA__
+            #!/bin/bash
+            python $STAMPIPES/scripts/altcode/upload_stats.py "$PWD"
+            __UPLOAD_POOL_DATA__""")
+        content = template.format(
+            label=flowcell_label,
+            job_name=job_name,
+            queue=self.qsub_queue,
+        )
+
+        with open(self.outfile, 'a') as outfile:
+               outfile.write(content)
 
     def get_script_template(self, process_template):
 
@@ -524,9 +545,9 @@ class ProcessSetUp(object):
         outfile.close()
 
         # Create the config file as well
-        self.create_sample_config(processing_info, alignment, script_directory)
+        self.create_sample_config(processing_info, alignment, script_directory, pool_name)
 
-    def create_sample_config(self, processing_info, alignment, script_directory):
+    def create_sample_config(self, processing_info, alignment, script_directory, pool_name):
         alignment_id = int(alignment["id"])
         logging.debug("Creating sample config for ALN%d", alignment_id)
 
@@ -704,10 +725,12 @@ class ProcessSetUp(object):
                 "lentitale_from_tc_notes": extract_lenti_from_tc_notes(tc_info["notes"]),
                 "cell_type": tc_info["sample_taxonomy__name"],
                 "sample_plate_wells": sample_plate_wells(sample_info),
+                "library_plate_wells": sample_plate_wells(lib_info),
                 "project": project_info["name"],
                 "flowcell": flowcell_label,
                 "cycle": cycle,
                 "effector_pools": pool_info,
+                "pool": pool_name,
             }
             return info
 

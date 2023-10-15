@@ -87,7 +87,7 @@ nextflow run \
 
 # Create sentinel/status file
 if [[ -e "$status_file" ]] ; then
-  old_date=$(jq .completed_on <<< "$status_file")
+  old_date=$(jq .completed_on < "$status_file")
   old_status_file=${status_file/json/$old_date}.json
   mv "$status_file" "$old_status_file"
 fi

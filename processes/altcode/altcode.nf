@@ -44,6 +44,9 @@ workflow {
   | flatMap { find_matrices_in_dir(it[0], it[1]) }
   | convert_to_h5ad
 
+  STAR_solo.out.solo_analysis
+  | map { [it[0], it[1], file(params.metadata)] }
+  | summarize_stats
 }
 
 // Helper functions
@@ -169,4 +172,21 @@ process convert_to_h5ad {
   mtx_to_h5.py tmp "!{out_file}"  --metadata "!{metadata_file}" 
   rm -r tmp
   '''
+}
+
+process summarize_stats {
+  cpus 1
+  publishDir params.outdir, mode: "copy"
+
+  input:
+    tuple val(meta), path(solo_dir), path(metadata_json)
+
+  output:
+    tuple val(meta), path(stats_json)
+
+  script:
+    stats_json = "stats.json"
+    """
+    summarize_stats.py "${solo_dir}" "${metadata_json}" > "${stats_json}"
+    """
 }
