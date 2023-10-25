@@ -1,13 +1,15 @@
 #import csv
-import json
-import os
-import sys
 import argparse
+import json
 import logging
+import os
 import re
-import requests
+import sys
 import textwrap
 from collections import OrderedDict, defaultdict
+
+import requests
+
 try:
     from concurrent.futures import ThreadPoolExecutor
 except ImportError:
@@ -682,6 +684,7 @@ class ProcessSetUp(object):
                 moi_estimate = match_notes(r"MOI Estimate: (.+?)\s*$")
                 virus_volume = match_notes(r"Virus volume: (\d+)\s*$")
                 lenti_x_content = match_notes(r"Lenti-X Content: (.+?)\s*$")
+                effector_assembly_qc = match_notes(r"Effector Assembly QC: (.+?)\s*$")
 
                 return {
                     "talen_number": talen_number,
@@ -690,6 +693,7 @@ class ProcessSetUp(object):
                     "moi_estimate": moi_estimate,
                     "virus_volume": virus_volume,
                     "lenti_x_content": lenti_x_content,
+                    "effector_assembly_qc": effector_assembly_qc,
                 }
 
             def sample_plate_wells(sample_info):
