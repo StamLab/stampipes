@@ -608,7 +608,8 @@ def find_stat_files_in_dir(flowcell_directory):
         versn = match.group("versn") if match and match.group("versn") else 0
         greek = match.group("greek") if match and match.group("greek") else "zzzzzz"  # last
         teeny = match.group("teeny") if match and match.group("teeny") else 0
-        return (LooseVersion(versn), greek, LooseVersion(teeny))
+        length = -1 * len(a) # Prefer shorter names to longer
+        return (LooseVersion(versn), greek, LooseVersion(teeny), length)
 
     for align_dir in align_dirs:
         # TODO: should we filter to output directories that have output? completed status in status.json?
