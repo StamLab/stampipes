@@ -345,7 +345,7 @@ class ProcessSetUp(object):
 
     def add_script(self, align_id, processing_info, script_file, sample_name):
 
-        ram_megabytes = 2000
+        ram_megabytes = 4000
 
         if not self.outfile:
             logging.debug("Writing script to stdout")
@@ -589,6 +589,12 @@ class ProcessSetUp(object):
         lib_ids = get_libraries_in_pool(alignment_id)
 
         def build_library_info(lib_id, flowcell_label):
+            errors = []
+            def add_error(fmt, *args):
+                err_msg = fmt % args
+                errors.append(err_msg)
+                logging.error(fmt, *args)
+
             lib_info = self.api_single_result("library/%d/" % lib_id)
             barcode = ""
             bc1 = lib_info["barcode1__sequence"]
@@ -614,9 +620,9 @@ class ProcessSetUp(object):
                         if match:
                             cycle = int(match.group())
                         else:
-                            logging.error("problem tag slug is '%s'" % tag_slug)
+                            add_error("problem tag slug is '%s'", tag_slug)
                     else:
-                        logging.warning("Multiple tags for LN%d", lib_info["number"])
+                        add_error("Multiple tags for LN%d", lib_info["number"])
 
             def build_effector_info(effectortopool):
                 eff = effectortopool["assemble_effector"]
@@ -696,7 +702,7 @@ class ProcessSetUp(object):
                     "effector_assembly_qc": effector_assembly_qc,
                 }
 
-            def sample_plate_wells(sample_info):
+            def sample_plate_wells(sample_info) -> "[dict]":
                 def info_to_data(well_info):
                     match = re.match(r"(.*) ([A-Z0-9]{2})", well_info["object_name"])
                     well_data = {
@@ -716,8 +722,15 @@ class ProcessSetUp(object):
                     wells.append(well_data)
                 return wells
 
+            def reverse_complement(bc: "Optional[str]") -> "Optional[str]":
+                if bc is None:
+                    return None
+                lookup = {"A":"T", "T":"A", "C":"G", "G":"C"}
+                return "".join(lookup[c] for c in bc)
 
-            info = {
+            lenti_from_tc = extract_lenti_from_tc_notes(tc_info["notes"])
+            lib_plate_wells = sample_plate_wells(lib_info)
+            deep_info = {
                 "barcode": barcode,
                 "barcode1": bc1,
                 "barcode2": bc2,
@@ -726,15 +739,103 @@ class ProcessSetUp(object):
                 "sample": "DS%d" % lib_info["sample_number"],
                 "tc": "TC%d" % tc_info["number"],
                 "tc_notes": tc_info["notes"],
-                "lentitale_from_tc_notes": extract_lenti_from_tc_notes(tc_info["notes"]),
+                "lentitale_from_tc_notes": lenti_from_tc,
                 "cell_type": tc_info["sample_taxonomy__name"],
+                "library_plate_wells": lib_plate_wells,
                 "sample_plate_wells": sample_plate_wells(sample_info),
-                "library_plate_wells": sample_plate_wells(lib_info),
                 "project": project_info["name"],
                 "flowcell": flowcell_label,
                 "cycle": cycle,
                 "effector_pools": pool_info,
                 "pool": pool_name,
+            }
+
+            #####################################
+            # Refine our data to match the spec #
+            #####################################
+            seq_well_label = None
+            seq_well_plate = None
+            sample_well_label = None
+            sample_well_plate = None
+            tc_well_label = None
+            tc_well_plate = None
+            try:
+                seq_well_label    = lib_plate_wells[0]["well_label"]
+                seq_well_plate    = "PL%d" % lib_plate_wells[0]["plate_id"]
+                sample_well_label = lib_plate_wells[0]["well_parent"]["well_label"]
+                sample_well_plate = "PL%d" % lib_plate_wells[0]["well_parent"]["plate_id"]
+                tc_well_label     = lib_plate_wells[0]["well_parent"]["well_parent"]["well_label"]
+                tc_well_plate     = "PL%d" % lib_plate_wells[0]["well_parent"]["well_parent"]["plate_id"]
+            except Exception as e:
+                add_error("Could not find well info in %s", lib_plate_wells)
+
+            if pool_info:
+                talen_name = None #TODO
+            else:
+                talens_str = lenti_from_tc["talen_name"]
+                # Sort to normalize for string comparison
+                if talens_str is not None:
+                    talens = sorted([t.strip() for t in talens_str.split(",")])
+                    talen_name = ",".join(talens)
+                else:
+                    talen_name = None
+
+            lenti_qc_passed = lenti_from_tc["effector_assembly_qc"] is None
+
+            if sample_info["time_point_unit"] == 5:
+                # harvest timepoint is in days
+                harvest_timepoint = float(sample_info["time_point"])
+            else:
+                add_error("Sample timepoint unit unknown")
+                harvest_timepoint = None
+
+            # def parse_talen_names_from_tc_notes(notes):
+            #     def match_notes(regex):
+            #         match = re.search(regex, notes, re.MULTILINE | re.IGNORECASE)
+            #         if match is None:
+            #             return None
+            #         return match.group(1)
+            #     talen_new = match_notes(r"Talen Number:\s*(.+?)\s*$")
+            #     talen_orig = match_notes(r"Original TALE name:\s*(.+?)\s*$")
+            #     if talen_new is not None and talen_orig is not None:
+            #         # Sort to make matching easier
+            #         split_new = [s.strip() for s in talen_new.split(",")]
+            #         split_orig = [s.strip() for s in talen_new.split(",")]
+            #         if len(split_new) != len(split_orig):
+            #             log.warning("Length of new and old talens differ")
+            #             break
+            #         sorted_pairs = sorted(zip(split_new, split_orig))
+            #         talen_new = [p[0] for p in sorted_pairs]
+            #         talen_orig = [p[1] for p in sorted_pairs]
+            #     return (talen_orig, talen_new)
+
+            # (talen_orig, talen_new) = parse_talen_names_from_tc_notes(tc_info["notes"])
+
+            info = {
+                "sequencing_barcode_well": seq_well_label,
+                "sequencing_barcode_plate": seq_well_plate,
+                "sample_well": sample_well_label,
+                "sample_plate": sample_well_plate,
+                "perturbation_well": tc_well_label,
+                "perturbation_plate": tc_well_plate,
+                "day": harvest_timepoint,
+                "talen_name": talen_name,
+                "cell_type": tc_info["sample_taxonomy__name"],
+                "cycle": cycle,
+                "tale_target_name": "TODO",
+                "tale_target_master_gene_id": "TODO",
+                "effector_purpose": "TODO",
+                "library_pool": pool_name,
+                "TC#": "TC%d" % tc_info["number"],
+                "DS#": "DS%d" % sample_info["number"],
+                "LN#": "LN%d" % lib_info["number"],
+                "TL#_original": lenti_from_tc["talen_name"],
+                "TL#_new": lenti_from_tc["talen_number"],
+                "sample_barcode": reverse_complement(bc2),
+                "lenti_qc_passed": True,
+
+                "script_errors": errors,
+                "additional_information": deep_info,
             }
             return info
 

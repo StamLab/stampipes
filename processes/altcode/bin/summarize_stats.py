@@ -79,8 +79,16 @@ def summarize_by_library(pool_info, stats):
     def build_barcode_to_library_lookup(pool_info, stats):
         barcode_to_library = {}
         for lib in pool_info["libraries"]:
-            bc = revcom(lib["barcode2"])
-            barcode_to_library[bc] = lib["library"]
+            #bc = revcom(lib["barcode2"])
+            # Some old backward-compatibility
+            # Newer stuff is at the top of the list
+            if "sample_barcode" in lib:
+                bc = lib["sample_barcode"]
+            elif "barcode2" in lib:
+                bc = revcom(lib["sample_barcode"])
+            elif "additional_information" in lib and "barcode2" in lib["additional_information"]:
+                bc = revcom(lib["additional_information"]["sample_barcode"])
+            barcode_to_library[bc] = lib["LN#"]
         return barcode_to_library
 
 
@@ -114,10 +122,10 @@ def summarize_by_library(pool_info, stats):
         for (k, v) in libraries[bc].items():
             libraries[bc][k] = str(v)
 
-    pool_set = set(lib["pool"] for lib in pool_info["libraries"])
+    pool_set = set(lib["library_pool"] for lib in pool_info["libraries"])
     assert len(pool_set) == 1, "Should have exactly 1 pool, instead: %s" % pool_set
     data["pool"] = pool_set.pop()
-    flowcell_set = set(lib["flowcell"] for lib in pool_info["libraries"])
+    flowcell_set = set(lib["additional_information"]["flowcell"] for lib in pool_info["libraries"])
     assert len(flowcell_set) == 1, "Pool should have exactly 1 flowcell, instead %s" % flowcell_set
     data["flowcell_label"] = flowcell_set.pop()[2:]
 
@@ -173,10 +181,10 @@ def summarize_by_sample(pool_info, stats):
         for (k, v) in samples[bc].items():
             samples[bc][k] = str(v)
 
-    pool_set = set(lib["pool"] for lib in pool_info["libraries"])
+    pool_set = set(lib["library_pool"] for lib in pool_info["libraries"])
     assert len(pool_set) == 1, "Should have exactly 1 pool, instead: %s" % pool_set
     data["pool"] = pool_set.pop()
-    flowcell_set = set(lib["flowcell"] for lib in pool_info["libraries"])
+    flowcell_set = set(lib["additional_information"]["flowcell"] for lib in pool_info["libraries"])
     assert len(flowcell_set) == 1, "Pool should have exactly 1 flowcell, instead %s" % flowcell_set
     data["flowcell_label"] = flowcell_set.pop()[2:]
 
