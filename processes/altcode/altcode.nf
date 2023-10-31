@@ -136,7 +136,7 @@ process STAR_solo {
     || kill 0) &
 
     samtools sort \
-      --reference  "${genome_fasta}" \
+      --reference "${genome_fasta}" \
       -o Aligned.out.cram \
       --output-fmt-option "version=3.0,level=7" \
       --threads "${num_threads}" \
