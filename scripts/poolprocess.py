@@ -726,7 +726,7 @@ class ProcessSetUp(object):
                 if bc is None:
                     return None
                 lookup = {"A":"T", "T":"A", "C":"G", "G":"C"}
-                return "".join(lookup[c] for c in bc)
+                return "".join(reversed([lookup[c] for c in bc]))
 
             lenti_from_tc = extract_lenti_from_tc_notes(tc_info["notes"])
             lib_plate_wells = sample_plate_wells(lib_info)
