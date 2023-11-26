@@ -22,6 +22,12 @@ LANE_ID_TO_ALN_IDS = defaultdict(list)   # {lane_id:                [aln_ids]}
 
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
+# Keys to copy directly from the api/locus/ endpoint
+LOCUS_KEYS = ["genome_label", "chromosome_name", "genes", "name",
+              "genomic_feature", "genomic_coordinate_genome_label",
+              "genomic_coordinate_chromosome_name", "genomic_coordinate_start",
+              "genomic_coordinate_end"]
+
 STAMPIPES = os.getenv('STAMPIPES', '~/stampipes')
 
 SCRIPT_OPTIONS = {
@@ -661,10 +667,22 @@ class ProcessSetUp(object):
             pool_info = []
             for effector_pool in tc_info["effector_pools"]:
                 effector_pool_info = self.api_single_result(url=effector_pool["url"])
+                loci_info = []
+                if effector_pool_info.get("loci", False):
+                    for locus_url in effector_pool_info["loci"]:
+                        locus_info = self.api_single_result(url=locus_url)
+                        locus_dict = {
+                            "label": locus_info.get("object_label"),
+                        }
+                        for key in LOCUS_KEYS:
+                            locus_dict[key] = locus_info.get(key, None)
+                        loci_info.append(locus_dict)
+
                 pool_info.append({
                     "effector_pool": effector_pool_info["object_name"],
                     "name": effector_pool_info["name"],
                     "purpose": effector_pool_info["purpose__name"],
+                    "loci": loci_info,
                     "effectors": [
                         build_effector_info(efftopool)
                         for efftopool in effector_pool_info["effectortopool_set"]
