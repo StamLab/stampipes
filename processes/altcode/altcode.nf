@@ -128,6 +128,7 @@ process STAR_solo {
       --limitBAMsortRAM "${bam_sort_RAM}" \
       --outSAMtype BAM Unsorted \
       --outSAMattributes NH HI AS nM CR CY UR UY sM \
+      --outSAMunmapped Within \
       --outBAMcompression 0 \
       --outBAMsortingThreadN "${num_threads}" \
       --readFilesCommand zcat \
