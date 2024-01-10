@@ -632,12 +632,16 @@ class ProcessSetUp(object):
 
             def build_effector_info(effectortopool):
                 eff = effectortopool["assemble_effector"]
+                talen_number = eff["talen_sheet_number"]
+                talen = "TL%s" % talen_number if talen_number else None
+
                 return {
                     "chromosome": eff["chromosome"],
                     "start": eff["start"],
                     "end": eff["end"],
                     "strand": eff["strand"],
                     "working_name": eff["working_name"],
+                    "talen": talen,
 
                     "n_terminus": {
                         "name": eff["effector__n_terminus__name"],
@@ -787,13 +791,30 @@ class ProcessSetUp(object):
             except Exception as e:
                 add_error("Could not find well info in %s", lib_plate_wells)
 
+            def sort_talens(tls):
+                """ Sort talens by number """
+                def get_num(tl):
+                    assert tl[:2] == "TL"
+                    return int(tl[2:])
+                return sorted(tls, key=get_num)
+
             if pool_info:
-                talen_name = None #TODO
+                #talen_name = None #TODO
+                talen_names = []
+                for pool in deep_info["effector_pools"]:
+                    for effector in pool.get("effectors", []):
+                        if effector["talen"]:
+                            talen_names.append(effector["talen"])
+                
+                talen_name = ",".join(sort_talens(talen_names))
+                orig_talen_name = talen_name
+
             else:
                 talens_str = lenti_from_tc["talen_name"]
+                orig_talen_name = lenti_from_tc["talen_name"]
                 # Sort to normalize for string comparison
                 if talens_str is not None:
-                    talens = sorted([t.strip() for t in talens_str.split(",")])
+                    talens = sort_talens([t.strip() for t in talens_str.split(",")])
                     talen_name = ",".join(talens)
                 else:
                     talen_name = None
@@ -847,7 +868,7 @@ class ProcessSetUp(object):
                 "TC#": "TC%d" % tc_info["number"],
                 "DS#": "DS%d" % sample_info["number"],
                 "LN#": "LN%d" % lib_info["number"],
-                "TL#_original": lenti_from_tc["talen_name"],
+                "TL#_original": orig_talen_name,
                 "TL#_new": lenti_from_tc["talen_number"],
                 "sample_barcode": reverse_complement(bc2),
                 "lenti_qc_passed": True,
