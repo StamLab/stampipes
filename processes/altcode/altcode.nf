@@ -70,7 +70,7 @@ def pos_to_str(start, length) {
 /// This process creates the Aligned.out.cram file and STARsolo analysis results
 process STAR_solo {
 
-  publishDir params.outdir, mode: "copy"
+  publishDir params.outdir, mode: "copy", saveAs: { f -> f.name == "Solo.out" ? null : f }
   cpus 30
   memory "80 GB"
   //scratch false
