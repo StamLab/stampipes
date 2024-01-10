@@ -92,6 +92,8 @@ if [[ -e "$status_file" ]] ; then
   mv "$status_file" "$old_status_file"
 fi
 
+samtools quickcheck  "$outdir/Aligned.out.cram"
+
 # TODO: What else do we want to capture here? It would be nice to at least
 # capture the command used and relevant env vars
 echo | jq . > "$status_file" <<EOF
