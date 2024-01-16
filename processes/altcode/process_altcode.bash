@@ -32,6 +32,7 @@ module load jdk/11.0.16
 module load nextflow/22.04.3
 module load python/3.5.1
 module load apptainer/1.1.2
+module load samtools/1.14
 
 export NXF_VER=23.04.2
 

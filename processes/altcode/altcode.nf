@@ -9,6 +9,7 @@ params.metadata = ""
 /// Processes a single sample
 workflow {
 
+  // This function finds the matrix.gz files that we want to convert to h5ad
   def find_matrices_in_dir = { m, dir -> 
     def mtx_files = []
     dir.eachFileRecurse { f -> 
@@ -70,7 +71,7 @@ def pos_to_str(start, length) {
 /// This process creates the Aligned.out.cram file and STARsolo analysis results
 process STAR_solo {
 
-  publishDir params.outdir, mode: "copy", saveAs: { f -> f.name == "Solo.out" ? null : f }
+  publishDir params.outdir, mode: "copy"
   cpus 30
   memory "80 GB"
   //scratch false
@@ -88,6 +89,7 @@ process STAR_solo {
 
   output:
     tuple(val(meta), path("Aligned.out.cram*"), emit: cram)
+    tuple(val(meta), path("Solo.out/???**"), emit: solo_files)
     tuple(val(meta), path("Solo.out"), emit: solo_analysis)
 
 
@@ -107,10 +109,7 @@ process STAR_solo {
     num_threads = 30
 
     """
-    set -o monitor
-    mkfifo Aligned.out.bam
-
-    (STAR \
+    STAR \
       --soloCellReadStats Standard \
       --clip3pAdapterSeq AAAAAAAAAA \
       --clip3pAdapterMMp 0.1 \
@@ -133,9 +132,8 @@ process STAR_solo {
       --outBAMsortingThreadN "${num_threads}" \
       --readFilesCommand zcat \
       --outFileNamePrefix ./ \
-      --limitOutSJcollapsed 5000000 \
-    || kill 0) &
-
+      --limitOutSJcollapsed 5000000
+    
     samtools sort \
       --reference "${genome_fasta}" \
       -o Aligned.out.cram \
@@ -145,7 +143,6 @@ process STAR_solo {
       -T "tmpsort" \
       Aligned.out.bam
 
-    wait
     rm Aligned.out.bam
     compress_mtx_files.sh ./Solo.out "${num_threads}"
     """
@@ -154,7 +151,7 @@ process STAR_solo {
 process convert_to_h5ad {
   cpus 1
   memory "10 GB"
-  publishDir params.outdir, mode: "copy", saveAs: {f -> "$out_dir/$f"}
+  publishDir params.outdir, mode: "copy"
 
   input: 
     tuple(val(meta), path(metadata_file), path(matrix), path(barcodes), path(features), val(out_dir))
@@ -163,10 +160,11 @@ process convert_to_h5ad {
     tuple(val(meta), path(out_file))
 
   shell:
-  out_file = "${matrix.simpleName}.h5ad"
+  out_file = "${out_dir}/${matrix.simpleName}.h5ad"
   // scanpy requires specific file names
   '''
   mkdir -p tmp
+  mkdir -p "!{out_dir}"
   cp "!{matrix}" tmp/matrix.mtx.gz
   cp "!{barcodes}" tmp/barcodes.tsv.gz
   cp "!{features}" tmp/features.tsv.gz
