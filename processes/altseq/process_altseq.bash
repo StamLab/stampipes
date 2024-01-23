@@ -47,7 +47,7 @@ python "$STAMPIPES"/scripts/lims/create_altseq_sample_config.py processing.json 
 
 SEQ_DIR=$(ls -d -1 ${SEQUENCER_MOUNT}/*$FLOWCELL* | head -n1)
 
-GENOME_DIR=/net/seq/data2/projects/prime_seq/cell_ranger_ref/star_2.7.10_genome_2022_gencode.v39/
+GENOME_DIR=/net/seq/data2/projects/prime_seq/cell_ranger_ref/star_2.7.10_genome/
 GENOME_FA=/net/seq/data2/projects/prime_seq/cell_ranger_ref/refdata-gex-GRCh38-2020-A/fasta/genome.fa
 BARCODE_WHITELIST=/net/seq/data2/projects/prime_seq/barcodes-combined.txt
 

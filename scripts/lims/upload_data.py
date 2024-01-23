@@ -638,7 +638,7 @@ class UploadLIMS(object):
 
         if jsondata['Sequencer'] == 'MiniSeq':
             print(jsondata['BaseDir'])
-            flowcell_label = re.search( '.*_[AB]000([A-Z0-9]{6}).*$', jsondata['BaseDir'] ).group(1)
+            flowcell_label = re.search( '.*_[AB](000[A-Z0-9]{6}).*$', jsondata['BaseDir'] ).group(1)
             print(flowcell_label)
 
         else:

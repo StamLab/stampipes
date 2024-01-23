@@ -140,7 +140,29 @@ fi
 
 # placeholder
 make_miniseq_samplesheet(){
-sleep 10
+  name=Stamlab
+  date=$(date '+%m/%d/%Y')
+  cat <<__SHEET__
+[Header]
+Investigator Name,$name
+Project Name,$name
+Experiment Name,$name
+Date,$date
+Workflow,GenerateFASTQ
+
+[Settings]
+
+[Data]
+SampleID,SampleName,index,index2
+none,none,GGGGGGGG,GGGGGGGG
+__SHEET__
+
+if [ -z "$demux" ] ; then
+  # This bit of cryptic magic generates the samplesheet part.
+  jq -r '.libraries[] | select(.failed == false) | [.samplesheet_name,.samplesheet_name,.barcode_index,""] | join(",") ' "$json" \
+    | sed 's/\([ACTG]\+\)-\([ACTG]\+\),$/\1,\2/'  # Changes dual-index barcodes to proper format
+fi
+
 }
 
 # placeholder
@@ -412,8 +434,7 @@ _U_
     bc_flag="--miniseq"
     queue="queue0"
     minidemux="True"
-    # placeholder
-    cp /net/fileserv0/projects/vol2/dchee7/datastore/talens/sample_sheets/SampleSheet.csv SampleSheet.csv
+    make_miniseq_samplesheet > SampleSheet.csv
     bcl_tasks=1
     set +e
     read -d '' unaligned_command  << _U_
@@ -436,6 +457,7 @@ _U_
     minidemux="True"
     # placeholder
     cat /net/fileserv0/projects/vol2/dchee7/datastore/talens/sample_sheets/SampleSheet.csv > SampleSheet.csv
+    #make_nextseq_samplesheet > SampleSheet.csv
     bcl_tasks=1
     set +e
     read -d '' unaligned_command  << _U_
@@ -674,6 +696,7 @@ mkdir -p "$analysis_dir"
 rsync -avP "$illumina_dir/InterOp" "$analysis_dir/"
 rsync -avP "$illumina_dir/RunInfo.xml" "$analysis_dir/"
 rsync -avP "$illumina_dir"/SampleSheet*.csv "$analysis_dir/"
+
 
 # Copy each sample by itself, checking to see if we have a project_share_directory set
 # This is very important to keep customer data separate from internal data.

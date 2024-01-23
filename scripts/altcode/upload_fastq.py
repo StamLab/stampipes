@@ -467,6 +467,8 @@ class UploadLIMS:
         def extract_id_from_url(url):
             return re.sub(r'[^\d]', "", url)
         lane_info = self.get_by_id("flowcell_lane", int(lane_id))
+        logging.info("lane %s info:\n%s", lane_id, lane_info)
+        assert lane_info["library_pool"] is not None, "library_pool for lane %s must not be None" % lane_id
         pool_info = self.api.get_single_result(url=lane_info["library_pool"])
         lib_ids = []
         flowcell_id = extract_id_from_url(lane_info["flowcell"])

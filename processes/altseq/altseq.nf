@@ -9,6 +9,7 @@ include { sort_and_encode_cram } from "../../modules/cram.nf"
 params.sample_config_tsv = ""
 params.input_directory = ""
 params.star_exe = "${workflow.projectDir}/../../third_party/STAR"
+params.samtools_exe = "/net/module/sw/samtools/1.14/samtools-1.14/bin/samtools" 
 
 params.outdir = "output"
 params.publishmode = "link"
@@ -115,6 +116,7 @@ workflow ALTSEQ {
         genome_dir,
         genome_fa,
         params.star_exe,
+        params.samtools_exe,
         barcode_whitelist,
         merged_fq_files,
       )
@@ -168,6 +170,7 @@ workflow {
   println "Running test workflow..."
 
   def star_exe = file("${workflow.projectDir}/../../third_party/STAR")
+  def samtools_exe = file("/net/module/sw/samtools/1.14/samtools-1.14/bin/samtools")
   def genome_dir = file("/net/seq/data2/projects/prime_seq/cell_ranger_ref/star_2.7.10_genome_2022_gencode.v39/")
   def genome_fa = file("/net/seq/data2/projects/prime_seq/cell_ranger_ref/GRCh38-2022-Altius-gencode.v39-build/Homo_sapiens.GRCh38.dna.primary_assembly.fa.modified")
   def barcode_whitelist = file("/net/seq/data2/projects/prime_seq/barcodes-combined.txt")
@@ -190,6 +193,7 @@ process align {
     path genome_dir
     path reference_fa
     path star_exe
+    path samtools_exe
     path barcode_whitelist
     tuple val(meta), path(fq1), path(fq2)
 
@@ -237,7 +241,9 @@ process align {
       --outTmpDir "$tmpdir/STARSolo" \
       &  # Launch in background, so we can convert to cram from pipe
 
-    samtools sort \
+    # TODO: Do not hardcode this!  Currently, though
+    # if we run without hardcoding, it cannot find samtools 
+    "./!{samtools_exe}" sort \
       --reference "!{reference_fa}" \
       --output-fmt-option "!{cram_fmt_options}" \
       --threads "!{cpus}" \
@@ -335,7 +341,7 @@ process create_sample_configs {
 
 process merge_stats {
   scratch false
-  executor "local"
+  //executor "local"
   input:
     path("input.???.json")
   output:
