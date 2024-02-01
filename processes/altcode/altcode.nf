@@ -91,6 +91,7 @@ process STAR_solo {
     tuple(val(meta), path("Aligned.out.cram*"), emit: cram)
     tuple(val(meta), path("Solo.out/???**"), emit: solo_files)
     tuple(val(meta), path("Solo.out"), emit: solo_analysis)
+    tuple(val(meta), path("Log*"), emit: logs)
 
 
   script:
@@ -119,7 +120,7 @@ process STAR_solo {
       --soloCBposition "${bc3_position}" "${bc2_position}" "${bc1_position}" \
       --soloCBwhitelist "${r3_barcodes}" "${r2_barcodes}" "${r1_barcodes}" \
       --soloUMIposition "${umi_position}" \
-      --soloCBmatchWLtype 1MM \
+      --soloCBmatchWLtype EditDist_2 \
       --soloUMIdedup 1MM_All \
       --soloFeatures Gene GeneFull SJ GeneFull_Ex50pAS GeneFull_ExonOverIntron \
       --soloMultiMappers Unique PropUnique Uniform Rescue EM \

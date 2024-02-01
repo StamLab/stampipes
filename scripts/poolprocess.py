@@ -794,8 +794,12 @@ class ProcessSetUp(object):
             def sort_talens(tls):
                 """ Sort talens by number """
                 def get_num(tl):
-                    assert tl[:2] == "TL"
-                    return int(tl[2:])
+                    match = re.search(r"TL(\d+)", tl)
+                    if match:
+                        return int(match.group(1))
+                    else:
+                        logging.warning("Weird talen: '%s'" % tl)
+                        return 0
                 return sorted(tls, key=get_num)
 
             if pool_info:
@@ -805,7 +809,7 @@ class ProcessSetUp(object):
                     for effector in pool.get("effectors", []):
                         if effector["talen"]:
                             talen_names.append(effector["talen"])
-                
+
                 talen_name = ",".join(sort_talens(talen_names))
                 orig_talen_name = talen_name
 
