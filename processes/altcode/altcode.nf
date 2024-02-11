@@ -126,25 +126,25 @@ process STAR_solo {
       --soloMultiMappers Unique PropUnique Uniform Rescue EM \
       --runThreadN "${num_threads}" \
       --limitBAMsortRAM "${bam_sort_RAM}" \
-      --outSAMtype BAM Unsorted \
-      --outSAMattributes NH HI AS nM CR CY UR UY sM \
+      --outSAMtype BAM SortedByCoordinate \
+      --outSAMattributes NH HI AS nM CR CY UR UY sM CB UB \
       --outSAMunmapped Within \
-      --outBAMcompression 0 \
+      --outBAMcompression 1 \
       --outBAMsortingThreadN "${num_threads}" \
       --readFilesCommand zcat \
       --outFileNamePrefix ./ \
       --limitOutSJcollapsed 5000000
     
-    samtools sort \
+    samtools view \
       --reference "${genome_fasta}" \
-      -o Aligned.out.cram \
       --output-fmt-option "version=3.0,level=7" \
       --threads "${num_threads}" \
-      --write-index \
-      -T "tmpsort" \
-      Aligned.out.bam
+      -o Aligned.out.cram \
+      Aligned.sortedByCoord.out.bam
+    rm Aligned.sortedByCoord.out.bam
 
-    rm Aligned.out.bam
+    samtools index -@ "${num_threads}" Aligned.out.cram
+
     compress_mtx_files.sh ./Solo.out "${num_threads}"
     """
 }
