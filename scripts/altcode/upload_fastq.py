@@ -481,12 +481,14 @@ class UploadLIMS:
             lane_info["lane"],
         )
         lane_info = self.get_list_result(lanes_query)
-        lanes_in_pool = []
+        lanes_in_pool = set()
+        lanes_in_pool.add(int(lane_id))
         for l in lane_info:
-            library_id = extract_id_from_url(l["library"])
-            if library_id in lib_ids:
-                lanes_in_pool.append(l["id"])
-        return lanes_in_pool
+            if l.get("library"):
+                library_id = extract_id_from_url(l["library"])
+                if library_id in lib_ids:
+                    lanes_in_pool.add(l["id"])
+        return list(lanes_in_pool)
 
 
     #def upload_flowcell_report(self, data):

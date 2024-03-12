@@ -156,19 +156,27 @@ class ProcessSetUp(object):
         processing_info = self.get_lane_process_info(lane_id)
 
         pool_name = None
-        try:
-            lib_number = processing_info["libraries"][0]["library"]
-            library_info = self.api.get_single_result(url_addition="library/?number=%d" % lib_number)["results"][0]
-            logging.debug("Info is %s", library_info)
-            pools = library_info["librarypools"]
-            if pools:
-                pool_name = pools[0]["object_name"]
-                pool_id = pools[0]["id"]
-                logging.debug("Lane %d is pool %s", lib_number, pool_name)
-            else:
-                logging.debug("Lane %d is not pool", lib_number)
-        except:
-            pass
+
+        if (len(processing_info.get("libraries", [])) == 1
+                and processing_info["libraries"][0].get("samplesheet_name",'').startswith("LP")):
+            pool_name = processing_info['libraries'][0]['samplesheet_name']
+            pool_number = int(pool_name[2:]) # remove leading LP
+            pool_data = self.api.get_single_result(url_addition="library_pool/?number=%d" % pool_number)["results"][0]
+            pool_id = pool_data["id"]
+        else:
+            try:
+                lib_number = processing_info["libraries"][0]["library"]
+                library_info = self.api.get_single_result(url_addition="library/?number=%d" % lib_number)["results"][0]
+                logging.debug("Info is %s", library_info)
+                pools = library_info["librarypools"]
+                if pools:
+                    pool_name = pools[0]["object_name"]
+                    pool_id = pools[0]["id"]
+                    logging.debug("Lane %d is pool %s", lib_number, pool_name)
+                else:
+                    logging.debug("Lane %d is not pool", lib_number)
+            except:
+                pass
 
         global POOL_INFO
         if pool_name and pool_name not in POOL_INFO:
@@ -215,7 +223,6 @@ class ProcessSetUp(object):
         if not "directory" in lane:
             logging.critical("No directory for lane %d" % lane["id"])
             return False
-
         fastq_directory = lane["directory"]
         alt_dir = lane.get("project_share_directory", "")
         if alt_dir:
