@@ -350,6 +350,20 @@ case $run_type in
     unaligned_command=$novaseq_bcl_command
 
 ;;
+"NovaSeq X 1.5B")
+    echo "NovaSeq X: 1.5B"
+    unset demux
+    parallel_env="-pe threads 6"
+    link_command=$novaseq_link_command
+    samplesheet="SampleSheet.csv"
+    fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
+    bc_flag="--novaseq"
+    queue="hpcz-2"
+    python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
+    bcl_tasks=1
+    unaligned_command=$novaseq_bcl_command
+
+;;
 "Novaseq 6000 SP")
     echo "Novaseq 6000: SP (non-pooled)"
     unset demux
