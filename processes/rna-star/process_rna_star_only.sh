@@ -8,6 +8,12 @@ if [[ "$LIBRARY_KIT" == "Smarter Stranded Total v3 Pico RNASeq with RNA Isolatio
   UMI_METHOD=takara-umt
 fi
 
+ADAPTER_FLAG=--use_fastp
+if [[ "$LIBRARY_KIT" == "Agilent Sure Select XT HS2" ]] ; then
+  ADAPTER_FLAG=--use_agent
+fi
+
+
 source "$MODULELOAD"
 module load openssl-dev jdk nextflow
 source "$PYTHON3_ACTIVATE"
@@ -38,7 +44,7 @@ NXF_VER=21.04.1 nextflow run \
   --outdir "$OUT_DIR" \
   --adapter_p5 "$ADAPTER_P5" \
   --adapter_p7 "$ADAPTER_P7" \
-  --use_fastp \
+  "$ADAPTER_FLAG" \
   -profile modules,cluster \
   -resume \
   "$@"

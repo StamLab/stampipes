@@ -3,6 +3,7 @@ import os
 import sys
 import argparse
 import logging
+import re
 import requests
 import collections
 
@@ -14,6 +15,9 @@ except ImportError:
 from stamlims_api import rest
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+POOL_INFO = {}
+SCRIPTS_WRITTEN = set()
 
 STAMPIPES = os.getenv('STAMPIPES', '~/stampipes')
 
@@ -85,7 +89,7 @@ class ProcessSetUp(object):
         self.dry_run = args.dry_run
         self.no_mask = args.no_mask
 
-        self.pool = ThreadPoolExecutor(max_workers=10)
+        self.pool = ThreadPoolExecutor(max_workers=6)
 
     def get_lane_process_info(self, lane_id):
 
@@ -113,7 +117,7 @@ class ProcessSetUp(object):
 
     def setup_flowcell(self, flowcell_label):
 
-        lanes = self.api.get_list_result(url_addition="flowcell_lane", query_arguments={"flowcell__label": flowcell_label}, page_size=1000, item_limit=10000)
+        lanes = self.api.get_list_result(url_addition="flowcell_lane/", query_arguments={"flowcell__label": flowcell_label}, page_size=1000, item_limit=50000)
 
         if not lanes:
             logging.error("Flowcell %s has no lanes" % flowcell_label)
@@ -141,7 +145,9 @@ class ProcessSetUp(object):
         if len(lane_ids) != len(set(lane_ids)):
             logging.warning("Duplicate lane IDs! %s " % [item for item, count in collections.Counter(lane_ids).items() if count > 1])
 
-        self.pool.map(self.setup_lane, lane_ids)
+        #self.pool.map(self.setup_lane, lane_ids)
+        for lane_id in lane_ids:
+            self.setup_lane(lane_id)
 
     def setup_lane(self, lane_id):
 
@@ -149,9 +155,50 @@ class ProcessSetUp(object):
 
         processing_info = self.get_lane_process_info(lane_id)
 
-        self.create_script(processing_info)
+        pool_name = None
+
+        if (len(processing_info.get("libraries", [])) == 1
+                and processing_info["libraries"][0].get("samplesheet_name",'').startswith("LP")):
+            pool_name = processing_info['libraries'][0]['samplesheet_name']
+            pool_number = int(pool_name[2:]) # remove leading LP
+            pool_data = self.api.get_single_result(url_addition="library_pool/?number=%d" % pool_number)["results"][0]
+            pool_id = pool_data["id"]
+        else:
+            try:
+                lib_number = processing_info["libraries"][0]["library"]
+                library_info = self.api.get_single_result(url_addition="library/?number=%d" % lib_number)["results"][0]
+                logging.debug("Info is %s", library_info)
+                pools = library_info["librarypools"]
+                if pools:
+                    pool_name = pools[0]["object_name"]
+                    pool_id = pools[0]["id"]
+                    logging.debug("Lane %d is pool %s", lib_number, pool_name)
+                else:
+                    logging.debug("Lane %d is not pool", lib_number)
+            except:
+                pass
+
+        global POOL_INFO
+        if pool_name and pool_name not in POOL_INFO:
+            pool_data = self.api.get_single_result(url_addition="library_pool/%d/" % pool_id)
+            bc1 = None
+            bc2 = None
+            if pool_data["barcode1"]:
+                bc1 = self.api.get_single_result(url=pool_data["barcode1"])["reverse_sequence"]
+            if pool_data["barcode2"]:
+                bc2 = self.api.get_single_result(url=pool_data["barcode2"])["reverse_sequence"]
+            barcode = "_".join(bc for bc in [bc1, bc2] if bc)
+            POOL_INFO[pool_name] = {"barcode": barcode}
+
+        self.create_script(processing_info, pool_name)
 
     def add_script(self, script_file, lane_id, flowcell_label, sample_name):
+
+        # Hacks to deduplicate files written for library pools
+        global SCRIPTS_WRITTEN
+        if script_file in SCRIPTS_WRITTEN:
+            return
+        SCRIPTS_WRITTEN.add(script_file)
 
         if not self.outfile:
             logging.debug("Writing script to stdout")
@@ -161,7 +208,7 @@ class ProcessSetUp(object):
             outfile = open(self.outfile, 'a')
 
         outfile.write("cd %s && " % os.path.dirname(script_file))
-        fullname = "%s%s-%s-Lane#%d" % (self.qsub_prefix,sample_name,flowcell_label,lane_id)
+        fullname = "%s%s-%s-Lane#%d" % (self.qsub_prefix, sample_name, flowcell_label, lane_id)
         outfile.write("sbatch --export=ALL -J %s -o %s.o%%A -e %s.e%%A --partition=%s --cpus-per-task=1 --ntasks=1 --mem-per-cpu=8000 --parsable --oversubscribe <<__LANEPROC__\n#!/bin/bash\nbash %s\n__LANEPROC__\n\n" % (fullname, fullname, fullname, self.queue, script_file))
         outfile.close()
 
@@ -169,18 +216,23 @@ class ProcessSetUp(object):
 
         return open(self.script_template, 'r').read()
 
-    def create_script(self, processing_info):
+    def create_script(self, processing_info, pool=None):
 
         lane = processing_info["libraries"][0]
 
         if not "directory" in lane:
             logging.critical("No directory for lane %d" % lane["id"])
             return False
-
         fastq_directory = lane["directory"]
         alt_dir = lane.get("project_share_directory", "")
         if alt_dir:
             fastq_directory = os.path.join(alt_dir, "fastq", "Project_%s" % lane["project"], "Sample_%s" % lane["samplesheet_name"])
+
+        if pool:
+            flowcell_dir = re.sub(r"/Project.*", "", lane["directory"])
+            if alt_dir:
+                flowcell_dir=alt_dir
+            fastq_directory = os.path.join(flowcell_dir, "Project_%s" % lane["project"], "LibraryPool_%s" % pool)
 
         barcode = "NoIndex" if lane['barcode_index'] is None else lane['barcode_index']
         try:
@@ -191,9 +243,15 @@ class ProcessSetUp(object):
             spreadsheet_name = "%s_%s_L00%d" % (lane['samplesheet_name'], barcode, lane['lane'])
             logging.warning("No alignment sample_name for lane, using %s instead" % spreadsheet_name)
 
+        if pool:
+            global POOL_INFO
+            barcode = POOL_INFO[pool]["barcode"]
+            spreadsheet_name = "%s_%s_L00%d" % (pool, barcode, lane['lane'])
+        #print("DBG:", pool, spreadsheet_name, POOL_INFO)
+
         if not os.path.exists(fastq_directory):
             logging.critical("fastq directory %s does not exist, cannot continue" % fastq_directory)
-            return False 
+            return False
 
         script_file = os.path.join( fastq_directory, "%s-%s" % (spreadsheet_name, self.qsub_scriptname) )
 

@@ -10,7 +10,7 @@ done
 
 set -eo pipefail
 
-version=1.1.0-alpha3
+version=1.1.0
 
 cd "$(dirname "$0")"
 
@@ -64,7 +64,7 @@ NXF_VER=21.10.6 nextflow \
   run "$STAMPIPES"/processes/altseq/altseq.nf \
   -with-trace \
   -ansi-log false \
-  -profile docker,cluster \
+  -profile cluster \
   -resume \
   -work-dir "$WORKDIR" \
   --input_directory "$SEQ_DIR"  \

@@ -26,11 +26,17 @@ R1_FILE=${FASTQ_NAME}_R1.fastq.gz
 R2_FILE=${FASTQ_NAME}_R2.fastq.gz
 
 function upload {
-  UPLOAD_SCRIPT="python3 $STAMPIPES/scripts/lims/upload_data.py --attach_file_contenttype SequencingData.flowcelllane --attach_file_objectid ${FLOWCELL_LANE_ID} --attach_file_type=gzipped-fastq"
-  $UPLOAD_SCRIPT --attach_file_purpose r1-fastq --attach_file ${R1_FILE}
+  if [[ "$SAMPLE_NAME" == LP* ]] ; then
+    # Altcode sample, use dedicated script
+    python3 "$STAMPIPES/scripts/altcode/upload_fastq.py" --lane "$FLOWCELL_LANE_ID" --r1 "$R1_FILE" --r2 "$R2_FILE"
+  else
+    # Regular sample, upload old-style
+	  UPLOAD_SCRIPT="python3 $STAMPIPES/scripts/lims/upload_data.py --attach_file_contenttype SequencingData.flowcelllane --attach_file_objectid ${FLOWCELL_LANE_ID} --attach_file_type=gzipped-fastq"
+	  $UPLOAD_SCRIPT --attach_file_purpose r1-fastq --attach_file "${R1_FILE}"
 
-  if [ -e $R2_FILE ]; then
-    $UPLOAD_SCRIPT --attach_file_purpose r2-fastq --attach_file ${R2_FILE}
+	  if [ -e "$R2_FILE" ]; then
+	    $UPLOAD_SCRIPT --attach_file_purpose r2-fastq --attach_file "${R2_FILE}"
+	  fi
   fi
 }
 

@@ -1,0 +1,11 @@
+Bootstrap: docker
+From: mambaorg/micromamba:1.4.9
+
+%files
+  $STAMPIPES/processes/altcode/scanpy.environment.yaml /env.yaml
+ 
+%post
+  micromamba install --quiet -y -n base -f /env.yaml && micromamba clean --all --yes
+  eval "$(micromamba shell hook --shell dash)"
+  micromamba activate
+  echo "export PATH=$PATH" >> $APPTAINER_ENVIRONMENT

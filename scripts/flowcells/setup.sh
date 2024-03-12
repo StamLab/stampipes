@@ -140,7 +140,29 @@ fi
 
 # placeholder
 make_miniseq_samplesheet(){
-sleep 10
+  name=Stamlab
+  date=$(date '+%m/%d/%Y')
+  cat <<__SHEET__
+[Header]
+Investigator Name,$name
+Project Name,$name
+Experiment Name,$name
+Date,$date
+Workflow,GenerateFASTQ
+
+[Settings]
+
+[Data]
+SampleID,SampleName,index,index2
+none,none,GGGGGGGG,GGGGGGGG
+__SHEET__
+
+if [ -z "$demux" ] ; then
+  # This bit of cryptic magic generates the samplesheet part.
+  jq -r '.libraries[] | select(.failed == false) | [.samplesheet_name,.samplesheet_name,.barcode_index,""] | join(",") ' "$json" \
+    | sed 's/\([ACTG]\+\)-\([ACTG]\+\),$/\1,\2/'  # Changes dual-index barcodes to proper format
+fi
+
 }
 
 # placeholder
@@ -254,13 +276,13 @@ _REG_BCL_CMD_
 
 read -d '' novaseq_bcl_command  << _NOVA_BCL_CMD_
     PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
-    for samplesheet in \$PWD/SampleSheet.withmask*csv ; do
+    for samplesheet in SampleSheet.withmask*csv ; do
       bcl_mask=\$(sed 's/.*withmask\\.//;s/\\.csv//' <<< \$samplesheet)
       fastq_dir=\$(sed 's/,/-/g' <<< "fastq-withmask-\$bcl_mask")
       bcl2fastq \\\\
         --input-dir          "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
         --output-dir         "${illumina_dir}/\$fastq_dir"                \\\\
-        --use-bases-mask     "$bcl_mask"                                  \\\\
+        --use-bases-mask     "\$bcl_mask"                                 \\\\
         --barcode-mismatches "$mismatches"                                \\\\
         --sample-sheet       "${illumina_dir}/\$samplesheet"              \\\\
         --writing-threads    0                                            \\\\
@@ -270,7 +292,7 @@ read -d '' novaseq_bcl_command  << _NOVA_BCL_CMD_
 _NOVA_BCL_CMD_
 
 read -d '' novaseq_link_command  <<'_NOVA_LINK_CMD_'
-for fq_dir in fastq-withmask-* ;
+for fq_dir in fastq-withmask-* ; do
   [[ -d $fq_dir ]] || continue
   python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i "$fq_dir" -o Demultiplexed -p processing.json
 done
@@ -316,6 +338,20 @@ case $run_type in
 ;;
 "Novaseq 6000 S4")
     echo "Novaseq 6000: S4 (non-pooled)"
+    unset demux
+    parallel_env="-pe threads 6"
+    link_command=$novaseq_link_command
+    samplesheet="SampleSheet.csv"
+    fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
+    bc_flag="--novaseq"
+    queue="hpcz-2"
+    python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
+    bcl_tasks=1
+    unaligned_command=$novaseq_bcl_command
+
+;;
+"NovaSeq X 1.5B")
+    echo "NovaSeq X: 1.5B"
     unset demux
     parallel_env="-pe threads 6"
     link_command=$novaseq_link_command
@@ -412,8 +448,7 @@ _U_
     bc_flag="--miniseq"
     queue="queue0"
     minidemux="True"
-    # placeholder
-    cp /net/fileserv0/projects/vol2/dchee7/datastore/talens/sample_sheets/SampleSheet.csv SampleSheet.csv
+    make_miniseq_samplesheet > SampleSheet.csv
     bcl_tasks=1
     set +e
     read -d '' unaligned_command  << _U_
@@ -436,6 +471,7 @@ _U_
     minidemux="True"
     # placeholder
     cat /net/fileserv0/projects/vol2/dchee7/datastore/talens/sample_sheets/SampleSheet.csv > SampleSheet.csv
+    #make_nextseq_samplesheet > SampleSheet.csv
     bcl_tasks=1
     set +e
     read -d '' unaligned_command  << _U_
@@ -673,7 +709,8 @@ $link_command
 mkdir -p "$analysis_dir"
 rsync -avP "$illumina_dir/InterOp" "$analysis_dir/"
 rsync -avP "$illumina_dir/RunInfo.xml" "$analysis_dir/"
-rsync -avP "$samplesheet" "$analysis_dir"
+rsync -avP "$illumina_dir"/SampleSheet*.csv "$analysis_dir/"
+
 
 # Copy each sample by itself, checking to see if we have a project_share_directory set
 # This is very important to keep customer data separate from internal data.
@@ -691,6 +728,13 @@ rsync -avP "$samplesheet" "$analysis_dir"
         else
             destination=\$destination/fastq
         fi
+        destination=\$destination/\$dir
+        mkdir -p "\$destination"
+        rsync -aL "\$dir/" "\$destination/"
+    done
+    for dir in Project*/LibraryPool* ; do
+        [[ -d \$dir ]] || continue
+        destination=$analysis_dir
         destination=\$destination/\$dir
         mkdir -p "\$destination"
         rsync -aL "\$dir/" "\$destination/"
@@ -772,11 +816,14 @@ python3 "$STAMPIPES/scripts/alignprocess.py" \
   --qsub-queue queue0                        \
   --outfile run_alignments.bash
 
+python3 "$STAMPIPES/scripts/poolprocess.py" --flowcell "$flowcell" --outfile run_pools.bash
+
 # Set up of flowcell aggregations
 curl -X POST "$LIMS_API_URL/flowcell_run/$flowcell_id/autoaggregate/" -H "Authorization: Token \$LIMS_API_TOKEN"
 
 # Run alignments
 bash run_alignments.bash
+bash run_pools.bash
 
 __COLLATE__
 

@@ -32,6 +32,26 @@ process fastp_adapter_trim {
     """
 }
 
+process agent_adapter_trim {
+  cpus 1
+  scratch false
+  module "jdk/11.0.16"
+
+  input:
+    tuple path(r1), path(r2)
+
+  output:
+    path 'output_R?.fastq.gz', emit: fastq
+
+  script:
+    """
+    agent.sh trim -v2 \
+      -fq1 "${r1}" \
+      -fq2 "${r2}" \
+      -out \$PWD/output
+    """
+}
+
 /// Our custom in-house adapter-trimming script
 process adapter_trim {
   cpus 3
