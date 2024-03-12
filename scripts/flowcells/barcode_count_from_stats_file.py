@@ -58,15 +58,22 @@ def main():
 
     for conversion_result in idata["ConversionResults"]:
             lane_num = conversion_result["LaneNumber"]
+            lane_idx = None
+            for (i, olane) in enumerate(odata["Lanes"]):
+                if int(olane["LaneIndex"]) == int(lane_num):
+                    lane_idx = i
+                    break
+            if lane_idx is None:
+                logging.error("Lane %s not in odata", lane_num)
             for sample_info in conversion_result["DemuxResults"]:
                 for metric_info in sample_info["IndexMetrics"]:
                     # Get matching count
                     barcode = metric_info["IndexSequence"].replace("+","")
                     count = metric_info["MismatchCounts"]["0"]
                     # Update out_data
-                    odata["Lanes"][lane_num-1]["Counts"][barcode] = {"Total": count, "Pass": count}
-                    odata["Lanes"][lane_num-1]["Total"] += count
-                    odata["Lanes"][lane_num-1]["Pass"] += count
+                    odata["Lanes"][lane_idx]["Counts"][barcode] = {"Total": count, "Pass": count}
+                    odata["Lanes"][lane_idx]["Total"] += count
+                    odata["Lanes"][lane_idx]["Pass"] += count
 
 
     print(json.dumps(odata))
