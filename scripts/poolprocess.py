@@ -1,5 +1,6 @@
 #import csv
 import argparse
+import functools
 import json
 import logging
 import os
@@ -19,6 +20,8 @@ except ImportError:
 POOL_KEY_TO_LIB_IDS = defaultdict(list)  # {(pool_id, lane_number): [lib_id]}
 LIB_ID_TO_LANE_IDS = defaultdict(list)   # {lib_id:                 [lane_ids]}
 LANE_ID_TO_ALN_IDS = defaultdict(list)   # {lane_id:                [aln_ids]}
+LANES_WITH_DIRECT_POOL = {}
+
 
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
@@ -131,6 +134,7 @@ class ProcessSetUp(object):
 
         self.pool = ThreadPoolExecutor(max_workers=10)
 
+    @functools.lru_cache(maxsize=None)
     def api_single_result(self, url_addition=None, url=None):
 
         if url_addition:
@@ -146,6 +150,7 @@ class ProcessSetUp(object):
             logging.error(request)
             return None
 
+    @functools.lru_cache(maxsize=None)
     def api_list_result(self, url_addition=None, url=None):
 
         more = True
@@ -257,7 +262,8 @@ class ProcessSetUp(object):
 
         logging.debug("align ids: %s", align_ids)
         #alignments = self.api_list_result("flowcell_lane_alignment/?lane__flowcell__label=%s&page_size=1000" % flowcell_label)
-        self.setup_alignments(align_ids)
+        # Disable parallelism so that caching works
+        self.setup_alignments(align_ids, parallel=False)
         self.add_stats_upload(flowcell_label)
 
     def get_alignment_ids(self, flowcell_label: str) -> [int]:
@@ -268,12 +274,15 @@ class ProcessSetUp(object):
         """
 
         def extract_id_from_url(url):
+            if url is None:
+                return None
             return int(re.findall(r'\d+', url)[-1])
 
         # Storage for the 3 layers of mapping between alignments and pools
         global POOL_KEY_TO_LIB_IDS
         global LIB_ID_TO_LANE_IDS
         global LANE_ID_TO_ALN_IDS
+        global LANES_WITH_DIRECT_POOL
 
         POOL_KEY_TO_LIB_IDS = defaultdict(list)  # {(pool_id, lane_number): [lib_id]}
         LIB_ID_TO_LANE_IDS = defaultdict(list)   # {lib_id:                 [lane_ids]}
@@ -283,9 +292,32 @@ class ProcessSetUp(object):
         for lane in self.api_list_result("flowcell_lane/?flowcell__label=%s&page_size=1000" % flowcell_label):
             lib_url = lane['library']
             lane_lane = lane['lane']
-            library_info.add((lib_url, lane_lane))
-            lib_id = extract_id_from_url(lib_url)
-            LIB_ID_TO_LANE_IDS[lib_id].append(lane['id'])
+            if lib_url is not None:
+                library_info.add((lib_url, lane_lane))
+                lib_id = extract_id_from_url(lib_url)
+                LIB_ID_TO_LANE_IDS[lib_id].append(lane['id'])
+            else:
+                # HACKS BELOW
+                # Get pool manually
+                pool_url = lane['library_pool']
+                pool_id = extract_id_from_url(pool_url)
+                LANES_WITH_DIRECT_POOL[lane['id']] = pool_id
+                pool_key = (pool_id, lane_lane)
+                pool_number = int(lane['library_pool__number'])
+
+                # Get Library info
+                lp_info = self.api_single_result(url=pool_url)
+                sl_info = self.api_single_result(url=lp_info['sublibrary'])
+                cl_info = self.api_single_result(url=sl_info['cell_library'])
+                lib_ids = [extract_id_from_url(lib_url) for lib_url in cl_info["libraries"]]
+                
+                for lib_url in cl_info["libraries"]:
+                    library_info.add((lib_url, lane_lane))
+
+                for lib_id in lib_ids:
+                    POOL_KEY_TO_LIB_IDS[pool_key].append(lib_id)
+                    LIB_ID_TO_LANE_IDS[lib_id].append(lane['id'])
+
 
         # Set of poolnums + lane
         pool_info = set()
@@ -297,9 +329,14 @@ class ProcessSetUp(object):
                 POOL_KEY_TO_LIB_IDS[key].append(lib_info['id'])
 
         all_alignments = self.api_list_result("flowcell_lane_alignment/?lane__flowcell__label=%s&page_size=1000" % flowcell_label)
+
+        direct_alns = set()
         for aln in all_alignments:
             lane_id = extract_id_from_url(aln['lane'])
             LANE_ID_TO_ALN_IDS[lane_id].append(aln['id'])
+            if lane_id in LANES_WITH_DIRECT_POOL:
+                direct_alns.add(aln['id'])
+                
 
         # Find the minimum alignment ID for each pool/lane combination
         lowest_aln_for_pool = {pool_key: None for pool_key in POOL_KEY_TO_LIB_IDS.keys()}
@@ -313,11 +350,12 @@ class ProcessSetUp(object):
                         if cur_aln is None or cur_aln > aln_id:
                             lowest_aln_for_pool[pool_key] = aln_id
 
+        align_ids = set(lowest_aln_for_pool.values()).union( direct_alns )
         logging.debug("POOL_KEY_TO_LIB_IDS %s", POOL_KEY_TO_LIB_IDS)
         logging.debug("LIB_ID_TO_LANE_IDS %s", LIB_ID_TO_LANE_IDS)
         logging.debug("LANE_ID_TO_ALN_IDS %s", LANE_ID_TO_ALN_IDS)
-        logging.debug("ALN IDS %s", lowest_aln_for_pool.values())
-        return list(lowest_aln_for_pool.values())
+        logging.debug("ALN IDS %s", align_ids)
+        return list(align_ids)
 
 
 
@@ -420,12 +458,15 @@ class ProcessSetUp(object):
             logging.error("Alignment %d has no flowcell directory for flowcell %s" % (align_id, processing_info['flowcell']['label']))
             return False
 
-        lib_info_response = self.api_single_result("library/?number=%d" % lane["library"])["results"]
-        assert len(lib_info_response) == 1
-        lib_info = lib_info_response[0]
-        logging.debug("lib info is %s", lib_info)
-        pool_name = lib_info["librarypools"][0]["object_name"]
-        logging.debug("pool is %s", pool_name)
+        if lane.get('library'):
+            lib_info_response = self.api_single_result("library/?number=%d" % int(lane["library"]))["results"]
+            assert len(lib_info_response) == 1
+            lib_info = lib_info_response[0]
+            logging.debug("lib info is %s", lib_info)
+            pool_name = lib_info["librarypools"][0]["object_name"]
+            logging.debug("pool is %s", pool_name)
+        else:
+            pool_name = lane['samplesheet_name']
 
         fastq_directory = os.path.join(flowcell_directory, "Project_%s" % lane['project'], "LibraryPool_%s" % pool_name)
 
@@ -465,9 +506,9 @@ class ProcessSetUp(object):
         env_vars["GENOME"]      = alignment['genome_index']
         env_vars["ASSAY"]       = lane['assay']
         env_vars["READLENGTH"]  = processing_info['flowcell']['read_length']
-        if processing_info['libraries'] and processing_info['libraries'][0] and processing_info['libraries'][0]['library_kit_method']:
+        try:
             env_vars["LIBRARY_KIT"] = '"' + processing_info['libraries'][0]['library_kit_method'] + '"'
-        else:
+        except:
             env_vars["LIBRARY_KIT"] = None
 
         if processing_info['flowcell']['paired_end']:
@@ -575,8 +616,8 @@ class ProcessSetUp(object):
             libs_with_align = set()
             for (lib_id, lane_ids) in LIB_ID_TO_LANE_IDS.items():
                 if align_lane_id in lane_ids:
-                    libs_with_align.add(lib_id), "Lane must have exactly 1 library"
-            assert len(libs_with_align) == 1
+                    libs_with_align.add(lib_id)
+            #assert len(libs_with_align) == 1, "Lane must have exactly 1 library"
             align_lib_id = libs_with_align.pop()
 
             pools_with_align = set()
@@ -584,7 +625,7 @@ class ProcessSetUp(object):
                 if align_lib_id in lib_ids:
                     pools_with_align.add(pool_key)
             # TODO: This is broken because the pool can be in more than one lane!!!
-            assert len(pools_with_align) == 1, "Lib must have exactly one pool"
+            #assert len(pools_with_align) == 1, "Lib must have exactly one pool"
             align_poolkey = pools_with_align.pop()
             logging.debug("Alignment ALN%d - poolkey %s", alignment_id, align_poolkey)
 
@@ -611,8 +652,7 @@ class ProcessSetUp(object):
                 barcode += bc2
 
             sample_info = self.api_single_result(url=lib_info["sample"])
-            tc_info = self.api_single_result(url=sample_info["tissue_culture"])
-            project_info = self.api_single_result(url=sample_info["project"])
+            project_info = self.api_single_result(url=sample_info["project"]) if sample_info.get("project") else {"name": None}
 
             taggedobject_infos = self.api_list_result("tagged_object/?object_id=%d&content_type=%d"
                                              % (lib_info["id"], lib_info["object_content_type"]))
@@ -669,29 +709,35 @@ class ProcessSetUp(object):
                 }
 
             pool_info = []
-            for effector_pool in tc_info["effector_pools"]:
-                effector_pool_info = self.api_single_result(url=effector_pool["url"])
-                loci_info = []
-                if effector_pool_info.get("loci", False):
-                    for locus_url in effector_pool_info["loci"]:
-                        locus_info = self.api_single_result(url=locus_url)
-                        locus_dict = {
-                            "label": locus_info.get("object_label"),
-                        }
-                        for key in LOCUS_KEYS:
-                            locus_dict[key] = locus_info.get(key, None)
-                        loci_info.append(locus_dict)
+            # Dummy info in case we can't get it from LIMS
+            tc_info = {"notes": "", "number": 0, "sample_taxonomy__name": ""}
+            try:
+                tc_info = self.api_single_result(url=sample_info["tissue_culture"])
+                for effector_pool in tc_info["effector_pools"]:
+                    effector_pool_info = self.api_single_result(url=effector_pool["url"])
+                    loci_info = []
+                    if effector_pool_info.get("loci", False):
+                        for locus_url in effector_pool_info["loci"]:
+                            locus_info = self.api_single_result(url=locus_url)
+                            locus_dict = {
+                                "label": locus_info.get("object_label"),
+                            }
+                            for key in LOCUS_KEYS:
+                                locus_dict[key] = locus_info.get(key, None)
+                            loci_info.append(locus_dict)
 
-                pool_info.append({
-                    "effector_pool": effector_pool_info["object_name"],
-                    "name": effector_pool_info["name"],
-                    "purpose": effector_pool_info["purpose__name"],
-                    "loci": loci_info,
-                    "effectors": [
-                        build_effector_info(efftopool)
-                        for efftopool in effector_pool_info["effectortopool_set"]
-                    ],
-                })
+                    pool_info.append({
+                        "effector_pool": effector_pool_info["object_name"],
+                        "name": effector_pool_info["name"],
+                        "purpose": effector_pool_info["purpose__name"],
+                        "loci": loci_info,
+                        "effectors": [
+                            build_effector_info(efftopool)
+                            for efftopool in effector_pool_info["effectortopool_set"]
+                        ],
+                    })
+            except:
+                add_error("Could not get effector information for sample DS%s", sample_info['number'])
 
             def extract_lenti_from_tc_notes(notes):
                 def match_notes(regex):
@@ -885,6 +931,7 @@ class ProcessSetUp(object):
 
         flowcell_label = "FC%s" % processing_info["flowcell"]["label"]
         libraries = []
+            
         for lib_id in lib_ids:
             libraries.append(build_library_info(lib_id, flowcell_label))
 
