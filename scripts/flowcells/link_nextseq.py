@@ -74,11 +74,18 @@ def create_links(
     If dry_run is passed, will print them instead of creating them
     """
 
-    # Skip processing the lane if it's not getting aligned
-    if not lane.get("alignments"):
-        return False
-    sample_name = lane["alignments"][0]["sample_name"]
     short_name = lane["samplesheet_name"]
+    if lane.get("alignments"):
+        sample_name = lane["alignments"][0]["sample_name"]
+    else:
+        bc1 = lane["barcode1"]["sequence"] if lane.get("barcode1") else ""
+        bc2 = lane["barcode2"]["sequence"] if lane.get("barcode2") else ""
+        lane_num = int(lane["lane"])
+        sample_name = "%s_%s_%s_L%03d" % (short_name, bc1, bc2, lane_num)
+
+
+    if lane.get("library_pool"):
+        is_pool = True
 
     if undetermined:
         output_dir = os.path.join(
@@ -107,13 +114,14 @@ def create_links(
     # sense in our system)
     input_fastq = sorted(glob.glob(input_wildcard))
 
+    logging.debug("Looking for %s", input_wildcard)
     for idx, input_file in enumerate(input_fastq, start=1):
         output_name = "%s_%s_%03d.fastq.gz" % (sample_name, read, idx)
         output_file = os.path.join(output_dir, output_name)
 
         rel_path = os.path.relpath(input_file, output_dir)
 
-        print("Linking %s => %s" % (rel_path, output_file))
+        logging.info("Linking %s => %s" % (rel_path, output_file))
         if not dry_run and not os.path.exists(output_file):
             os.symlink(rel_path, output_file)
 
