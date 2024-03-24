@@ -78,10 +78,17 @@ def create_links(
     if lane.get("alignments"):
         sample_name = lane["alignments"][0]["sample_name"]
     else:
-        bc1 = lane["barcode1"]["sequence"] if lane.get("barcode1") else ""
-        bc2 = lane["barcode2"]["sequence"] if lane.get("barcode2") else ""
+        bc1 = lane["barcode1"]["reverse_sequence"] if lane.get("barcode1") else ""
+        bc2 = lane["barcode2"]["reverse_sequence"] if lane.get("barcode2") else ""
         lane_num = int(lane["lane"])
-        sample_name = "%s_%s_%s_L%03d" % (short_name, bc1, bc2, lane_num)
+        if bc1 and bc2:
+            sample_name = "%s_%s_%s_L%03d" % (short_name, bc1, bc2, lane_num)
+        elif bc1:
+            sample_name = "%s_%s_L%03d" % (short_name, bc1, lane_num)
+        elif bc2:
+            sample_name = "%s_%s_L%03d" % (short_name, bc2, lane_num)
+        else:
+            sample_name = "%s_L%03d" % (short_name, lane_num)
 
 
     if lane.get("library_pool"):
