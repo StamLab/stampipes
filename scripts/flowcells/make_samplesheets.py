@@ -39,64 +39,27 @@ def parser_setup():
 
 def get_barcode_assignments(data: dict, reverse_barcode1: bool, reverse_barcode2: bool) -> "[dict]":
     assignments = []
-    # Initialize our library pool lookup tables
-    pools = data["library_pools"]
-    libs_to_pools = dict()
-    for (pool_name, pool_data) in pools.items():
-        for lib_str in pool_data["libraries"]:
-            lib_num = int(re.sub("[A-Z]", "", lib_str))
-            if lib_num in libs_to_pools:
-                raise Exception("library {} in more than one pool".format(lib_str))
-            libs_to_pools[lib_num] = (pool_name,
-                                      pool_data.get("barcode1"),
-                                      pool_data.get("barcode2"))
 
     # This will store our pool samplesheet lines
     pool_assignment_set = set()
 
     for libdata in data["libraries"]:
-        # Skip libraries in pools
-        lib_num = libdata.get('library')
-        pool_data = libs_to_pools.get(lib_num)
-        if pool_data is None:
-            assignment = {
-                "lane":   libdata.get("lane"),
-                "sample": libdata.get("samplesheet_name"),
-                "barcode1": "",
-                "barcode2": "",
-            }
-            if libdata.get("barcode1") is not None:
-                assignment["barcode1"] = libdata["barcode1"]["reverse_sequence"] if reverse_barcode1 else libdata["barcode1"]["sequence"]
-            if libdata.get("barcode2") is not None:
-                assignment["barcode2"] = libdata["barcode2"]["reverse_sequence"] if reverse_barcode2 else libdata["barcode2"]["sequence"]
+        assignment = {
+            "lane": libdata.get("lane"),
+            "sample": libdata.get("samplesheet_name"),
+            "barcode1": "",
+            "barcode2": "",
+        }
+        if assignment["sample"] == "None":
+            assignment["sample"] = "LANE%d" % libdata["id"]
+        if libdata.get("barcode1") is not None:
+            assignment["barcode1"] = libdata["barcode1"]["reverse_sequence"] if reverse_barcode1 else libdata["barcode1"]["sequence"]
+        if libdata.get("barcode2") is not None:
+            assignment["barcode2"] = libdata["barcode2"]["reverse_sequence"] if reverse_barcode2 else libdata["barcode2"]["sequence"]
+    
+        assignments.append(assignment)
 
-            assignments.append(assignment)
-        else:
-            pool_assignment_set.add(
-                (libdata.get("lane"), *libs_to_pools[lib_num])
-            )
-
-    # a quick little inner function to reverse complement
-    # a sequence and return the string of that
-    def reverse_complement(sequence: str) -> str:
-        seq = Seq(sequence)
-        return str(seq.reverse_complement())
-
-    # Turn set of tuples into list of dicts
-    pool_assignments = [{
-        "lane": a[0],
-        "sample": a[1],
-        # Okay so we're trying to do the same with these as we do with
-        # the library barcodes including following the reverse instructions
-        # and these come reversed in the processing.json
-        # eventually we might want to change the processing.json to have both versions at hand
-        # like we do for libraries
-        # and remove the dependency on biopython
-        "barcode1": a[2] if reverse_barcode1 else reverse_complement(a[2]),
-        "barcode2": a[3] if reverse_barcode2 else reverse_complement(a[3]),
-        } for a in pool_assignment_set]
-
-    return assignments + pool_assignments
+    return assignments
 
 
 def make_samplesheet_header(name: str, date: str) -> str:
