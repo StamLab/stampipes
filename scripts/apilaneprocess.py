@@ -187,7 +187,7 @@ class ProcessSetUp(object):
                 bc1 = self.api.get_single_result(url=pool_data["barcode1"])["reverse_sequence"]
             if pool_data["barcode2"]:
                 bc2 = self.api.get_single_result(url=pool_data["barcode2"])["reverse_sequence"]
-            barcode = "_".join(bc for bc in [bc1, bc2] if bc)
+            barcode = "-".join(bc for bc in [bc1, bc2] if bc)
             POOL_INFO[pool_name] = {"barcode": barcode}
 
         self.create_script(processing_info, pool_name)

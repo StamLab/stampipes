@@ -82,7 +82,7 @@ def create_links(
         bc2 = lane["barcode2"]["reverse_sequence"] if lane.get("barcode2") else ""
         lane_num = int(lane["lane"])
         if bc1 and bc2:
-            sample_name = "%s_%s_%s_L%03d" % (short_name, bc1, bc2, lane_num)
+            sample_name = "%s_%s-%s_L%03d" % (short_name, bc1, bc2, lane_num)
         elif bc1:
             sample_name = "%s_%s_L%03d" % (short_name, bc1, lane_num)
         elif bc2:
