@@ -205,6 +205,7 @@ class ProcessSetUp(object):
     # Run alignment setup in parallel
     def setup_alignments(self, align_ids, parallel=True):
         all_okay = True
+        logging.info("Setting up alignments: %s", align_ids)
         if parallel:
             for id, error in self.pool.map(self.setup_alignment, align_ids):
                 if error:
@@ -213,7 +214,8 @@ class ProcessSetUp(object):
                 else:
                     logging.debug("ALN%d result received, OK" % id)
             if not all_okay:
-                logging.critical("Errors during setup, exiting")
+                #logging.critical("Errors during setup, exiting")
+                logging.error("Errors during setup, but continuing with other alignments")
         # Sequential version, helpful for debugging
         else:
             for aln_id in align_ids:
@@ -232,7 +234,7 @@ class ProcessSetUp(object):
                 logging.info("Skipping completed alignment %d" % align_id)
                 return (align_id, None)
         except Exception as e:
-            logging.exception("Could not set up alignment %d}: (%s)" % (align_id, e))
+            logging.exception("Could not set up alignment %s}: (%s)" % (align_id, e))
             return (align_id, e)
 
     def get_lane_file(self, lane_id, purpose):
