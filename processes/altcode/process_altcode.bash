@@ -70,6 +70,13 @@ umi_pos: 0
 umi_len: 10
 PARAMS_YAML
 
+# Let LIMS know the alignment is starting
+python3 "$STAMPIPES/scripts/lims/upload_data.py" \
+  --api "$LIMS_API_URL"          \
+  --token "$LIMS_API_TOKEN"      \
+  --alignment_id "$ALIGNMENT_ID" \
+  --start_alignment_progress
+
 # Run :)
 nextflow run \
     "$STAMPIPES/processes/altcode/altcode.nf" \
@@ -80,11 +87,37 @@ nextflow run \
     -profile cluster \
     -resume
 
-## Upload fastq metadata
-#python "$STAMPIPES/scripts/altseq/upload_data.py" \
-  #"$sample_config" \
-  #processing.json \
-  #--output_file_directory "$outdir"
+
+require_file(){
+  if ! [[ -s "$1" ]] ; then
+    echo "ERROR: File '$1' does not exist or is zero-size. Alignment did not complete successfully."
+    exit 1
+  fi
+}
+
+# Verify that output files exist
+require_file "$outdir/Aligned.out.cram"
+require_file "$outdir/Aligned.out.cram.crai"
+require_file "$outdir/Solo.out/Barcodes.stats"
+
+samtools quickcheck  "$outdir/Aligned.out.cram"
+for d in Gene GeneFull GeneFull_Ex50pAS GeneFull_ExonOverIntron ; do
+  for statsfile in CellReads.stats Features.stats Summary.csv UMIperCellSorted.txt ; do
+    require_file "$outdir/Solo.out/$d/$statsfile"
+  done
+  for mtx in matrix UniqueAndMult-EM UniqueAndMult-PropUnique UniqueAndMult-Rescue UniqueAndMult-Uniform ; do
+    require_file "$outdir/Solo.out/$d/raw/$mtx.h5ad"
+  done
+
+done
+
+# Mark as completed in LIMS
+python3 "$STAMPIPES/scripts/lims/upload_data.py" \
+  --api "$LIMS_API_URL"          \
+  --token "$LIMS_API_TOKEN"      \
+  --alignment_id "$ALIGNMENT_ID" \
+  --finish_alignment
+
 
 # Create sentinel/status file
 if [[ -e "$status_file" ]] ; then
@@ -92,9 +125,6 @@ if [[ -e "$status_file" ]] ; then
   old_status_file=${status_file/json/$old_date}.json
   mv "$status_file" "$old_status_file"
 fi
-
-samtools quickcheck  "$outdir/Aligned.out.cram"
-
 # TODO: What else do we want to capture here? It would be nice to at least
 # capture the command used and relevant env vars
 echo | jq . > "$status_file" <<EOF
