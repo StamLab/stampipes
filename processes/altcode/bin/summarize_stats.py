@@ -4,6 +4,7 @@ import argparse
 import csv
 import json
 import logging
+import math
 import os
 import pathlib
 import pprint
@@ -44,11 +45,19 @@ def parse_summary_stats(filename):
     with open(filename) as f:
         data = {}
         for line in f:
-            (key, val) = line.strip().split(",")
+            (key, orig_val) = line.strip().split(",")
+            val = orig_val
             try:
                 val = int(val)
             except ValueError:
-                val = float(val)
+                try:
+                    val = float(val)
+                    if math.isnan(val) or math.isinf(val):
+                        # If NaN or Inf, leave as string
+                        # because the python json module fucks those up
+                        val = orig_val
+                except ValueError:
+                    pass
             data[key] = val
     return data
 
