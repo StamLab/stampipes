@@ -668,9 +668,13 @@ class UploadLIMS(object):
 
     def upload_counts(self, alignment_id, counts_file):
         parsed = self.parse_counts(counts_file)
-        #response = self.bulk_upload_counts(alignment_id, self.parse_counts(counts_file))
-        #if response is None:
-            #log.error("Upload failed: Counts file {} for ALN{}".format(counts_file, alignment_id))
+        response = self.bulk_upload_counts(alignment_id, self.parse_counts(counts_file))
+        if response is None:
+            log.error("Bulk upload failed: Counts file {} for ALN{}".format(counts_file, alignment_id))
+        else:
+            log.info("Upload successful.")
+        return
+        # TODO: Remove below code
 
         #log.warn("Counts: %s", self.get_list_result(
         #        'flowcell_lane_count/', query={"alignment":alignment_id}
