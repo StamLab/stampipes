@@ -312,7 +312,7 @@ class ProcessSetUp(object):
                 sl_info = self.api_single_result(url=lp_info['sublibrary'])
                 cl_info = self.api_single_result(url=sl_info['cell_library'])
                 lib_ids = [extract_id_from_url(lib_url) for lib_url in cl_info["libraries"]]
-                
+
                 for lib_url in cl_info["libraries"]:
                     library_info.add((lib_url, lane_lane))
 
@@ -338,7 +338,7 @@ class ProcessSetUp(object):
             LANE_ID_TO_ALN_IDS[lane_id].append(aln['id'])
             if lane_id in LANES_WITH_DIRECT_POOL:
                 direct_alns.add(aln['id'])
-                
+
 
         # Find the minimum alignment ID for each pool/lane combination
         lowest_aln_for_pool = {pool_key: None for pool_key in POOL_KEY_TO_LIB_IDS.keys()}
@@ -569,6 +569,7 @@ class ProcessSetUp(object):
         if self.dry_run:
             logging.info("Dry run, would have created: %s" % script_file)
             logging.debug(env_vars)
+            self.create_sample_config(processing_info, alignment, script_directory, pool_name)
             return True
 
         if not os.path.exists(script_directory):
@@ -902,6 +903,28 @@ class ProcessSetUp(object):
 
             # (talen_orig, talen_new) = parse_talen_names_from_tc_notes(tc_info["notes"])
 
+            def get_sbl_and_cl(pool_name):
+                (sbl, cl) = (None, None)
+                try:
+                    m = re.match(r"LP(\d+)", pool_name)
+                    if not m:
+                        add_error("Pool name '%s' not valid, can't get SBL&CL", pool_name)
+                        return (None, None)
+                    pool_id = int(m.group(1))
+                    pool_info = self.api_list_result("library_pool/?number=%d" % pool_id)[0]
+                    if not pool_info.get("sublibrary"):
+                        return (None, None)
+                    sbl_info = self.api_single_result(url=pool_info.get("sublibrary"))
+                    sbl = sbl_info["object_name"]
+                    if not sbl_info.get("cell_library"):
+                        return (sbl, None)
+                    cl_info = self.api_single_result(url=sbl_info.get("cell_library"))
+                    cl = cl_info.get("object_name")
+                except Exception as e:
+                    add_error("Error finding SBL or CL: %s", e)
+                return (sbl, cl)
+            (sbl_name, cl_name) = get_sbl_and_cl(pool_name)
+
             info = {
                 "sequencing_barcode_well": seq_well_label,
                 "sequencing_barcode_plate": seq_well_plate,
@@ -916,6 +939,8 @@ class ProcessSetUp(object):
                 "tale_target_name": "TODO",
                 "tale_target_master_gene_id": "TODO",
                 "effector_purpose": "TODO",
+                "cell_library": cl_name,
+                "sublibrary": sbl_name,
                 "library_pool": pool_name,
                 "TC#": "TC%d" % tc_info["number"],
                 "DS#": "DS%d" % sample_info["number"],
@@ -933,11 +958,14 @@ class ProcessSetUp(object):
 
         flowcell_label = "FC%s" % processing_info["flowcell"]["label"]
         libraries = []
-            
+
         for lib_id in lib_ids:
             libraries.append(build_library_info(lib_id, flowcell_label))
 
         data = {"libraries": libraries}
+        if self.dry_run:
+            logging.info("dry_run, would have written %s/pool_info.json", script_directory)
+            return
         # do stuff
         with open("%s/pool_info.json" % script_directory, "w") as out:
             json.dump(data, out, indent=2, sort_keys=True)
