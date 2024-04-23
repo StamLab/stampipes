@@ -397,7 +397,7 @@ case $run_type in
 
     echo "Regular NextSeq 500 run detected"
     parallel_env="-pe threads 6"
-    link_command="python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o ."
+    link_command="python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--nextseq"
@@ -422,7 +422,7 @@ case $run_type in
     # Identical to nextseq processing
     echo "High-output MiniSeq run detected for DNase"
     parallel_env="-pe threads 6"
-    link_command="python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o ."
+    link_command="python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--miniseq"
@@ -435,7 +435,7 @@ case $run_type in
     # Identical to nextseq processing
     echo "Mid-output MiniSeq run detected for GUIDEseq"
     parallel_env="-pe threads 6"
-    link_command="python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o ."
+    link_command="python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--miniseq"
@@ -457,7 +457,7 @@ _U_
     # Identical to nextseq processing
     echo "Mid-output MiniSeq run detected"
     parallel_env="-pe threads 6"
-    link_command="python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o ."
+    link_command="python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--miniseq"
@@ -478,7 +478,7 @@ _U_
     # Identical to nextseq processing
     echo "High-output MiniSeq run detected"
     parallel_env="-pe threads 6"
-    link_command="python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o ."
+    link_command="python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--miniseq"

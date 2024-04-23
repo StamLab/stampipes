@@ -52,6 +52,11 @@ def parser_setup():
         dest="processing_file",
         help="The processing_file to use as a guide.",
     )
+    parser.add_argument(
+        "--merge-across-lanes",
+        action="store_true",
+        help="Merge across physical flowcell lanes. (Recommended for nextseq, not for Novaseq)",
+    )
 
     parser.add_argument(
         "--dry-run",
@@ -67,7 +72,7 @@ def parser_setup():
 
 
 def create_links(
-        lane, read, input_basedir, output_basedir, dry_run=False, undetermined=False, is_pool=False,
+        lane, read, input_basedir, output_basedir, dry_run=False, undetermined=False, is_pool=False, merge_across_lanes=False,
     ):
     """
     Create the links between the input directories and output dir
@@ -107,8 +112,9 @@ def create_links(
         )
 
     short_name = re.sub(r"_", "-", short_name)
+    lane_lane = "*" if (merge_across_lanes or "lane" not in lane) else "_L%03d" % int(lane["lane"])
     input_wildcard = os.path.join(
-        input_basedir, "%s_S*_%s_???.fastq.gz" % (short_name, read)
+        input_basedir, "%s_S*%s_%s_???.fastq.gz" % (short_name, lane_lane, read)
     )
 
     if not dry_run and not os.path.isdir(output_dir):
@@ -153,8 +159,8 @@ def main():
     data = json.loads(open(poptions.processing_file, "r").read())
 
     for lane in data["libraries"]:
-        create_links(lane, "R1", input_dir, poptions.output_dir, poptions.dry_run)
-        create_links(lane, "R2", input_dir, poptions.output_dir, poptions.dry_run)
+        create_links(lane, "R1", input_dir, poptions.output_dir, poptions.dry_run, merge_across_lanes=poptions.merge_across_lanes)
+        create_links(lane, "R2", input_dir, poptions.output_dir, poptions.dry_run, merge_across_lanes=poptions.merge_across_lanes)
 
     undet_lane = {
         "alignments": [{"sample_name": "lane1_Undetermined_L001"}],
@@ -162,7 +168,8 @@ def main():
     }
     for read in ["R1", "R2"]:
         create_links(
-            undet_lane, read, input_dir, poptions.output_dir, poptions.dry_run, undetermined=True
+            undet_lane, read, input_dir, poptions.output_dir, poptions.dry_run, undetermined=True,
+            merge_across_lanes=poptions.merge_across_lanes,
         )
 
     # Set up conversion table
@@ -188,7 +195,7 @@ def main():
             }
             for read in ["R1", "R2"]:
                 create_links(
-                    lane, read, input_dir, poptions.output_dir, poptions.dry_run, is_pool=True
+                    lane, read, input_dir, poptions.output_dir, poptions.dry_run, is_pool=True, merge_across_lanes=poptions.merge_across_lanes,
                 )
 
 
