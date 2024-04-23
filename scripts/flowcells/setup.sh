@@ -373,7 +373,7 @@ case $run_type in
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
     queue="hpcz-2"
-    python "python $STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
+    python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
     unaligned_command=$novaseq_bcl_command
 
