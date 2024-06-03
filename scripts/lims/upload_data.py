@@ -658,11 +658,11 @@ class UploadLIMS(object):
 
     def bulk_upload_counts(self, alignment_id, stats):
         # TODO: This isn't ready yet.
-        data = {
+        data = [{
             "object_id": alignment_id,
             "content_type": "flowcelllanealignment",
             "stats": stats,
-        }
+        }]
         response = self.api.post_single_result(url_addition="stat/create", json=data)
         return response
 
