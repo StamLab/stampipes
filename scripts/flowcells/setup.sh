@@ -202,7 +202,7 @@ run_type=$(     jq -r '.flowcell.run_type'          "$json" )
 has_umi=$(      jq -r '.libraries | map(.barcode1.umi) | any' "$json")
 
 # Novaseq runs always use native bcl2fastq demuxing
-if [[ $run_type =~ Novaseq ]] ; then
+if [[ $run_type =~ Novaseq ]] || [[ $run_type =~ NovaSeq ]] ; then
   unset demux
 fi
 
