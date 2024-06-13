@@ -291,6 +291,50 @@ read -d '' novaseq_bcl_command  << _NOVA_BCL_CMD_
     done
 _NOVA_BCL_CMD_
 
+# TODO: Remove hardcoded queue here!
+# The issue that that 'queue' isn't set until later in the script, but is needed for NOVA_SUBMIT_CMD
+queue=hpcz-2
+
+# This is a variant where we submit one job for each lane
+read -d '' novaseq_submit_command <<_NOVA_SUBMIT_CMD_
+# Run bcl2fastq in parallel, for each samplesheet and lane
+PROCESSING=
+for samplesheet in SampleSheet.withmask*csv ; do
+  for lane in {1..8} ; do
+    # TODO: Skip submission if lane not in this samplesheet
+    if ! (cut -d, -f1 \$samplesheet | sort -u | grep -q \$lane) ; then
+      echo "Lane \$lane not in samplesheet \$samplesheet, skipping"
+      continue
+    fi
+    bcl_mask=\$(sed 's/.*withmask\\.//;s/\\.csv//' <<< \$samplesheet)
+    fastq_dir=\$(sed 's/,/-/g' <<< "fastq-withmask-\$bcl_mask-lane-00\$lane")
+    jobname=u-$flowcell-\$bcl_mask-L00\$lane
+    bcl_jobid=\$(sbatch --export=ALL -J "\$jobname" -o "\$jobname.o%A" -e "\$jobname.e%A" --partition=$queue --ntasks=1 --cpus-per-task=40 --mem-per-cpu=8000 --parsable --oversubscribe <<__FASTQ__
+#!/bin/bash
+      set -x -e -o pipefail
+      cd "${illumina_dir}"
+      PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
+      bcl2fastq \\\\
+        --input-dir          "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
+        --output-dir         "${illumina_dir}/\\\$fastq_dir"              \\\\
+        --use-bases-mask     "\\\$bcl_mask"                               \\\\
+        --tiles              "s_\\\$lane"                                 \\\\
+        --barcode-mismatches "$mismatches"                                \\\\
+        --sample-sheet       "${illumina_dir}/\$samplesheet"              \\\\
+        --writing-threads    0                                            \\\\
+        --loading-threads    \\\\\$SLURM_CPUS_PER_TASK                    \\\\
+        --processing-threads \\\\\$SLURM_CPUS_PER_TASK
+__FASTQ__
+)
+    PROCESSING="\$PROCESSING,\$bcl_jobid"
+  done
+done
+if [[ -n "\$PROCESSING" ]]; then
+  bcl_dependency=\$(echo \$PROCESSING | sed -e 's/,/,afterok:/g' | sed -e 's/^,afterok/--dependency=afterok/g')
+fi
+
+_NOVA_SUBMIT_CMD_
+
 read -d '' novaseq_link_command  <<'_NOVA_LINK_CMD_'
 for fq_dir in fastq-withmask-* ; do
   [[ -d $fq_dir ]] || continue
@@ -319,7 +363,8 @@ case $run_type in
     queue="hpcz-2"
     python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
-    unaligned_command=$novaseq_bcl_command
+    #unaligned_command=$novaseq_bcl_command
+    submit_bcl2fastq_cmd=$novaseq_submit_command
 ;;
 
 "Novaseq 6000 S2")
@@ -333,7 +378,8 @@ case $run_type in
     queue="hpcz-2"
     python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
-    unaligned_command=$novaseq_bcl_command
+    #unaligned_command=$novaseq_bcl_command
+    submit_bcl2fastq_cmd=$novaseq_submit_command
 
 ;;
 "Novaseq 6000 S4")
@@ -347,7 +393,8 @@ case $run_type in
     queue="hpcz-2"
     python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
-    unaligned_command=$novaseq_bcl_command
+    #unaligned_command=$novaseq_bcl_command
+    submit_bcl2fastq_cmd=$novaseq_submit_command
 
 ;;
 "NovaSeq X 1.5B")
@@ -361,7 +408,8 @@ case $run_type in
     queue="hpcz-2"
     python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
-    unaligned_command=$novaseq_bcl_command
+    #unaligned_command=$novaseq_bcl_command
+    submit_bcl2fastq_cmd=$novaseq_submit_command
 
 ;;
 "NovaSeq X 10B")
@@ -375,7 +423,8 @@ case $run_type in
     queue="hpcz-2"
     python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
-    unaligned_command=$novaseq_bcl_command
+    #unaligned_command=$novaseq_bcl_command
+    submit_bcl2fastq_cmd=$novaseq_submit_command
 
 ;;
 "NovaSeq X 25B")
@@ -389,7 +438,8 @@ case $run_type in
     queue="hpcz-2"
     python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
-    unaligned_command=$novaseq_bcl_command
+    #unaligned_command=$novaseq_bcl_command
+    submit_bcl2fastq_cmd=$novaseq_submit_command
 
 ;;
 
@@ -568,7 +618,7 @@ flowcell_id=$( curl \
 
 # The final script is below:
 if [[ -n "$minidemux" ]]; then
-
+  # If miniseq, demux flowcell with fixed/known barcodes.
 cat > run_bcl2fastq.sh <<__BCL2FASTQ__
 #!/bin/bash
 source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
@@ -615,7 +665,29 @@ __FASTQ__
 
 __BCL2FASTQ__
 
-else
+else # If not miniseq
+
+# Default (slow) bcl2fastq cmd
+if [[ -z "$submit_bcl2fastq_cmd" ]] ; then
+  # If we haven't created the submit command yet, wrap up the unaligned_command
+  # This is the "old" way of submitting one job that does the whole flowcell
+  submit_bcl2fastq_cmd=<<__SUBMIT_BCL2FASTQ_CMD__
+# bcl2fastq
+bcl_jobid=\$(sbatch --export=ALL -J "u-$flowcell" -o "u-$flowcell.o%A" -e "u-$flowcell.e%A"  --partition=$queue --ntasks=1 --cpus-per-task=20 --mem-per-cpu=8000 --parsable --oversubscribe <<'__FASTQ__'
+#!/bin/bash
+set -x -e -o pipefail
+cd "$illumina_dir"
+
+$unaligned_command
+__FASTQ__
+)
+# Wait for bcl2fastq to complete
+if [[ -n \$bcl_jobid ]]; then
+   bcl_dependency=\$(echo \$bcl_jobid | sed -e 's/^/--dependency=afterok:/g')
+fi
+__SUBMIT_BCL2FASTQ_CMD__
+fi
+
 # Not miniseq
 cat > run_bcl2fastq.sh <<__BCL2FASTQ__
 #!/bin/bash
@@ -660,21 +732,7 @@ __BARCODES__
     PROCESSING="\$PROCESSING,\$bcjobid"
 done
 
-# bcl2fastq
-bcl_jobid=\$(sbatch --export=ALL -J "u-$flowcell" -o "u-$flowcell.o%A" -e "u-$flowcell.e%A"  --partition=$queue --ntasks=1 --cpus-per-task=20 --mem-per-cpu=8000 --parsable --oversubscribe <<'__FASTQ__'
-#!/bin/bash
-
-set -x -e -o pipefail
-cd "$illumina_dir"
-
-$unaligned_command
-
-__FASTQ__
-)
-
-if [[ -n \$bcl_jobid ]]; then
-   bcl_dependency=\$(echo \$bcl_jobid | sed -e 's/^/--dependency=afterok:/g')
-fi
+$submit_bcl2fastq_cmd
 
 sbatch --export=ALL -J queuedemux-$flowcell -o "queuedemux-$flowcell.o%A" -e "queuedemux-$flowcell.e%A" \$bcl_dependency --partition $queue --ntasks=1 --cpus-per-task=1 --mem-per-cpu=1000 --parsable --oversubscribe <<__PART2__
 #!/bin/bash
