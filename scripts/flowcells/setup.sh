@@ -804,6 +804,7 @@ rsync -avP "$illumina_dir"/SampleSheet*.csv "$analysis_dir/"
 (
     cd "$copy_from_dir"
     for dir in Project*/Sample* ; do
+        [[ -d \$dir ]] || continue
         samp_number=\$(sed 's/.*DS\([0-9]*\).*/\1/' <<< "\$dir")
         [[ -n "\$samp_number" ]]
         destination=\$(jq -c -r ".libraries[] | select(.sample == \$samp_number) | .project_share_directory" ../processing.json)
