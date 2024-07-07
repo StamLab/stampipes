@@ -890,7 +890,7 @@ python3 "$STAMPIPES/scripts/apilaneprocess.py" \
 bash collate.bash
 
 # Wait for collation jobs to finish
-while ( squeue -o "%j" | grep -q '^.collatefqDS.*$flowcell') ; do
+while ( squeue -o "%j" | grep -q '^.collatefq*$flowcell') ; do
    sleep 60
 done
 
