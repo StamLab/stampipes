@@ -829,30 +829,6 @@ rsync -avP "$illumina_dir"/SampleSheet*.csv "$analysis_dir/"
     done
 )
 
-
-# create fastqc and collation scripts
-cd "$analysis_dir"
-# Remove existing scripts if they exist (to avoid appending)
-rm -f fastqc.bash collate.bash run.bash
-
-# Create fastqc scripts
-python3 "$STAMPIPES/scripts/apilaneprocess.py" \
-  --script_template "$STAMPIPES/processes/fastq/fastqc.bash" \
-  --qsub-prefix .fq \
-  --queue $queue \
-  --sample-script-basename fastqc.bash \
-  --flowcell_label "$flowcell" \
-  --outfile fastqc.bash
-
-# Create collation scripts
-python3 "$STAMPIPES/scripts/apilaneprocess.py" \
-  --script_template "$STAMPIPES/processes/fastq/collate_fastq.bash" \
-  --qsub-prefix .collatefq \
-  --queue $queue \
-  --sample-script-basename "collate.bash" \
-  --flowcell_label "$flowcell" \
-  --outfile collate.bash
-
 __COPY__
 )
 
@@ -890,7 +866,7 @@ python3 "$STAMPIPES/scripts/apilaneprocess.py" \
 bash collate.bash
 
 # Wait for collation jobs to finish
-while ( squeue -o "%j" | grep -q '^.collatefqDS.*$flowcell') ; do
+while ( squeue -o "%j" | grep -q '^.collatefq*$flowcell') ; do
    sleep 60
 done
 
