@@ -162,10 +162,10 @@ class MakeBrowserload(object):
     def load_config(self, trackhubconfig):
         import configparser
 
-        Config = configparser.ConfigParser()
-        Config.read(trackhubconfig)
-        self.trackhubURL = Config.get("browser", "trackhub_url")
-        self.flowcell_link_folder = Config.get("browser", "flowcell_link_folder")
+        config = configparser.ConfigParser()
+        config.read(trackhubconfig)
+        self.trackhubURL = config.get("browser", "trackhub_url")
+        self.flowcell_link_folder = config.get("browser", "flowcell_link_folder")
 
     def load(self):
         self.basedir_name = os.path.basename(self.basedir)

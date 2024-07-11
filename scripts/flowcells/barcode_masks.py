@@ -76,7 +76,7 @@ def get_barcode_lengths(json_data):
 
     # Make sure only 1 report is run each for single/dual indexed barcodes until reporting is more flexible
     tempbc1, tempbc2 = [], []
-    finalList = []
+    final_list = []
 
     for n in lengths:
         if n[2] == "0":
@@ -84,11 +84,11 @@ def get_barcode_lengths(json_data):
         else:
             tempbc2.append(n)
     if tempbc1 != []:
-        finalList.append(sorted(tempbc1)[0])
+        final_list.append(sorted(tempbc1)[0])
     if tempbc2 != []:
-        finalList.append(sorted(tempbc2)[0])
+        final_list.append(sorted(tempbc2)[0])
 
-    return finalList
+    return final_list
 
 
 # Detects if there are barcode collisions per lane

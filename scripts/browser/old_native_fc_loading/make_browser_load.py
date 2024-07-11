@@ -156,15 +156,15 @@ class MakeBrowserload(object):
     def load_config(self, browserconfig):
         import configparser
 
-        Config = configparser.ConfigParser()
-        Config.read(browserconfig)
-        self.server = Config.get("browser", "server")
-        self.browser_url = Config.get("browser", "browser_url")
-        self.flowcell_link_folder = Config.get("browser", "flowcell_link_folder")
-        self.track_basedir = Config.get("browser", "track_basedir")
-        self.browser_excludes_file = Config.get("browser", "browser_excludes_file")
-        self.group = Config.get("browser", "browser_group")
-        self.file_label = Config.get("browser", "file_label")
+        config = configparser.ConfigParser()
+        config.read(browserconfig)
+        self.server = config.get("browser", "server")
+        self.browser_url = config.get("browser", "browser_url")
+        self.flowcell_link_folder = config.get("browser", "flowcell_link_folder")
+        self.track_basedir = config.get("browser", "track_basedir")
+        self.browser_excludes_file = config.get("browser", "browser_excludes_file")
+        self.group = config.get("browser", "browser_group")
+        self.file_label = config.get("browser", "file_label")
 
     def load(self):
         # self.browsersheet = SampleSheet(file=self.browsersheet_file)

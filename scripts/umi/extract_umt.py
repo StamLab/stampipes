@@ -17,7 +17,7 @@ stem_lengths = [11, 10, 9, 8]
 mismatched_stems = set()
 
 
-def parseArgs():
+def parse_args():
     parser = argparse.ArgumentParser(description="Annotate read names with UMT")
     parser.add_argument(
         "--mismatches", type=int, default=1, help="number of mismatches"
@@ -37,11 +37,11 @@ def parseArgs():
 def mismatch(word, mismatches):
     for d in range(mismatches + 1):
         for locs in itertools.combinations(range(len(word)), d):
-            thisWord = [[char] for char in word]
+            this_word = [[char] for char in word]
             for loc in locs:
-                origChar = word[loc]
-                thisWord[loc] = [letter for letter in "ACGTN" if letter != origChar]
-            for poss in itertools.product(*thisWord):
+                orig_char = word[loc]
+                this_word[loc] = [letter for letter in "ACGTN" if letter != orig_char]
+            for poss in itertools.product(*this_word):
                 yield "".join(poss)
 
 
@@ -118,18 +118,18 @@ def setup_mismatches(num_mismatches):
 
 
 def main(argv):
-    args = parseArgs()
+    args = parse_args()
     logging.basicConfig(level=logging.WARN, format=log_format)
     setup_mismatches(args.mismatches)
 
     with open(args.r1_fastq) as r1_in, open(args.r2_fastq) as r2_in, open(
         args.out_r1, "wt"
     ) as r1_out, open(args.out_r2, "wt") as r2_out:
-        r1_seqIO = SeqIO.parse(r1_in, "fastq")
-        r2_seqIO = SeqIO.parse(r2_in, "fastq")
+        r1_seq_io = SeqIO.parse(r1_in, "fastq")
+        r2_seq_io = SeqIO.parse(r2_in, "fastq")
         try:
             while True:
-                (r1, r2) = attach_umt(next(r1_seqIO), next(r2_seqIO))
+                (r1, r2) = attach_umt(next(r1_seq_io), next(r2_seq_io))
                 # Only write Fastq records for which we find stems
                 if r1 is not None and r2 is not None:
                     r1_out.write(r1.format("fastq"))

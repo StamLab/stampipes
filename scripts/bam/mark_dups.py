@@ -34,7 +34,7 @@ def parser_setup():
 # Takes a list of reads, returns one sorted such that the "best" read is at the
 # top.  That means highest mapping quality, with ties broken by query_name (in
 # lexicographic order)
-def sortQuality(x):
+def sort_quality(x):
     return (-1 * x.mapping_quality, x.query_name)
 
 
@@ -55,7 +55,7 @@ def find_dups(reads):
             key = r.template_length
         lists[key].append(r)
 
-    return [sorted(sublist, key=sortQuality) for sublist in lists.values()]
+    return [sorted(sublist, key=sort_quality) for sublist in lists.values()]
 
 
 # Sets a read's duplicate flag, returns it

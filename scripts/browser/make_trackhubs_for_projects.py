@@ -155,10 +155,10 @@ class MakeBrowserLoad(object):
     def load_config(self, trackhubconfig):
         import configparser
 
-        Config = configparser.ConfigParser()
-        Config.read(trackhubconfig)
-        self.trackhubURL = Config.get("browser", "trackhub_url")
-        self.aggregation_link_folder = Config.get("browser", "aggregation_link_folder")
+        config = configparser.ConfigParser()
+        config.read(trackhubconfig)
+        self.trackhubURL = config.get("browser", "trackhub_url")
+        self.aggregation_link_folder = config.get("browser", "aggregation_link_folder")
 
     def load(self):
         # set up folder

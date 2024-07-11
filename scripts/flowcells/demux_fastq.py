@@ -18,7 +18,7 @@ log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 lengths = set([])
 
 
-def parseArgs():
+def parse_args():
     parser = argparse.ArgumentParser(description="Split up fastq files by barcode")
     parser.add_argument(
         "--mismatches", type=int, default=0, help="number of mismatches"
@@ -290,7 +290,7 @@ def split_file(filename, barcodes, labels):
 
 
 def main(argv):
-    args = parseArgs()
+    args = parse_args()
 
     if args.debug:
         logging.basicConfig(level=logging.DEBUG, format=log_format)

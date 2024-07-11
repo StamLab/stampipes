@@ -50,11 +50,11 @@ def parser_setup():
 def gen_snps(word, mismatches):
     for d in range(mismatches + 1):
         for locs in itertools.combinations(range(len(word)), d):
-            thisWord = [[char] for char in word]
+            this_word = [[char] for char in word]
             for loc in locs:
-                origChar = word[loc]
-                thisWord[loc] = [letter for letter in "ACGTN" if letter != origChar]
-            for poss in itertools.product(*thisWord):
+                orig_char = word[loc]
+                this_word[loc] = [letter for letter in "ACGTN" if letter != orig_char]
+            for poss in itertools.product(*this_word):
                 yield "".join(poss)
 
 

@@ -75,16 +75,16 @@ def create_links(lane, read, base_dir, dry_run=False):
     lane1_fastq = glob.glob("%s_%s_*.fastq.gz" % (sample_name, read))
 
     replace = re.compile(r"_L001$")
-    L2_sample_name = replace.sub("_L002", sample_name)
+    l2_sample_name = replace.sub("_L002", sample_name)
 
-    lane2_fastq = glob.glob("%s_%s_*.fastq.gz" % (L2_sample_name, read))
+    lane2_fastq = glob.glob("%s_%s_*.fastq.gz" % (l2_sample_name, read))
 
     lane1_filecount = len(lane1_fastq)
     lane2_filecount = len(lane2_fastq)
 
     for lane2_filenum in range(1, lane2_filecount + 1):
         effective_filenum = lane1_filecount + lane2_filenum
-        orig_filename = "%s_%s_%03d.fastq.gz" % (L2_sample_name, read, lane2_filenum)
+        orig_filename = "%s_%s_%03d.fastq.gz" % (l2_sample_name, read, lane2_filenum)
         new_filename = "%s_%s_%03d.fastq.gz" % (sample_name, read, effective_filenum)
 
         print("Linking %s => %s" % (orig_filename, new_filename))
