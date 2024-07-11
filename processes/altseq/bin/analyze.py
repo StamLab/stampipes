@@ -4,7 +4,6 @@ import argparse
 import csv
 import os
 import pathlib
-import pprint
 
 
 def parse_args():

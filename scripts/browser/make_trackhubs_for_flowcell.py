@@ -6,7 +6,6 @@ import sys
 import argparse
 import logging
 import re
-import copy
 import requests
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -32,7 +31,7 @@ def foldercheck(*args):
             try:
                 os.mkdir(folder)
                 util_log.info("Created folder: %s" % folder)
-            except OSError as x:
+            except OSError:
                 util_log.error("ERROR: Could not create directory: %s" % folder)
                 util_log.warn(
                     "Please make sure all nonexistant parent directories have been created."
@@ -261,14 +260,14 @@ class MakeBrowserload(object):
 
         for lane in self.data:
             logging.debug("preparing tracks for lane: " + str(lane))
-            if not "hgdb" in lane:
+            if "hgdb" not in lane:
                 logging.error("Not using lane %s: no hgdb value" % lane)
                 continue
 
             if lane["Index"] == "":
                 lane["Index"] = "NoIndex"
 
-            if not lane["hgdb"] in self.subtrack_sets:
+            if lane["hgdb"] not in self.subtrack_sets:
                 self.subtrack_sets[lane["hgdb"]] = []
 
             if lane["aligner"] == "bwa":
@@ -464,7 +463,7 @@ class MakeBrowserload(object):
 
         samples = dict()
         for subtrack in subtracks:
-            if not subtrack["SampleID"] in subtrack:
+            if subtrack["SampleID"] not in subtrack:
                 samples[subtrack["SampleID"]] = "%s %s %s %s" % (
                     subtrack["SampleID"],
                     subtrack["CellType"],
@@ -501,15 +500,15 @@ class MakeBrowserload(object):
         ra.write("\tvisibility hide\n\n")
 
         for subtrack in subtracks:
-            if not "wellmapping-no-mito" in subtrack:
+            if "wellmapping-no-mito" not in subtrack:
                 logging.warn(
                     "%s has no wellmapping-no-mito count" % subtrack["dentrackname"]
                 )
                 subtrack["wellmapping-no-mito"] = "N/A"
-            if not "wellmapping" in subtrack:
+            if "wellmapping" not in subtrack:
                 logging.warn("%s has no wellmapping count" % subtrack["dentrackname"])
                 subtrack["wellmapping"] = "N/A"
-            if not "SPOT" in subtrack:
+            if "SPOT" not in subtrack:
                 logging.warn("%s has no SPOT score" % subtrack["dentrackname"])
                 subtrack["SPOT"] = "N/A"
 
@@ -635,7 +634,7 @@ class LimsQuery(object):
         return self.get_by_url("%s/%s" % (self.api_url, query))
 
     def get_by_url(self, url):
-        if not url in self.cache:
+        if url not in self.cache:
             self.cache[url] = requests.get(
                 url, headers={"Authorization": "Token %s" % self.api_token}
             ).json()
@@ -765,7 +764,7 @@ def main(args=sys.argv):
     data = json.loads(open(poptions.process_config, "r").read())
     trackhubconfig = poptions.trackhub_config
 
-    projects = [d["code_name"] for d in data["projects"]]
+    # projects = [d["code_name"] for d in data["projects"]]
 
     # get basedir
     basedir = data["alignment_group"]["directory"]
@@ -789,12 +788,12 @@ def main(args=sys.argv):
     load_groups = dict()
 
     # find projects
-    for l in data["libraries"]:
-        for a in l["alignments"]:
-            align_data = get_alignment_data(l, a, lims)
+    for lib in data["libraries"]:
+        for a in lib["alignments"]:
+            align_data = get_alignment_data(lib, a, lims)
             if not align_data["failed_lane"]:
                 p = align_data["project"]
-                if not p in load_groups:
+                if p not in load_groups:
                     load_groups[p] = []
                 load_groups[p].append(align_data)
 

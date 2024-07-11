@@ -1,7 +1,7 @@
-import os, sys, logging, re
+import os
+import sys
+import logging
 import requests
-import json
-import fileinput
 import argparse
 
 token = None
@@ -73,7 +73,7 @@ class TagChange(object):
         self.contenttypes = {}
 
     def get_contenttype(self, contenttype):
-        if not contenttype in self.contenttypes:
+        if contenttype not in self.contenttypes:
             contenttype_url = "%s/content_type/?model=%s" % (self.api_url, contenttype)
             contenttype_results = requests.get(
                 contenttype_url, headers=self.headers
@@ -88,16 +88,15 @@ class TagChange(object):
         exists = requests.get(
             "%s/tag/?slug=%s" % (self.api_url, slug), headers=self.headers
         )
-        tag = None
         if exists.ok:
             results = exists.json()
             if results["count"] > 0:
                 return results["results"][0]
             else:
-                print("Tag %s not found" % slug)
+                logging.error("Tag %s not found", slug)
                 return None
         else:
-            print("Error finding tag %s through API" % slug)
+            logging.error("Error finding tag %s through API", slug)
             return None
 
     def change_tag(self, contenttype, object_id, old_tag, new_tag):

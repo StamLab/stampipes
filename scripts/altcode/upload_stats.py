@@ -3,9 +3,7 @@
 Uploads all the results of alt-code processing to LIMS
 """
 
-import pprint
 import re
-import csv
 import argparse
 import datetime
 import hashlib
@@ -541,9 +539,10 @@ class UploadLIMS:
             LOG.debug("idx=%s, lane=%d, name=%s", idx, lane, name)
             # Get lane IDs for each file
             lane_ids = [
-                l["id"]
-                for l in processing_dict["libraries"]
-                if l["barcode1"]["reverse_sequence"] == idx and int(l["lane"]) == lane
+                lane["id"]
+                for lane in processing_dict["libraries"]
+                if lane["barcode1"]["reverse_sequence"] == idx
+                and int(lane["lane"]) == lane
             ]
             r1_file = os.path.join(outdir, name, "R1.fq.gz")
             r2_file = os.path.join(outdir, name, "R2.fq.gz")

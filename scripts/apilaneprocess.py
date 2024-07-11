@@ -1,10 +1,8 @@
-import json
 import os
 import sys
 import argparse
 import logging
 import re
-import requests
 import collections
 
 try:
@@ -12,7 +10,7 @@ try:
 except ImportError:
     from futures import ThreadPoolExecutor
 
-from stamlims_api import rest
+from stamlims_api import rest, lims
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
@@ -170,7 +168,7 @@ class ProcessSetUp(object):
         self.setup_lanes([lane["id"] for lane in lanes])
 
     def setup_tag(self, tag_slug):
-        flowcelllane_contenttype = content_types.contenttype_from_model_name(
+        flowcelllane_contenttype = lims.content_types.contenttype_from_model_name(
             self.api, model_name="FlowcellLane"
         )
         lane_tags = self.api.get_list_result(
@@ -235,7 +233,7 @@ class ProcessSetUp(object):
                     logging.debug("Lane %d is pool %s", lib_number, pool_name)
                 else:
                     logging.debug("Lane %d is not pool", lib_number)
-            except:
+            except Exception:
                 pass
 
         global POOL_INFO
@@ -291,7 +289,7 @@ class ProcessSetUp(object):
     def create_script(self, processing_info, pool=None):
         lane = processing_info["libraries"][0]
 
-        if not "directory" in lane:
+        if "directory" not in lane:
             logging.critical("No directory for lane %d" % lane["id"])
             return False
         fastq_directory = lane["directory"]

@@ -10,10 +10,10 @@ Criteria:
    face each other on the same reference and have an insert length wit
 """
 
+import argparse
 import sys
 import logging
 import pysam
-import re
 
 """
 Exception when a bad read is found
@@ -32,7 +32,7 @@ Looks for the UMI embeded in the read name, places it in a tag and trims the rea
 def parse_umi(read):
     try:
         umi_loc = read.query_name.index("#")
-    except:
+    except Exception:
         pass
     else:
         read.set_tag("XD", read.query_name[umi_loc + 1 :])
@@ -84,8 +84,6 @@ def validate_read(read, min_mapq=1, max_mismatches=2):
 
     return read
 
-
-import argparse
 
 parser = argparse.ArgumentParser(
     prog="filter_reads",
@@ -150,12 +148,12 @@ while 1:
     try:
         if not read1:
             read1 = parse_umi(next(raw_reads))
-    except:
+    except Exception:
         break
 
     try:
         read2 = parse_umi(next(raw_reads))
-    except:
+    except Exception:
         read2 = None
 
     # Continue in pair-end mode if their is two reads that are paired and that they have the same name
@@ -225,12 +223,12 @@ while 1:
             set_qc_fail(read1, qc_fail)
             set_proper_pair(read1, proper_pair)
 
-            if read1.reference_id != -1 and not read1.reference_name in nuclear_chrs:
+            if read1.reference_id != -1 and read1.reference_name not in nuclear_chrs:
                 set_nonnuclear(read1, True)
 
             set_qc_fail(read2, qc_fail)
             set_proper_pair(read2, proper_pair)
-            if read2.reference_id != -1 and not read2.reference_name in nuclear_chrs:
+            if read2.reference_id != -1 and read2.reference_name not in nuclear_chrs:
                 set_nonnuclear(read2, True)
 
             # Write file
@@ -266,7 +264,7 @@ while 1:
             set_qc_fail(read1, qc_fail)
             set_proper_pair(read1, False)
 
-            if read1.reference_id != -1 and not read1.reference_name in nuclear_chrs:
+            if read1.reference_id != -1 and read1.reference_name not in nuclear_chrs:
                 set_nonnuclear(read1, True)
 
             filtered_alignment.write(read1)

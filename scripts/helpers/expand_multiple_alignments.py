@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+
+from collections import namedtuple
 import sys
 import copy
 
@@ -58,8 +60,6 @@ def get_secondary_aligns(read):
         [Alignment(*a.split(",")[:-1]) for a in aligns],
     )
 
-
-from collections import namedtuple
 
 Alignment = namedtuple("Alignment", "chr pos cigar")
 
@@ -170,7 +170,7 @@ def process_pair(r1, r2):
         # print("r2", r2)
         # print("s1", s1)
         # print("s2", s2)
-        combinations = []
+        # combinations = []
         for i in s1:
             for j in s2:
                 pass

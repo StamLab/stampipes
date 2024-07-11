@@ -374,7 +374,7 @@ class ProcessSetUp(object):
                 included = aggregation_lane
                 break
 
-        if not "alignment" in aggregation_lane or not aggregation_lane["alignment"]:
+        if "alignment" not in aggregation_lane or not aggregation_lane["alignment"]:
             logging.critical(
                 "No alignment set for included aggregation lane %s"
                 % str(aggregation_lane)
@@ -438,8 +438,13 @@ class ProcessSetUp(object):
             if aggregation_lane["include"]:
                 included = aggregation_lane
                 break
-
-        lane = self.api_single_result(url=aggregation_lane["lane"])
+        if included is None:
+            logging.error(
+                "No included aggregation lanes for aggregation %s", aggregation_id
+            )
+            lane = None
+        else:
+            lane = self.api.single_result(url=included["lane"])
 
         if not lane:
             logging.critical(
@@ -484,7 +489,7 @@ class ProcessSetUp(object):
         assay_info = self.api_single_result(url=assay_url)
         category_url = assay_info["category"]
         if category_url is None:
-            logging.warn("Assay %s has no category" % (assay_name))
+            logging.warn("Assay %s has no category" % (assay_info))
             return None
         category_info = self.api_single_result(url=category_url)
         return category_info["slug"]
@@ -663,7 +668,7 @@ class ProcessSetUp(object):
                 )
                 for var, value in process_template_variables.items():
                     env_vars[var] = value
-            except ValueError as e:
+            except ValueError:
                 logging.error(
                     "Could not parse process variables for aggregation %d (template %d): '%s'"
                     % (
@@ -686,7 +691,7 @@ class ProcessSetUp(object):
 
         try:
             os.makedirs(aggregation_folder)
-        except:
+        except Exception:
             pass
 
         file_record = open("%s/bamfiles.txt" % aggregation_folder, "w")

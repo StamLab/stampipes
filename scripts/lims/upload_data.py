@@ -15,7 +15,6 @@ sys.path.insert(
     1, os.path.join(os.path.dirname(os.path.abspath(__file__)), "stamlims_api")
 )
 
-from stamlims_api.lims import aggregations, content_types
 from stamlims_api import rest
 
 lane_tags = None
@@ -619,7 +618,11 @@ class UploadLIMS(object):
             )
             # Allow for sloppiness in NFS timestamps
             difference = recorded_mtime - last_modified
-            if timedelta(minutes=-1) <= difference <= timedelta(minutes=1):
+            if (
+                datetime.timedelta(minutes=-1)
+                <= difference
+                <= datetime.timedelta(minutes=1)
+            ):
                 log.info("File exists and matches recorded size, skipping %s" % path)
             return
 
@@ -705,7 +708,7 @@ class UploadLIMS(object):
     # TODO : make sure that no more of one count type exists
     def get_alignment_counts(self, alignment_id):
         log.info("Getting alignment counts for %d" % alignment_id)
-        if not alignment_id in self.alignment_counts:
+        if alignment_id not in self.alignment_counts:
             counts = self.get_list_result(
                 "flowcell_lane_count/", query={"alignment": alignment_id}
             )
@@ -1088,14 +1091,14 @@ class UploadLIMS(object):
         picard_metric = None
         try:
             picard_metric = open(filename, "r").read()
-        except:
+        except Exception:
             log.error("Could not read picard metric file %s" % filename)
             return None
 
         log.debug("Uploading metric contents from: %s" % filename)
         log.debug(picard_metric)
 
-        if not metric_name in self.picard_metrics:
+        if metric_name not in self.picard_metrics:
             log.error("Could not find metrics type %s" % metric_name)
             return False
 

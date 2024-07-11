@@ -1,9 +1,10 @@
 from __future__ import unicode_literals
 
-import os, sys, logging, re
-import requests
+import os
+import sys
+import logging
+import re
 import json
-import fileinput
 import argparse
 import glob
 

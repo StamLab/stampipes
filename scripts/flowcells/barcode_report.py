@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 
-import os, sys, logging, re, json, argparse, glob
+import os
+import sys
+import re
+import json
+import argparse
+import glob
 
 script_options = {
     "quiet": False,
@@ -56,7 +61,7 @@ def sum_barcodes(input_files):
                 continue
             count, barcode = words
             barcode = barcode.replace("+", "-")
-            if not barcode in totals:
+            if barcode not in totals:
                 totals[barcode] = 0
             totals[barcode] += int(count)
         f.close()
@@ -67,15 +72,15 @@ def sum_barcodes(input_files):
 def get_input_files_for_lane(data, lane, basedir):
     globs = []
     files = []
-    for l in data["libraries"]:
+    for lib in data["libraries"]:
         # TODO: Allow to work with NoIndex samples that span a lane
-        if l["lane"] == lane:
+        if lib["lane"] == lane:
             name = "Project_%s/Sample_%s/%s_%s_L%03d_R1_???.barcodes.txt" % (
-                l["project"],
-                l["samplesheet_name"],
-                l["samplesheet_name"],
-                l["realbarcode"],
-                l["lane"],
+                lib["project"],
+                lib["samplesheet_name"],
+                lib["samplesheet_name"],
+                lib["realbarcode"],
+                lib["lane"],
             )
 
             globs.append(os.path.join(basedir, name))
@@ -92,7 +97,7 @@ def apply_mask(mask, barcode_string):
     orig_barcodes = barcode_string.split("-")
     while len(orig_barcodes) < len(mask):
         orig_barcodes.append("")
-    barcodes = [orig_barcodes[i][:l] for (i, l) in enumerate(mask)]
+    barcodes = [orig_barcodes[i][:length] for (i, length) in enumerate(mask)]
     return barcodes
 
 
@@ -104,16 +109,16 @@ def parse_bases_mask(mask_string):
 def get_expected_barcodes(data):
     mask = parse_bases_mask(data["alignment_group"]["bases_mask"])
     libraries = {}
-    for l in data["libraries"]:
-        if l["barcode_index"] == "NoIndex":
+    for lib in data["libraries"]:
+        if lib["barcode_index"] == "NoIndex":
             barcode = None
         else:
-            barcode = "-".join(apply_mask(mask, l["barcode_index"]))
-        lane = l["lane"]
-        l["realbarcode"] = barcode
-        if not lane in libraries:
+            barcode = "-".join(apply_mask(mask, lib["barcode_index"]))
+        lane = lib["lane"]
+        lib["realbarcode"] = barcode
+        if lane not in libraries:
             libraries[lane] = {}
-        libraries[lane][barcode] = l
+        libraries[lane][barcode] = lib
 
     return libraries
 
@@ -182,7 +187,7 @@ def main(args=sys.argv):
     if poptions.lane:
         lanes = [poptions.lane]
     else:
-        lanes = sorted(list(set([l["lane"] for l in processing_data["libraries"]])))
+        lanes = sorted(list(set([lib["lane"] for lib in processing_data["libraries"]])))
 
     # Get actual barcodes and merge with expected
     compiled_stats = {}

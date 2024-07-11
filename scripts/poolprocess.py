@@ -376,7 +376,7 @@ class ProcessSetUp(object):
                 pool_id = extract_id_from_url(pool_url)
                 LANES_WITH_DIRECT_POOL[lane["id"]] = pool_id
                 pool_key = (pool_id, lane_lane)
-                pool_number = int(lane["library_pool__number"])
+                # pool_number = int(lane["library_pool__number"])
 
                 # Get Library info
                 lp_info = self.api_single_result(url=pool_url)
@@ -536,7 +536,7 @@ class ProcessSetUp(object):
         lane = processing_info["libraries"][0]
         alignment = [a for a in lane["alignments"] if a["id"] == align_id][0]
 
-        if not "process_template" in alignment:
+        if "process_template" not in alignment:
             logging.error("Alignment %d has no process template" % align_id)
             return False
 
@@ -632,7 +632,7 @@ class ProcessSetUp(object):
             env_vars["LIBRARY_KIT"] = (
                 '"' + processing_info["libraries"][0]["library_kit_method"] + '"'
             )
-        except:
+        except Exception:
             env_vars["LIBRARY_KIT"] = None
 
         if processing_info["flowcell"]["paired_end"]:
@@ -686,7 +686,7 @@ class ProcessSetUp(object):
                 )
                 for var, value in process_template_variables.items():
                     env_vars[var] = value
-            except ValueError as e:
+            except ValueError:
                 logging.error(
                     "Could not parse process variables for align %d (template %d): '%s'"
                     % (
@@ -746,7 +746,6 @@ class ProcessSetUp(object):
             # Get all lane ids
             # Go up to the pool then down to the lanes
             # Note: This is inefficient but probably doesnt matter in practice
-            lanes = []
             lanes_with_align = set()
             for lane_id, aln_ids in LANE_ID_TO_ALN_IDS.items():
                 if alignment_id in aln_ids:
@@ -891,7 +890,7 @@ class ProcessSetUp(object):
                             ],
                         }
                     )
-            except:
+            except Exception:
                 add_error(
                     "Could not get effector information for sample DS%s",
                     sample_info["number"],
@@ -950,7 +949,7 @@ class ProcessSetUp(object):
                     wells.append(well_data)
                 return wells
 
-            def reverse_complement(bc: "Optional[str]") -> "Optional[str]":
+            def reverse_complement(bc: "Optional[str]") -> "Optional[str]":  # noqa: F821
                 if bc is None:
                     return None
                 lookup = {"A": "T", "T": "A", "C": "G", "G": "C"}
@@ -1001,7 +1000,7 @@ class ProcessSetUp(object):
                     "PL%d"
                     % lib_plate_wells[0]["well_parent"]["well_parent"]["plate_id"]
                 )
-            except Exception as e:
+            except Exception:
                 add_error("Could not find well info in %s", lib_plate_wells)
 
             def sort_talens(tls):
@@ -1038,7 +1037,7 @@ class ProcessSetUp(object):
                 else:
                     talen_name = None
 
-            lenti_qc_passed = lenti_from_tc["effector_assembly_qc"] is None
+            # lenti_qc_passed = lenti_from_tc["effector_assembly_qc"] is None
 
             if sample_info["time_point_unit"] == 5:
                 # harvest timepoint is in days

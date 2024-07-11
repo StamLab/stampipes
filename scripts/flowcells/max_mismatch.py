@@ -8,7 +8,8 @@
 #   For each setting (most permissive to least), generate all possible barcodes for each lane
 #     If there are any collisions, check the next tighter mismatch setting
 
-import os, sys, logging, re, math
+import sys
+import re
 import argparse
 import itertools
 import json
@@ -52,7 +53,7 @@ def gen_snps(word, mismatches):
             thisWord = [[char] for char in word]
             for loc in locs:
                 origChar = word[loc]
-                thisWord[loc] = [l for l in "ACGTN" if l != origChar]
+                thisWord[loc] = [letter for letter in "ACGTN" if letter != origChar]
             for poss in itertools.product(*thisWord):
                 yield "".join(poss)
 
@@ -107,7 +108,7 @@ def apply_mask(mask, barcode_string):
     orig_barcodes = barcode_string.split("-")
     while len(orig_barcodes) < len(mask):
         orig_barcodes.append("")
-    barcodes = [orig_barcodes[i][:l] for (i, l) in enumerate(mask)]
+    barcodes = [orig_barcodes[i][:length] for (i, length) in enumerate(mask)]
     return barcodes
 
 

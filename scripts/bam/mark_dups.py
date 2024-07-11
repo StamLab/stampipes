@@ -54,7 +54,7 @@ def find_dups(reads):
             key = r.template_length
         lists[key].append(r)
 
-    return [sorted(l, key=sortQuality) for l in lists.values()]
+    return [sorted(sublist, key=sortQuality) for sublist in lists.values()]
 
 
 # Sets a read's duplicate flag, returns it
@@ -90,19 +90,19 @@ class DupMarker:
 
         read_sets = find_dups(new_reads)
 
-        for l in read_sets:
+        for read_set in read_sets:
             if self.histo is not None:
-                self.read_histo[len(l)] += 1
+                self.read_histo[len(read_set)] += 1
             # Mark all but the highest-quality read as duplicates
-            l[0] = set_dup(l[0], False)
-            self.pair_map[l[0].query_name] = False
-            for r in l[1:]:
+            read_set[0] = set_dup(read_set[0], False)
+            self.pair_map[read_set[0].query_name] = False
+            for r in read_set[1:]:
                 r = set_dup(r, True)
                 self.pair_map[r.query_name] = True
 
             # Print the read set
             if self.output is not None:
-                for r in l:
+                for r in read_set:
                     self.output.write(r)
 
         # Print out already seen reads

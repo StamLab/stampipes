@@ -6,8 +6,6 @@ import json
 import logging
 import math
 import os
-import pathlib
-import pprint
 import re
 
 from collections import defaultdict
@@ -37,7 +35,7 @@ def parse_cellreads(filename):
             for k, v in row.items():
                 try:
                     row[k] = int(v)
-                except:
+                except Exception:
                     pass
             data.append(row)
         return data

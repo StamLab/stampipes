@@ -1,16 +1,12 @@
-import json
 import os
 import sys
 import argparse
 import logging
-import requests
-import subprocess
 
 sys.path.append("/home/audrakj/stamlims_api")
 print(sys.path)
-
-from stamlims_api import rest
-from stamlims_api.lims import files
+from stamlims_api import rest  # noqa: E402
+from stamlims_api.lims import files  # noqa: E402
 
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -209,8 +205,13 @@ class ProcessSetUp(object):
             if aggregation_lane["include"]:
                 included = aggregation_lane
                 break
-
-        lane = self.api.single_result(url=aggregation_lane["lane"])
+        if included is None:
+            logging.error(
+                "No included aggregation lanes for aggregation %s", aggregation_id
+            )
+            lane = None
+        else:
+            lane = self.api.single_result(url=included["lane"])
 
         if not lane:
             logging.critical(
@@ -301,7 +302,7 @@ class ProcessSetUp(object):
                     % (lane_id, aggregation_id)
                 )
 
-            alignment_id = int(alignment_endpoint.strip("/").split("/")[-1])
+            # alignment_id = int(alignment_endpoint.strip("/").split("/")[-1])
 
             r1_fastq = self.get_lane_fastq_file(aggregation_id, lane_id, "r1-fastq")
             r2_fastq = self.get_lane_fastq_file(aggregation_id, lane_id, "r2-fastq")

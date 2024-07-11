@@ -3,7 +3,6 @@
 import argparse
 import csv
 import os
-import pathlib
 
 # import pprint
 import json

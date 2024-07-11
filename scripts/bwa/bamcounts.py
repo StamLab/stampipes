@@ -7,7 +7,8 @@ paired reads.
 Useful SAM flag reference: http://broadinstitute.github.io/picard/explain-flags.html
 """
 
-import os, sys, logging, re
+import sys
+import logging
 from collections import defaultdict
 from pysam import Samfile
 import argparse
@@ -144,7 +145,7 @@ class BAMFilter(object):
         if read.is_paired and not self.process_read_paired(read, inbam):
             return
 
-        nuclear = not chr in ("chrM", "chrC")
+        nuclear = chr not in ("chrM", "chrC")
         autosomal = nuclear and chr not in ("chrX", "chrY", "chrZ", "chrW")
 
         if nuclear:

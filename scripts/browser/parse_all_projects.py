@@ -2,16 +2,12 @@
 
 from __future__ import unicode_literals
 
-import os, sys, logging, re
+import os
+import sys
+import logging
 import requests
-import json
-import fileinput
 import argparse
 
-try:
-    from concurrent.futures import ThreadPoolExecutor
-except ImportError:
-    from futures import ThreadPoolExecutor
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 

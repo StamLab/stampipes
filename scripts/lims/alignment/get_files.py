@@ -1,12 +1,9 @@
-import os, sys, logging, re
+import os
+import sys
+import logging
 import requests
-import json
-import fileinput
 import argparse
-import datetime
-import hashlib
 import string
-from zipfile import ZipFile
 
 token = None
 headers = None
@@ -271,7 +268,7 @@ class FileFetch(object):
             sys.exit(1)
 
         if args.alignment_id:
-            self.retrieve_file(alignment_id, file_purpose)
+            self.retrieve_file(args.alignment_id, file_purpose)
 
         lanes = self.find_lanes(args)
 

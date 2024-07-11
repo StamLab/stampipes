@@ -4,7 +4,6 @@ from Bio import SeqIO
 import argparse
 import itertools
 import logging
-import string
 import sys
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -40,7 +39,7 @@ def mismatch(word, mismatches):
             thisWord = [[char] for char in word]
             for loc in locs:
                 origChar = word[loc]
-                thisWord[loc] = [l for l in "ACGTN" if l != origChar]
+                thisWord[loc] = [letter for letter in "ACGTN" if letter != origChar]
             for poss in itertools.product(*thisWord):
                 yield "".join(poss)
 

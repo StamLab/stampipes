@@ -12,7 +12,6 @@ from collections import defaultdict
 # requires BioPython which seems to be in our environment
 # but only to reverse complement which we could figure out
 # another way to do
-from Bio.Seq import Seq
 
 # Usage: $0 -p processing.json
 
@@ -56,9 +55,6 @@ def get_barcode_assignments(
     data: dict, reverse_barcode1: bool, reverse_barcode2: bool
 ) -> "[dict]":
     assignments = []
-
-    # This will store our pool samplesheet lines
-    pool_assignment_set = set()
 
     for libdata in data["libraries"]:
         assignment = {

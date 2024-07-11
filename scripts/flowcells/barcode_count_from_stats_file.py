@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import os, sys, re
 import json
 import argparse
 import logging

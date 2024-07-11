@@ -388,7 +388,7 @@ class ProcessSetUp(object):
         lane = processing_info["libraries"][0]
         alignment = [a for a in lane["alignments"] if a["id"] == align_id][0]
 
-        if not "process_template" in alignment:
+        if "process_template" not in alignment:
             logging.error("Alignment %d has no process template" % align_id)
             return False
 
@@ -530,7 +530,7 @@ class ProcessSetUp(object):
                 )
                 for var, value in process_template_variables.items():
                     env_vars[var] = value
-            except ValueError as e:
+            except ValueError:
                 logging.error(
                     "Could not parse process variables for align %d (template %d): '%s'"
                     % (

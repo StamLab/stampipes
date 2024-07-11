@@ -1,5 +1,4 @@
 import sys
-import numpy as np
 from sklearn.datasets import dump_svmlight_file
 
 clusternames = sys.argv[1]
@@ -23,7 +22,7 @@ with open(hotspots) as file:
             motifs = line_split[9].split(";")
             newrow = [0] * len(fimos)
             for motif in motifs:
-                index = [n for n, l in enumerate(fimos) if l == motif]
+                index = [n for n, candidate in enumerate(fimos) if candidate == motif]
                 newrow[index[0]] = 1
         else:
             newrow = [0] * len(fimos)

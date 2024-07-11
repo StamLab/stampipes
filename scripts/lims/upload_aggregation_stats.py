@@ -1,17 +1,15 @@
 import sys
-import json
 import argparse
 
 import logging
+
+from stamlims_api.rest import setup_api
 
 # Change to logging.DEBUG to see all messages
 logging.basicConfig(level=logging.WARN)
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 log = logging.getLogger(__name__)
-
-from stamlims_api.rest import setup_api
-from stamlims_api.lims import aggregations, metrics
 
 
 def parser_setup():
@@ -57,18 +55,6 @@ def upload_stats(api, aggregation, stats={}):
         raise Exception("Upload failed")
 
     log.info(response)
-
-
-def upload_spot(api, aggregation, spot_file):
-    if not os.path.exists(spot_file):
-        log.error("Cannot find spot file %s" % spot_file)
-        return
-    spot = open(spot_file, "r").read().strip()
-    try:
-        spot = Decimal(spot)
-        upload_stat(api, aggregation, "hotspot2-SPOT", spot)
-    except ValueError:
-        log.error("Could not turn %s into decimal" % spot)
 
 
 def upload_file(api, aggregation, counts_file):
@@ -128,7 +114,7 @@ def main(args=sys.argv):
     if poptions.aggregation_id is None:
         log.critical("No --aggregation specified")
         sys.exit(2)
-    aggregation = aggregations.get_aggregation(api, poptions.aggregation_id)
+    # aggregation = aggregations.get_aggregation(api, poptions.aggregation_id)
     if poptions.counts_file:
         for count_file in poptions.counts_file:
             upload_file(api, poptions.aggregation_id, count_file)

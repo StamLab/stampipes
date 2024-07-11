@@ -1,9 +1,6 @@
 import json
-import os
-import sys
 import argparse
 import logging
-import re
 
 from collections import defaultdict
 

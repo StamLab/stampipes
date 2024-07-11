@@ -3,18 +3,14 @@
 Uploads alt-code fastq files to LIMS
 """
 
-import pprint
 import re
-import csv
 import argparse
 import datetime
 import hashlib
-import json
 import logging
 import os
 import sys
 from functools import lru_cache
-from collections import defaultdict
 
 # Make sure we can load our vendored stamlims_api dependency
 sys.path.insert(
@@ -502,11 +498,11 @@ class UploadLIMS:
         lane_info = self.get_list_result(lanes_query)
         lanes_in_pool = set()
         lanes_in_pool.add(int(lane_id))
-        for l in lane_info:
-            if l.get("library"):
-                library_id = extract_id_from_url(l["library"])
+        for lane in lane_info:
+            if lane.get("library"):
+                library_id = extract_id_from_url(lane["library"])
                 if library_id in lib_ids:
-                    lanes_in_pool.add(l["id"])
+                    lanes_in_pool.add(lane["id"])
         return list(lanes_in_pool)
 
     # def upload_flowcell_report(self, data):

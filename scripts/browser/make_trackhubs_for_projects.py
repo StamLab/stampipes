@@ -6,7 +6,6 @@ import sys
 import argparse
 import logging
 import re
-import copy
 import requests
 import datetime
 
@@ -22,7 +21,7 @@ def foldercheck(*args):
             try:
                 os.mkdir(folder)
                 util_log.info("Created folder: %s" % folder)
-            except OSError as x:
+            except OSError:
                 util_log.error("ERROR: Could not create directory: %s" % folder)
                 util_log.warn(
                     "Please make sure all nonexistant parent directories have been created."
@@ -201,9 +200,9 @@ class MakeBrowserLoad(object):
 
         for agg in self.data:
             # skip aggregations that are not completed
-            if agg["needs_reprocessing"] == True:
+            if agg["needs_reprocessing"]:
                 continue
-            if agg["processing_completed"] == None:
+            if agg["processing_completed"] is None:
                 continue
 
             tracks = {}
@@ -280,7 +279,7 @@ class MakeBrowserLoad(object):
                     "Unknown template type, %s, for %s"
                     % (agg["aggregation_process_template_id"], agg["id"])
                 )
-            if not tracks["agg_genome"] in self.all_tracks:
+            if tracks["agg_genome"] not in self.all_tracks:
                 self.all_tracks[tracks["agg_genome"]] = []
             self.all_tracks[tracks["agg_genome"]].append(tracks)
 
@@ -445,8 +444,8 @@ def main(args=sys.argv):
         poptions.priority,
         poptions.projectname,
         date,
-        poptions.base_api_url,
-        poptions.token,
+        api_url,
+        token,
     )
     hubwriter.load()
 

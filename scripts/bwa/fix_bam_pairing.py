@@ -1,6 +1,5 @@
 #!/bin/env python3
 
-import sys
 import pysam
 import argparse
 
@@ -34,7 +33,7 @@ while 1:
         read2 = unfiltered_reads.next()
         (read1, read2) = (read1, read2) if read1.is_read1 else (read2, read1)
 
-    except:
+    except Exception:
         break
 
     # strip off the umi, and place it in a custom tag (if it exists)
@@ -44,7 +43,7 @@ while 1:
             read1_umi_loc = read1.qname.index("#")
             read2_umi_loc = read2.qname.index("#")
 
-        except:
+        except Exception:
             pass
 
         else:
@@ -73,7 +72,7 @@ while 1:
         if read1.isize > 750 or read2.isize > 750:
             raise
 
-    except:
+    except Exception:
         # failed a test above, not properly paired
         read1.flag &= ~(1 << 1)
         read2.flag &= ~(1 << 1)

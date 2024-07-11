@@ -3,7 +3,6 @@
 Uploads all the results of alt-seq processing to LIMS
 """
 
-import pprint
 import re
 import csv
 import argparse
@@ -536,9 +535,10 @@ class UploadLIMS:
             LOG.debug("idx=%s, lane=%d, name=%s", idx, lane, name)
             # Get lane IDs for each file
             lane_ids = [
-                l["id"]
-                for l in processing_dict["libraries"]
-                if l["barcode1"]["reverse_sequence"] == idx and int(l["lane"]) == lane
+                lib["id"]
+                for lib in processing_dict["libraries"]
+                if lib["barcode1"]["reverse_sequence"] == idx
+                and int(lib["lane"]) == lane
             ]
             r1_file = os.path.join(outdir, name, "R1.fq.gz")
             r2_file = os.path.join(outdir, name, "R2.fq.gz")

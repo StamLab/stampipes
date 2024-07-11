@@ -188,7 +188,7 @@ class ProcessSetUp(object):
             self.template_script_content = open(self.template_script, "r").read()
 
     def include_lane(self, lane):
-        if self.umi_filter != None:
+        if self.umi_filter is not None:
             if lane["barcode1"] and lane["barcode1"]["umi"]:
                 umi = True
             else:
@@ -199,7 +199,7 @@ class ProcessSetUp(object):
             if not self.umi_filter and umi:
                 return False
 
-        if self.filter_lanes and not lane["lane"] in self.filter_lanes:
+        if self.filter_lanes and lane["lane"] not in self.filter_lanes:
             return False
 
         if self.ignore_failed_lanes and lane["failed"]:
@@ -209,19 +209,19 @@ class ProcessSetUp(object):
             )
             return False
 
-        if self.project_filter and not (lane["project"] in self.project_filter):
+        if self.project_filter and lane["project"] not in self.project_filter:
             logging.debug(
                 "Skipping %s, not in project filter" % lane["samplesheet_name"]
             )
             return False
 
-        if self.library_filter and not (lane["library"] in self.library_filter):
+        if self.library_filter and lane["library"] not in self.library_filter:
             logging.debug(
                 "Skipping %s, not in library filter" % lane["samplesheet_name"]
             )
             return False
 
-        if self.sample_filter and not (lane["sample"] in self.sample_filter):
+        if self.sample_filter and lane["sample"] not in self.sample_filter:
             logging.debug(
                 "Skipping %s, not in sample filter" % lane["samplesheet_name"]
             )
@@ -230,7 +230,7 @@ class ProcessSetUp(object):
         if (
             self.alignment_filter
             and lane["alignments"]
-            and not (lane["alignments"][0]["id"] in self.alignment_filter)
+            and lane["alignments"][0]["id"] not in self.alignment_filter
         ):
             logging.debug(
                 "Skipping %s, not in alignment filter" % lane["samplesheet_name"]
@@ -255,7 +255,7 @@ class ProcessSetUp(object):
         self.run_scripts()
 
     def add_script(self, script_file, sample_name, priority):
-        if not priority in self.processing_scripts:
+        if priority not in self.processing_scripts:
             self.processing_scripts[priority] = list()
 
         self.processing_scripts[priority].append((sample_name, script_file))
@@ -294,7 +294,7 @@ class ProcessSetUp(object):
             base_script = alignment["aligner"]
             logging.info("# Aligning %s with %s" % (lane["sample"], base_script))
 
-        if not base_script in script_contents:
+        if base_script not in script_contents:
             script_contents[base_script] = open(script_files[base_script], "r").read()
 
         return script_contents[base_script]

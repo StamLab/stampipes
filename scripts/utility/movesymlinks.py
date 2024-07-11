@@ -5,7 +5,10 @@ Use to update symlinks with a target base path of X to the new target
 base path of Y.
 """
 
-import sys, os, argparse, logging
+import sys
+import os
+import argparse
+import logging
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 

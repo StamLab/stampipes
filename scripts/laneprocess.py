@@ -1,6 +1,5 @@
 """This script is deprecated!"""
 
-import json
 import os
 import sys
 import argparse
@@ -253,7 +252,7 @@ class ProcessSetUp(object):
     def create_script(self, processing_info):
         lane = processing_info["libraries"][0]
 
-        if not "directory" in lane:
+        if "directory" not in lane:
             logging.critical("No directory for lane %d" % lane["id"])
             return False
 

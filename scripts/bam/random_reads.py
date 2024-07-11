@@ -3,7 +3,6 @@ def main():
     import random
     import pysam
     import shutil
-    import datetime
 
     parser = argparse.ArgumentParser()
     parser.add_argument("infile")

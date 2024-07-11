@@ -6,13 +6,11 @@ import errno
 import itertools
 import json
 import logging
-import operator
 import os
 import re
 import subprocess
 import sys
 
-from Bio import SeqIO
 from Bio.SeqIO.QualityIO import FastqGeneralIterator
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

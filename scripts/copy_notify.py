@@ -6,7 +6,12 @@ new sequencer folders and for sequencer folders that have finished copying.
 TODO: Generalize some of these functions into a library.
 TODO: This might be more robust as a cron job."""
 
-import os, re, time, logging, smtplib, json
+import os
+import re
+import time
+import logging
+import smtplib
+import json
 from email.mime.text import MIMEText
 import xml
 from xml.dom import minidom
@@ -182,7 +187,7 @@ def get_folder_info(sequencer_folder):
         if sequencer_folder.find(server) > 0:
             info["server"] = server
 
-    if not "server" in info:
+    if "server" not in info:
         info["server"] = "UNKNOWN"
 
     match = folder_pattern_ga.search(sequencer_folder)

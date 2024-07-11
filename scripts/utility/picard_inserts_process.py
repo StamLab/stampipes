@@ -1,8 +1,7 @@
-import numpy, re, sys
+import numpy
+import sys
 
 from copy import copy
-from datetime import datetime
-from sklearn.preprocessing import normalize
 
 
 # returns the convolutional or statistical autocorrelation of the passed histogram
@@ -53,7 +52,7 @@ def normalize_hist(hist, mode="max"):
 def diff_norm(df, idx, hist_name="agg_hist", mode="max", r=(50, 140)):
     try:
         c = copy(get_arr(df[hist_name].iloc[idx])[r[0] : r[1]])
-    except:
+    except Exception:
         c = copy(df[hist_name].iloc[idx][r[0] : r[1]])
     return numpy.diff(normalize_hist(c, mode=mode))
 
@@ -66,7 +65,7 @@ def get_peak_loc(hist, r=(100, 106), npeaks=1):
         n_highest = sorted(hist[r[0] : r[1]], reverse=True)[:npeaks]
         for n in n_highest:
             peaks.append(hist.index(n))
-    except:
+    except Exception:
         peaks = numpy.nan
     return peaks
 
@@ -77,7 +76,7 @@ def get_large_small_ratio(hist, r=(60, 120)):
     try:
         rt = (hist[r[1]]) / (hist[r[0]])
         ratio = rt
-    except:
+    except Exception:
         ratio = numpy.nan
     return ratio
 
@@ -92,7 +91,7 @@ def f_transform(hist, position=11):
     pa = numpy.nan
     pv = numpy.nan
     vat = numpy.nan
-    adp = numpy.nan
+    _adp = numpy.nan
     adv = numpy.nan
     try:
         norm_hist = normalize_hist(get_arr(hist), mode="max")
@@ -102,15 +101,11 @@ def f_transform(hist, position=11):
         m = numpy.argmax(ft)
         adj = numpy.mean(ft)
         pa = m
-        pv = ft[m]
+        pv = ft[pa]
         vat = ft[11]
-        adp = ft[m] - adj
-        adv = ft[11] - adj
-    except:
-        pa = numpy.nan
-        pv = numpy.nan
-        vat = numpy.nan
-        adp = numpy.nan
+        _adp = pv - adj
+        adv = vat - adj
+    except Exception:
         adv = numpy.nan
     return adv
 
@@ -123,7 +118,7 @@ def read_hist(file):
             try:
                 (key, val) = line.split()
                 d[int(key)] = int(val)
-            except:
+            except Exception:
                 next
     return d
 

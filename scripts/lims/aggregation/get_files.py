@@ -1,12 +1,9 @@
-import os, sys, logging, re
+import os
+import sys
+import logging
 import requests
-import json
-import fileinput
 import argparse
-import datetime
-import hashlib
 import string
-from zipfile import ZipFile
 
 token = None
 headers = None

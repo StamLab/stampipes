@@ -4,11 +4,10 @@
 # In[2]:
 
 
-import sys, os
+import sys
 import numpy as np
 import scipy
 import scipy.stats
-from scipy import optimize
 
 from footprint_tools.modeling import dispersion
 

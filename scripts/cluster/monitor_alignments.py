@@ -1,8 +1,9 @@
-import os, sys, logging, re
+import os
+import sys
+import logging
+import re
 import requests
-import json
 import argparse
-import datetime
 import subprocess
 import xml.dom.minidom
 
@@ -203,7 +204,7 @@ class ClusterMonitor(object):
         )
         lims_process_align_ids = set()
 
-        if fetch_results == None:
+        if fetch_results is None:
             log.critical("Could not get list of currently processing alignments")
             sys.exit(1)
 
@@ -220,7 +221,7 @@ class ClusterMonitor(object):
         host = run_command("hostname").split(".")[0]
         key = "%s-usage" % host
         url = "%s/key_value/?key=%s" % (self.api_url, key)
-        key_value = self.get_single_result("%s/key_value/?key=%s" % (self.api_url, key))
+        key_value = self.get_single_result(url)
         if not key_value:
             log.error("Cannot find '%s' key value" % key)
             return
