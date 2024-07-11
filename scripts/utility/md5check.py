@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 For a tab delineated file with rows of:
 

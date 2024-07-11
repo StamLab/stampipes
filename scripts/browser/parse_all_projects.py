@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # pulls out top 1000 projects and their ids
 
 from __future__ import unicode_literals

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys
 
 from sklearn.datasets import dump_svmlight_file

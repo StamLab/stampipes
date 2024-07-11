@@ -1,4 +1,4 @@
-#!/bin/env python3
+#!/usr/bin/env python3
 """
 move_umt_to_tag.py
 Takes a BAM file as input, and produces one as output.

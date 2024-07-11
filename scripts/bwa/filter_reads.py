@@ -1,4 +1,4 @@
-#!/bin/env python3
+#!/usr/bin/env python3
 """
 filter_reads.py - Set SAM flag 0x200 (QC-fail) for reads failing various criteria.
 

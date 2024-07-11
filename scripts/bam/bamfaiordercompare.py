@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 This quick script uses pysam's capabilities to compare the ordering
 of references in the header of a BAM file with the order in a FAI

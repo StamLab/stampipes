@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 This script uses pip to print out versions of all installed packages.
 """

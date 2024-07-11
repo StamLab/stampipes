@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # This is a quick script to split up FASTQ files by barcode given
 # Used to rescue tags from undeterminde state
 
