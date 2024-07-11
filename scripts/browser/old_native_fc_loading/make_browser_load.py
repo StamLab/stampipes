@@ -368,7 +368,7 @@ class MakeBrowserload(object):
     def create_htmls(self):
         self.html_files = {}
 
-        for hgdb, subtracks in self.subtrack_sets.items():
+        for hgdb in self.subtrack_sets.keys():
             self.create_html(hgdb)
 
     def create_html(self, hgdb):
@@ -416,7 +416,7 @@ class MakeBrowserload(object):
     def create_ras(self):
         self.ra_files = {}
 
-        for hgdb, subtracks in self.subtrack_sets.items():
+        for hgdb in self.subtrack_sets.keys():
             self.create_ra(hgdb)
 
     def create_commands(self):
@@ -439,7 +439,7 @@ fi
                 % {"base_dir": self.basedir, "link_dir": self.link_dir}
             )
 
-        for hgdb, subtracks in self.subtrack_sets.items():
+        for hgdb in self.subtrack_sets.keys():
             self.create_genome_commands(hgdb, commands)
 
         # commands.write("\ncat %s >> %s\n" % (self.excludes_file, self.browser_excludes_file))

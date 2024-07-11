@@ -165,23 +165,24 @@ def process_pair(r1, r2):
         sys.stdout.write(r2)
         return
 
-    if s1 and s2:
-        # print("r1", r1)
-        # print("r2", r2)
-        # print("s1", s1)
-        # print("s2", s2)
-        # combinations = []
-        for i in s1:
-            for j in s2:
-                pass
+    # I'm not sure what this block was for.
+    # if s1 and s2:
+    #    # print("r1", r1)
+    #    # print("r2", r2)
+    #    # print("s1", s1)
+    #    # print("s2", s2)
+    #    combinations = []
+    #    for i in s1:
+    #        for j in s2:
+    #            pass
 
-        return
+    #    return
 
     # print("r1", r1)
     # print("r2", r2)
 
 
-def main(args=[]):
+def main():
     while True:
         try:
             r1 = next(sys.stdin)

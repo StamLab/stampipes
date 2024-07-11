@@ -1,4 +1,7 @@
-# import csv
+# Ignore B019, because we don't care about the upload class leaking into
+# memory after use, because we only construct one
+# ruff: noqa: B019
+
 import argparse
 import functools
 import json

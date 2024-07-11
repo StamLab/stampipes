@@ -3,6 +3,10 @@
 Uploads alt-code fastq files to LIMS
 """
 
+# Ignore B019, because we don't care about the upload class leaking into
+# memory after use, because we only construct one
+# ruff: noqa: B019
+
 import argparse
 import datetime
 import hashlib

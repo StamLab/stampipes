@@ -128,13 +128,9 @@ def main(argv):
             lane = lib["lane"]
             for lane in barcodes["Lanes"]:
                 if lane == lane["LaneIndex"]:
-                    if bcs in lane["Counts"]:
-                        next
-                    else:
+                    if bcs not in lane["Counts"]:
                         print(lib)
                         success = "FALSE"
-        else:
-            next
 
     print(success)
 

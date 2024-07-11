@@ -3,6 +3,10 @@
 Uploads all the results of alt-seq processing to LIMS
 """
 
+# Ignore B019, because we don't care about the upload class leaking into
+# memory after use, because we only construct one
+# ruff: noqa: B019
+
 import argparse
 import csv
 import datetime
@@ -501,7 +505,7 @@ class UploadLIMS:
         else:
             # Error! too many reports
             LOG.critical("Too many JSON reports exist")
-            raise "Too many JSON reports exist, exiting"
+            raise Exception("Too many JSON reports exist, exiting")
 
     def upload_altseq_flowcell(self, sample_config, processing_dict, outdir):
         """
@@ -522,7 +526,7 @@ class UploadLIMS:
             lane = int(row["lane"])
             pool_name = row["pool_name"]
             sample_name = row["sample_name"]
-            for idx, lib in enumerate(processing_dict["libraries"]):
+            for lib in processing_dict["libraries"]:
                 if int(lib["lane"]) == lane and lib["barcode_index"] == barcode_index:
                     lib.update({"pool_name": pool_name, "sample_name": sample_name})
                     processing_info.append(lib)

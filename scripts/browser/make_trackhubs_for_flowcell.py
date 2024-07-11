@@ -247,7 +247,7 @@ class MakeBrowserload(object):
         genomefile = os.path.join(self.outdir, "genomes.txt")
         logging.info("Creating genome.txt file: %s" % genomefile)
         genomes = open(genomefile, "w")
-        for hgdb, subtracks in self.subtrack_sets.items():
+        for hgdb in self.subtrack_sets.keys():
             genomes.write("\ngenome %s\n" % hgdb)
             genomes.write(
                 "trackDb %s/trackDb.%s.%s.txt\n" % (hgdb, self.project, self.main_label)
@@ -401,7 +401,7 @@ class MakeBrowserload(object):
         self.html_files = {}
         masterhtmlloc = os.path.join(self.outdir, "description.html")
         masterhtml = open(masterhtmlloc, "w")
-        for hgdb, subtracks in self.subtrack_sets.items():
+        for hgdb in self.subtrack_sets.keys():
             self.html_files[hgdb] = os.path.join(
                 self.outdir, hgdb, "%s.html" % self.main_label
             )
@@ -445,7 +445,7 @@ class MakeBrowserload(object):
     def create_ras(self):
         self.ra_files = {}
 
-        for hgdb, subtracks in self.subtrack_sets.items():
+        for hgdb in self.subtrack_sets.keys():
             self.create_ra(hgdb)
 
     # write RA / track file

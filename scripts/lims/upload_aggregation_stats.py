@@ -41,7 +41,7 @@ def parser_setup():
 
 
 # aggregation
-def upload_stats(api, aggregation, stats={}):
+def upload_stats(api, aggregation, stats):
     data = [
         {
             "object_id": aggregation,

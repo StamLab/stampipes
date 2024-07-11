@@ -329,7 +329,7 @@ def main(argv):
     for label, info in labels.items():
         print("%s\t%s" % (label, str(info)))
 
-    for label, info in labels.items():
+    for info in labels.values():
         info["out"].communicate()
         info["fh"].close()
 

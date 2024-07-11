@@ -119,7 +119,7 @@ def read_hist(file):
                 (key, val) = line.split()
                 d[int(key)] = int(val)
             except Exception:
-                next
+                pass
     return d
 
 
