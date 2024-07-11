@@ -192,7 +192,7 @@ class ProcessSetUp(object):
             logging.debug(request.json())
             return request.json()
         else:
-            logging.error("Could not get data from %s" % url)
+            logging.error("Could not get data from %s", url)
             logging.error(request)
             return None
 
@@ -204,7 +204,7 @@ class ProcessSetUp(object):
             url = "%s/%s" % (self.api_url, url_addition)
 
         while more:
-            logging.debug("Fetching more results for query %s" % url)
+            logging.debug("Fetching more results for query %s", url)
 
             request = self.session.get(url)
 
@@ -227,7 +227,7 @@ class ProcessSetUp(object):
 
         if not process_info:
             logging.critical(
-                "Could not find processing info for alignment %d\n" % alignment_id
+                "Could not find processing info for alignment %d\n", alignment_id
             )
             logging.critical(process_info)
             sys.exit(1)
@@ -236,14 +236,14 @@ class ProcessSetUp(object):
 
     def get_process_template(self, align_id, process_template_id):
         if not process_template_id:
-            logging.critical("No process template for alignment %d\n" % align_id)
+            logging.critical("No process template for alignment %d\n", align_id)
             return None
 
         info = self.api_single_result("process_template/%d/" % (process_template_id))
 
         if not info:
             logging.critical(
-                "Could not find processing template for ID %d\n" % process_template_id
+                "Could not find processing template for ID %d\n", process_template_id
             )
             sys.exit(1)
 
@@ -251,11 +251,11 @@ class ProcessSetUp(object):
 
     # Run alignment setup in parallel
     def setup_alignments(self, align_ids):
-        for id, error in self.pool.map(self.setup_alignment, align_ids):
+        for align_id, error in self.pool.map(self.setup_alignment, align_ids):
             if error:
-                logging.debug("ALN%d result received, error: %s" % (id, error))
+                logging.warning("ALN%d result received, error: %s", align_id, error)
             else:
-                logging.debug("ALN%d result received, OK" % id)
+                logging.debug("ALN%d result received, OK", align_id)
 
     def setup_alignment(self, align_id):
         try:
@@ -268,10 +268,10 @@ class ProcessSetUp(object):
                 self.create_script(processing_info, alignment["id"])
                 return (align_id, None)
             else:
-                logging.info("Skipping completed alignment %d" % align_id)
+                logging.info("Skipping completed alignment %d", align_id)
                 return (align_id, None)
         except Exception as e:
-            logging.exception("Could not set up alignment %d}: (%s)" % (align_id, e))
+            logging.exception("Could not set up alignment %d}: (%s)", align_id, e)
             return (align_id, e)
 
     def get_lane_file(self, lane_id, purpose):
@@ -294,14 +294,14 @@ class ProcessSetUp(object):
         self.setup_alignments([align_tag["object_id"] for align_tag in align_tags])
 
     def setup_project(self, project_id):
-        logging.info("Setting up project #%s" % project_id)
+        logging.info("Setting up project #%s", project_id)
         alignments = self.api_list_result(
             "flowcell_lane_alignment/?lane__sample__project=%s" % project_id
         )
         self.setup_alignments([alignment["id"] for alignment in alignments])
 
     def setup_flowcell(self, flowcell_label):
-        logging.info("Setting up flowcell for %s" % flowcell_label)
+        logging.info("Setting up flowcell for %s", flowcell_label)
         alignments = self.api_list_result(
             "flowcell_lane_alignment/?lane__flowcell__label=%s&page_size=1000"
             % flowcell_label
@@ -320,7 +320,7 @@ class ProcessSetUp(object):
             logging.debug("Writing script to stdout")
             outfile = sys.stdout
         else:
-            logging.debug("Logging script to %s" % self.outfile)
+            logging.debug("Logging script to %s", self.outfile)
             outfile = open(self.outfile, "a")
 
         contents = textwrap.dedent(
@@ -351,7 +351,7 @@ class ProcessSetUp(object):
             logging.debug("Writing script to stdout")
             outfile = sys.stdout
         else:
-            logging.debug("Logging script to %s" % self.outfile)
+            logging.debug("Logging script to %s", self.outfile)
             outfile = open(self.outfile, "a")
 
         if self.simple_output:
@@ -391,7 +391,7 @@ class ProcessSetUp(object):
         alignment = [a for a in lane["alignments"] if a["id"] == align_id][0]
 
         if "process_template" not in alignment:
-            logging.error("Alignment %d has no process template" % align_id)
+            logging.error("Alignment %d has no process template", align_id)
             return False
 
         process_template = self.get_process_template(
@@ -408,8 +408,9 @@ class ProcessSetUp(object):
             flowcell_directory = os.path.join(share_dir, "alignments")
         if not flowcell_directory:
             logging.error(
-                "Alignment %d has no flowcell directory for flowcell %s"
-                % (align_id, processing_info["flowcell"]["label"])
+                "Alignment %d has no flowcell directory for flowcell %s",
+                align_id,
+                processing_info["flowcell"]["label"],
             )
             return False
 
@@ -443,8 +444,10 @@ class ProcessSetUp(object):
 
         if not r1_fastq:
             logging.error(
-                "Missing r1-fastq for lane %d (alignment %d) - check dir %s"
-                % (lane["id"], alignment["id"], fastq_directory)
+                "Missing r1-fastq for lane %d (alignment %d) - check dir %s",
+                lane["id"],
+                alignment["id"],
+                fastq_directory,
             )
             return False
 
@@ -452,15 +455,16 @@ class ProcessSetUp(object):
             r2_fastq = self.get_lane_file(lane["id"], "r2-fastq")
             if not r2_fastq:
                 logging.error(
-                    "Missing r2-fastq for lane %d (alignment %d)"
-                    % (lane["id"], alignment["id"])
+                    "Missing r2-fastq for lane %d (alignment %d)",
+                    lane["id"],
+                    alignment["id"],
                 )
                 return False
 
         script_file = os.path.join(
             script_directory, "%s-%s" % (alignment["sample_name"], self.qsub_scriptname)
         )
-        logging.info("Will write to %s" % script_file)
+        logging.info("Will write to %s", script_file)
 
         # Set up & add environment variables
         env_vars = OrderedDict()
@@ -505,9 +509,9 @@ class ProcessSetUp(object):
                 p5_adapter = lane["barcode2"]["adapter5_reverse_complement"]
 
             if not p7_adapter or not p5_adapter:
-                logging.warn(
-                    "Alignment %d missing adapters, some processes might not work"
-                    % alignment["id"]
+                logging.warning(
+                    "Alignment %d missing adapters, some processes might not work",
+                    alignment["id"],
                 )
 
             env_vars["ADAPTER_P7"] = p7_adapter
@@ -534,22 +538,20 @@ class ProcessSetUp(object):
                     env_vars[var] = value
             except ValueError:
                 logging.error(
-                    "Could not parse process variables for align %d (template %d): '%s'"
-                    % (
-                        alignment["id"],
-                        process_template["id"],
-                        process_template["process_variables"],
-                    )
+                    "Could not parse process variables for align %d (template %d): '%s'",
+                    alignment["id"],
+                    process_template["id"],
+                    process_template["process_variables"],
                 )
                 return False
 
         if self.dry_run:
-            logging.info("Dry run, would have created: %s" % script_file)
+            logging.info("Dry run, would have created: %s", script_file)
             logging.debug(env_vars)
             return True
 
         if not os.path.exists(script_directory):
-            logging.info("Creating directory %s" % script_directory)
+            logging.info("Creating directory %s", script_directory)
             os.makedirs(script_directory)
 
         # Append to master script

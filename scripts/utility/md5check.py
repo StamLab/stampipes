@@ -15,7 +15,7 @@ infile = sys.argv[1]
 
 
 def check_md5sum(filename, md5sum):
-    logging.debug("Checking file %s matches %s" % (filename, md5sum))
+    logging.debug("Checking file %s matches %s", filename, md5sum)
     current_md5sum = subprocess.check_output(
         ["md5sum", filename], stderr=subprocess.STDOUT, universal_newlines=True
     ).split()[0]
@@ -24,8 +24,10 @@ def check_md5sum(filename, md5sum):
 
     if not match:
         logging.error(
-            "md5sum for file %s does not match: %s recorded, %s as exists"
-            % (filename, md5sum, current_md5sum)
+            "md5sum for file %s does not match: %s recorded, %s as exists",
+            filename,
+            md5sum,
+            current_md5sum,
         )
 
     return match

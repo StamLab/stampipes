@@ -128,13 +128,13 @@ class ProcessSetUp(object):
         if info:
             return info
         else:
-            logging.error("Could not find processing info for lane %d\n" % lane_id)
+            logging.error("Could not find processing info for lane %d\n", lane_id)
             sys.exit(1)
 
     def get_process_template(self, process_template_id):
         if not process_template_id:
             logging.critical(
-                "No process template for alignment %d\n" % self.alignment_id
+                "No process template for alignment %d\n", self.alignment_id
             )
             sys.exit(1)
 
@@ -146,7 +146,7 @@ class ProcessSetUp(object):
             return info
         else:
             logging.error(
-                "Could not find processing template for ID %d\n" % process_template_id
+                "Could not find processing template for ID %d\n", process_template_id
             )
             sys.exit(1)
 
@@ -159,11 +159,11 @@ class ProcessSetUp(object):
         )
 
         if not lanes:
-            logging.error("Flowcell %s has no lanes" % flowcell_label)
+            logging.error("Flowcell %s has no lanes", flowcell_label)
             return
 
         logging.debug(
-            "Setting up flowcell %s with %d lanes" % (flowcell_label, len(lanes))
+            "Setting up flowcell %s with %d lanes", flowcell_label, len(lanes)
         )
 
         self.setup_lanes([lane["id"] for lane in lanes])
@@ -181,23 +181,23 @@ class ProcessSetUp(object):
         )
 
         if not lane_tags:
-            logging.error("Tag %s has no lanes" % lane_tags)
+            logging.error("Tag %s has no lanes", lane_tags)
 
-        logging.debug("Setting up tag %s " % tag_slug)
+        logging.debug("Setting up tag %s ", tag_slug)
 
         self.setup_lanes([lane_tag["object_id"] for lane_tag in lane_tags])
 
     def setup_lanes(self, lane_ids):
-        logging.debug("Setting up lane IDs %s" % str(lane_ids))
+        logging.debug("Setting up lane IDs %s", lane_ids)
 
         if len(lane_ids) != len(set(lane_ids)):
             logging.warning(
-                "Duplicate lane IDs! %s "
-                % [
+                "Duplicate lane IDs! %s ",
+                [
                     item
                     for item, count in collections.Counter(lane_ids).items()
                     if count > 1
-                ]
+                ],
             )
 
         # self.pool.map(self.setup_lane, lane_ids)
@@ -205,7 +205,7 @@ class ProcessSetUp(object):
             self.setup_lane(lane_id)
 
     def setup_lane(self, lane_id):
-        logging.debug("Setting up lane %d" % lane_id)
+        logging.debug("Setting up lane %d", lane_id)
 
         processing_info = self.get_lane_process_info(lane_id)
 
@@ -268,7 +268,7 @@ class ProcessSetUp(object):
             logging.debug("Writing script to stdout")
             outfile = sys.stdout
         else:
-            logging.debug("Logging script to %s" % self.outfile)
+            logging.debug("Logging script to %s", self.outfile)
             outfile = open(self.outfile, "a")
 
         outfile.write("cd %s && " % os.path.dirname(script_file))
@@ -291,7 +291,7 @@ class ProcessSetUp(object):
         lane = processing_info["libraries"][0]
 
         if "directory" not in lane:
-            logging.critical("No directory for lane %d" % lane["id"])
+            logging.critical("No directory for lane %d", lane["id"])
             return False
         fastq_directory = lane["directory"]
         alt_dir = lane.get("project_share_directory", "")
@@ -323,7 +323,7 @@ class ProcessSetUp(object):
                 lane["lane"],
             )
             logging.warning(
-                "No alignment sample_name for lane, using %s instead" % spreadsheet_name
+                "No alignment sample_name for lane, using %s instead", spreadsheet_name
             )
 
         if pool:
@@ -334,7 +334,7 @@ class ProcessSetUp(object):
 
         if not os.path.exists(fastq_directory):
             logging.critical(
-                "fastq directory %s does not exist, cannot continue" % fastq_directory
+                "fastq directory %s does not exist, cannot continue", fastq_directory
             )
             return False
 
@@ -343,13 +343,13 @@ class ProcessSetUp(object):
         )
 
         if self.dry_run:
-            logging.info("Dry run, would have created: %s" % script_file)
+            logging.info("Dry run, would have created: %s", script_file)
             return True
 
         try:
             outfile = open(script_file, "w")
         except FileNotFoundError:
-            logging.critical("Could not create script file %s" % script_file)
+            logging.critical("Could not create script file %s", script_file)
             return False
 
         self.add_script(

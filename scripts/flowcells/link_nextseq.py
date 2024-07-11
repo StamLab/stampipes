@@ -144,7 +144,7 @@ def create_links(
 
         rel_path = os.path.relpath(input_file, output_dir)
 
-        logging.info("Linking %s => %s" % (rel_path, output_file))
+        logging.info("Linking %s => %s", rel_path, output_file)
         if not dry_run and not os.path.exists(output_file):
             os.symlink(rel_path, output_file)
 

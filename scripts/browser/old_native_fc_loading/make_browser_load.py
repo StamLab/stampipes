@@ -144,7 +144,7 @@ class MakeBrowserload(object):
 
         if len(self.projects) == 1 and project_dir:
             self.project_dirs[project] = project_dir
-            logging.info("Using project dir: %s" % self.project_dirs[project])
+            logging.info("Using project dir: %s", self.project_dirs[project])
         else:
             for project in self.projects:
                 self.project_dirs[project] = os.path.join(
@@ -191,7 +191,7 @@ class MakeBrowserload(object):
             if not self.flowcell_date:
                 self.flowcell_date = match.groups()[1]
 
-            logging.info("FLOWCELL DATE: %s" % self.flowcell_date)
+            logging.info("FLOWCELL DATE: %s", self.flowcell_date)
 
             self.main_label = "%s%son%s" % (
                 self.file_label,
@@ -199,23 +199,22 @@ class MakeBrowserload(object):
                 self.flowcell_date,
             )
 
-        logging.info("Main track name: %s" % self.main_label)
+        logging.info("Main track name: %s", self.main_label)
 
         self.excludes_file = os.path.join(self.outdir, "excludes.%s" % self.main_label)
 
         if self.flowcell_link_folder:
             logging.debug(
-                "link folder: "
-                + self.flowcell_link_folder
-                + " base folder: "
-                + self.basedir_name
+                "link folder: %s base_folder: %s",
+                self.flowcell_link_folder,
+                self.basedir_name,
             )
             self.link_dir = os.path.join(self.flowcell_link_folder, self.basedir_name)
         else:
             self.link_dir = ""
 
         self.prepare_tracks()
-        logging.info("Main label: %s" % self.main_label)
+        logging.info("Main label: %s", self.main_label)
 
         self.create_ras()
         self.create_htmls()
@@ -229,9 +228,9 @@ class MakeBrowserload(object):
         self.tracks = []
 
         for lane in self.data:
-            logging.debug("preparing tracks for lane: " + str(lane))
+            logging.debug("preparing tracks for lane: %s", str(lane))
             if "hgdb" not in lane:
-                logging.error("Not using lane %s: no hgdb value" % lane)
+                logging.error("Not using lane %s: no hgdb value", lane)
                 continue
 
             if lane["Index"] == "":
@@ -268,8 +267,8 @@ class MakeBrowserload(object):
                 "%sden%s" % (self.main_label, trackname_suffix)
             )
 
-            logging.debug("tag track name: " + track["tagtrackname"])
-            logging.debug("den track name: " + track["dentrackname"])
+            logging.debug("tag track name: %s", track["tagtrackname"])
+            logging.debug("den track name: %s", track["dentrackname"])
 
             project = track["SampleProject"]
 
@@ -341,26 +340,26 @@ class MakeBrowserload(object):
                 track["hasTags"] = True
 
             if not track["hasDensities"] or not track["hasTags"]:
-                logging.error("%s does not have all files" % track["SampleID"])
+                logging.error("%s does not have all files", track["SampleID"])
                 if not track["hasDensities"]:
                     logging.error("Missing densities")
                     if self.bigwig:
                         logging.error(
-                            "Wanted: "
-                            + os.path.join(track["sampleDir"], track["bigwigfilename"])
+                            "Wanted: %s",
+                            os.path.join(track["sampleDir"], track["bigwigfilename"]),
                         )
                     else:
                         logging.error(
-                            "Wanted: "
-                            + os.path.join(track["sampleDir"], track["wigfilename"])
+                            "Wanted: %s",
+                            os.path.join(track["sampleDir"], track["wigfilename"]),
                         )
                 if not track["hasTags"]:
                     logging.error("Missing tags")
                     logging.error(
-                        "Wanted: "
-                        + os.path.join(track["sampleDir"], track["bamfilename"])
+                        "Wanted: %s",
+                        os.path.join(track["sampleDir"], track["bamfilename"]),
                     )
-                logging.info("%s" % str(track))
+                logging.info("%s", str(track))
 
             if track["hasDensities"] or track["hasTags"]:
                 self.subtrack_sets[hgdb].append(track)
@@ -421,7 +420,7 @@ class MakeBrowserload(object):
 
     def create_commands(self):
         makefile = os.path.join(self.outdir, "make.%s.doc" % self.main_label)
-        logging.info("Makefile: %s" % makefile)
+        logging.info("Makefile: %s", makefile)
         commands = open(makefile, "w")
 
         commands.write("# %s\n" % makefile)
@@ -510,7 +509,7 @@ done
 
     def create_genome_commands(self, hgdb, commandsout):
         if hgdb not in self.genome_organisms:
-            logging.error(hgdb + " not in " + str(self.genome_organisms))
+            logging.error("%s not in %s", hgdb, self.genome_organisms)
             commandsout.write("\n ERROR: no " + hgdb + " genome\n")
             return
 
@@ -554,14 +553,14 @@ fi
 
         for subtrack in self.tracks:
             for suffix in ["frm", "MYD", "MYI"]:
-                logging.debug("subtrack contents: " + str(subtrack))
+                logging.debug("subtrack contents: %s", str(subtrack))
                 excludes.write("%s.%s\n" % (subtrack["tagtrackname"], suffix))
                 excludes.write("%s.%s\n" % (subtrack["dentrackname"], suffix))
 
         excludes.close()
 
     def create_ra(self, hgdb):
-        logging.info("CREATING RA FOR %s" % hgdb)
+        logging.info("CREATING RA FOR %s", hgdb)
         subtracks = self.subtrack_sets[hgdb]
 
         foldercheck(os.path.join(self.outdir, hgdb))
@@ -613,15 +612,15 @@ fi
 
         for subtrack in subtracks:
             if "wellmapping-no-mito" not in subtrack:
-                logging.warn(
-                    "%s has no wellmapping-no-mito count" % subtrack["dentrackname"]
+                logging.warning(
+                    "%s has no wellmapping-no-mito count", subtrack["dentrackname"]
                 )
                 subtrack["wellmapping-no-mito"] = "N/A"
             if "wellmapping" not in subtrack:
-                logging.warn("%s has no wellmapping count" % subtrack["dentrackname"])
+                logging.warning("%s has no wellmapping count", subtrack["dentrackname"])
                 subtrack["wellmapping"] = "N/A"
             if "SPOT" not in subtrack:
-                logging.warn("%s has no SPOT score" % subtrack["dentrackname"])
+                logging.warning("%s has no SPOT score", subtrack["dentrackname"])
                 subtrack["SPOT"] = "N/A"
 
         # track STAM_FC630D3_110711_IT_TAG_L5_DS18900_36_
@@ -779,8 +778,8 @@ class LimsQuery(object):
         # Check to see if we got all the types we wanted
         for count in self.count_types:
             if count not in counts:
-                logging.warn(
-                    "Could not fetch count %s for alignment: %s" % (count, alignment)
+                logging.warning(
+                    "Could not fetch count %s for alignment: %s", (count, alignment)
                 )
 
         return counts
@@ -788,7 +787,7 @@ class LimsQuery(object):
     def get_rna_metrics_for_alignment(self, alignment):
         results = self.get("rna_alignment_metrics/?alignment=%s" % alignment)
         if not results["results"]:
-            logging.warn("Could not fetch RNA metrics for alignment: %s" % alignment)
+            logging.warning("Could not fetch RNA metrics for alignment: %s", alignment)
             return None
         return results["results"][0]
 
@@ -806,7 +805,7 @@ class LimsQuery(object):
 def get_alignment_data(library, alignment, lims):
     # This is mainly a shim.
 
-    logging.debug("Fetching data for library: %s" % library)
+    logging.debug("Fetching data for library: %s", library)
 
     d = dict()
     d["project"] = library["project"]
@@ -828,7 +827,7 @@ def get_alignment_data(library, alignment, lims):
 
     d["failed_lane"] = lims_lane["failed"]
     if d["failed_lane"]:
-        logging.warn("Lane marked as failed, not using: %s" % library["id"])
+        logging.warning("Lane marked as failed, not using: %s", library["id"])
         return d
 
     if d["aligner"] == "bwa":
@@ -920,12 +919,14 @@ def main(args=sys.argv):
 
         if not os.path.isfile(browserconfig):
             logging.error(
-                "No configuration file '%s' exists, don't know how to load project %s into browser %s"
-                % (browserconfig, project, browser)
+                "No configuration file '%s' exists, don't know how to load project %s into browser %s",
+                browserconfig,
+                project,
+                browser,
             )
             sys.exit(1)
 
-        logging.info("Reading browser configuration from %s" % browserconfig)
+        logging.info("Reading browser configuration from %s", browserconfig)
 
         outdir = os.path.join(basedir, "browser-load-%s-%s" % (project, browser))
 

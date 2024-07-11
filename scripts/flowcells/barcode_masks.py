@@ -108,9 +108,7 @@ def detect_collisions(json_data):
                 for x, barcode in enumerate(barcodes)
                 if barcode == barcodes[x - 1]
             ]
-            logging.error(
-                "Collision on lane {}. Barcode(s): {}\n".format(i + 1, collision)
-            )
+            logging.error("Collision on lane %d. Barcode(s): %s\n", i + 1, collision)
             sys.exit(1)
             return True
     return False

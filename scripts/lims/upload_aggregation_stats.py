@@ -60,13 +60,13 @@ def upload_stats(api, aggregation, stats):
 def upload_file(api, aggregation, counts_file):
     count_content = open(counts_file, "r")
 
-    log.info("uploading {}".format(counts_file))
+    log.info("uploading %s", counts_file)
     stats = {}
     for line in count_content:
         values = line.split()
 
         if len(values) < 2:
-            log.warn("skipping {}".format(values))
+            log.warning("skipping %s", values)
             continue
 
         stat_type_name = values[0]
@@ -75,18 +75,18 @@ def upload_file(api, aggregation, counts_file):
         try:
             float(value)
         except ValueError:
-            log.warn(
-                "skipping stat-type '{}' with non-numeric value '{}'".format(
-                    stat_type_name, value
-                )
+            log.warning(
+                "skipping stat-type '%s' with non-numeric value '%s'",
+                stat_type_name,
+                value,
             )
             continue
 
         if not stat_type_name:
-            log.warn("skipping {}".format(stat_type_name))
+            log.warning("skipping %s", stat_type_name)
             continue
         stats[stat_type_name] = value
-        log.debug("{} : {}".format(stat_type_name, value))
+        log.debug("%s : %s", stat_type_name, value)
     count_content.close()
     upload_stats(api, aggregation, stats)
 

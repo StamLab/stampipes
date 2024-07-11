@@ -92,7 +92,7 @@ class SGEChecker(object):
             if match:
                 alignments.add(int(match.group(1)))
 
-        log.info("Alignment IDs: %s" % alignments)
+        log.info("Alignment IDs: %s", alignments)
         return alignments
 
     def get_host_info(self):
@@ -111,7 +111,7 @@ class SLURMChecker(object):
             match = ALIGN_REGEX.search(jobname)
             if match:
                 alignments.add(int(match.group(1)))
-        log.info("Alignment IDs: %s" % alignments)
+        log.info("Alignment IDs: %s", alignments)
         return alignments
 
     def get_host_info(self):
@@ -145,7 +145,7 @@ class ClusterMonitor(object):
             url = "%s/%s" % (self.api_url, url_addition)
 
         while more:
-            logging.debug("Fetching more results for query %s" % url)
+            logging.debug("Fetching more results for query %s", url)
 
             request = requests.get(url, headers=self.headers)
 
@@ -168,7 +168,7 @@ class ClusterMonitor(object):
         # What alignments are currently running but not marked yet?
         mark_alignments = currently_running - marked_running
         if mark_alignments:
-            log.info("Marking alignments as processing: %s" % str(mark_alignments))
+            log.info("Marking alignments as processing: %s", (mark_alignments))
             [
                 self.update_processing_status(align_id, True)
                 for align_id in mark_alignments
@@ -177,7 +177,7 @@ class ClusterMonitor(object):
         # What alignments are currently marked but not running?
         finished_alignments = marked_running - currently_running
         if finished_alignments:
-            log.info("Alignments no longer processing: %s" % str(finished_alignments))
+            log.info("Alignments no longer processing: %s", (finished_alignments))
             [
                 self.update_processing_status(align_id, False)
                 for align_id in finished_alignments
@@ -194,7 +194,7 @@ class ClusterMonitor(object):
 
         if not update_result.ok:
             log.critical(
-                "Could not update alignment %d: %s" % (align_id, str(update_result))
+                "Could not update alignment %d: %s", (align_id, str(update_result))
             )
             return False
 
@@ -213,7 +213,7 @@ class ClusterMonitor(object):
         for result in fetch_results:
             lims_process_align_ids.add(result["id"])
         log.info(
-            "Currently marked as processing on LIMS: %s" % str(lims_process_align_ids)
+            "Currently marked as processing on LIMS: %s", str(lims_process_align_ids)
         )
         return lims_process_align_ids
 
@@ -225,7 +225,7 @@ class ClusterMonitor(object):
         url = "%s/key_value/?key=%s" % (self.api_url, key)
         key_value = self.get_single_result(url)
         if not key_value:
-            log.error("Cannot find '%s' key value" % key)
+            log.error("Cannot find '%s' key value", key)
             return
 
         update = requests.patch(
@@ -235,7 +235,7 @@ class ClusterMonitor(object):
         if update.ok:
             log.info(update.json())
         else:
-            log.error("Could not update %s usage." % host)
+            log.error("Could not update %s usage.", host)
             log.error(update.text)
 
     def get_single_result(self, fetch_url, field=None):
@@ -248,19 +248,17 @@ class ClusterMonitor(object):
         if fetch_results.ok:
             results = fetch_results.json()
             if results["count"] > 1:
-                log.error("More than one matching item for fetch query: %s" % fetch_url)
+                log.error("More than one matching item for fetch query: %s", fetch_url)
             elif results["count"] == 0:
-                log.debug("No matching items for fetch query: %s" % fetch_url)
+                log.debug("No matching items for fetch query: %s", fetch_url)
             else:
                 result = results["results"][0]
-                log.debug(
-                    "Single result fetched from %s: %s" % (fetch_url, str(result))
-                )
+                log.debug("Single result fetched from %s: %s", fetch_url, (result))
                 if field:
                     return result[field]
                 return result
         else:
-            log.error("Could not execute api query: %s" % fetch_url)
+            log.error("Could not execute api query: %s", fetch_url)
 
         return None
 
@@ -285,10 +283,10 @@ def main(args=sys.argv):
 
     if not poptions.base_api_url and "LIMS_API_URL" in os.environ:
         api_url = os.environ["LIMS_API_URL"]
-        log.debug("Using LIMS API endpoint: %s from environment" % api_url)
+        log.debug("Using LIMS API endpoint: %s from environment", api_url)
     elif poptions.base_api_url:
         api_url = poptions.base_api_url
-        log.debug("Using LIMS API endpoint: %s from options" % api_url)
+        log.debug("Using LIMS API endpoint: %s from options", api_url)
     else:
         sys.stderr.write("Could not find LIMS API URL.\n")
         sys.exit(1)

@@ -174,7 +174,7 @@ class ProcessSetUp(object):
             logging.debug(request.json())
             return request.json()
         else:
-            logging.error("Could not get data from %s" % url)
+            logging.error("Could not get data from %s", url)
             logging.error(request)
             return None
 
@@ -186,7 +186,7 @@ class ProcessSetUp(object):
             url = "%s/%s" % (self.api_url, url_addition)
 
         while more:
-            logging.debug("Fetching more results for query %s" % url)
+            logging.debug("Fetching more results for query %s", url)
 
             request = self.session.get(url)
 
@@ -207,7 +207,7 @@ class ProcessSetUp(object):
 
         if not results:
             logging.error(
-                "Could not find information for aggregation %d" % aggregation_id
+                "Could not find information for aggregation %d", aggregation_id
             )
             return None
 
@@ -232,8 +232,9 @@ class ProcessSetUp(object):
 
         if len(results) > 1:
             logging.error(
-                "Found %d folders for aggregation %d, require 1"
-                % (len(results), aggregation_info["id"])
+                "Found %d folders for aggregation %d, require 1",
+                len(results),
+                aggregation_info["id"],
             )
 
         if len(results) == 0:
@@ -254,7 +255,7 @@ class ProcessSetUp(object):
 
             path = os.path.join(self.aggregation_base_directory, dir_name)
 
-            logging.info("Setting aggregation folder to %s" % path)
+            logging.info("Setting aggregation folder to %s", path)
 
             data = {
                 "content_type": "%s/content_type/%d/"
@@ -269,8 +270,8 @@ class ProcessSetUp(object):
             if not new_result.ok:
                 logging.critical(new_result)
                 logging.critical(
-                    "Could not upload new aggregation folder path to LIMS: %s"
-                    % json.dumps(data)
+                    "Could not upload new aggregation folder path to LIMS: %s",
+                    json.dumps(data),
                 )
                 sys.exit(1)
 
@@ -284,7 +285,7 @@ class ProcessSetUp(object):
         )
 
         if not results:
-            logging.error("Could not find lanes for aggregation %d" % aggregation_id)
+            logging.error("Could not find lanes for aggregation %d", aggregation_id)
             return []
 
         return results
@@ -297,8 +298,10 @@ class ProcessSetUp(object):
 
         if len(results) != 1:
             logging.error(
-                "Found %d files for alignment %d, require 1 (Aggregation %d)"
-                % (len(results), alignment_id, aggregation_id)
+                "Found %d files for alignment %d, require 1 (Aggregation %d)",
+                len(results),
+                alignment_id,
+                aggregation_id,
             )
             logging.error(results)
             return None
@@ -314,8 +317,10 @@ class ProcessSetUp(object):
 
         if len(results) != 1:
             logging.error(
-                "Found %d trimmed FQ files for alignment %d, require 1 (Aggregation %d)"
-                % (len(results), alignment_id, aggregation_id)
+                "Found %d trimmed FQ files for alignment %d, require 1 (Aggregation %d)",
+                len(results),
+                alignment_id,
+                aggregation_id,
             )
             logging.error(results)
             return None
@@ -330,8 +335,10 @@ class ProcessSetUp(object):
 
         if len(results) != 1:
             logging.error(
-                "Found %d trimmed FQ files for alignment %d, require 1 (Aggregation %d)"
-                % (len(results), alignment_id, aggregation_id)
+                "Found %d trimmed FQ files for alignment %d, require 1 (Aggregation %d)",
+                len(results),
+                alignment_id,
+                aggregation_id,
             )
             logging.error(results)
             return None
@@ -342,8 +349,9 @@ class ProcessSetUp(object):
         library_info = self.api_single_result(url=aggregation_info["library"])
         if not library_info:
             logging.critical(
-                "Cannot proceed without library!  Could not get info from %s (Aggregation %d)"
-                % (aggregation_info["library"], aggregation_info["id"])
+                "Cannot proceed without library!  Could not get info from %s (Aggregation %d)",
+                aggregation_info["library"],
+                aggregation_info["id"],
             )
             sys.exit(1)
         return library_info
@@ -354,8 +362,9 @@ class ProcessSetUp(object):
         )
         if not sample_info:
             logging.critical(
-                "Cannot proceed without sample!  Could not get info from %s (Aggregation %d)"
-                % (aggregation_info["sample"], aggregation_info["id"])
+                "Cannot proceed without sample!  Could not get info from %s (Aggregation %d)",
+                aggregation_info["sample"],
+                aggregation_info["id"],
             )
             sys.exit(1)
         return sample_info
@@ -364,7 +373,7 @@ class ProcessSetUp(object):
         genome_info = self.api_single_result(url=aggregation_info["genome_index"])
         if not genome_info:
             logging.critical(
-                "Could not get genome info! (Aggregation %d)" % aggregation_info["id"]
+                "Could not get genome info! (Aggregation %d)", aggregation_info["id"]
             )
             sys.exit(1)
         return genome_info
@@ -378,8 +387,7 @@ class ProcessSetUp(object):
 
         if "alignment" not in aggregation_lane or not aggregation_lane["alignment"]:
             logging.critical(
-                "No alignment set for included aggregation lane %s"
-                % str(aggregation_lane)
+                "No alignment set for included aggregation lane %s", aggregation_lane
             )
             sys.exit(1)
 
@@ -387,16 +395,18 @@ class ProcessSetUp(object):
 
         if not alignment:
             logging.critical(
-                "Was not able to fetch alignment %s! (Aggregation %d)"
-                % (aggregation_lane["alignment"], aggregation_id)
+                "Was not able to fetch alignment %s! (Aggregation %d)",
+                aggregation_lane["alignment"],
+                aggregation_id,
             )
             sys.exit(1)
 
         genome_location = self.api_single_result(url=alignment["genome_index_location"])
         if not genome_location:
             logging.critical(
-                "Could not get genome location from alignment %d! (Aggregation %d)"
-                % (included["id"], aggregation_id)
+                "Could not get genome location from alignment %d! (Aggregation %d)",
+                included["id"],
+                aggregation_id,
             )
             sys.exit(1)
 
@@ -410,22 +420,20 @@ class ProcessSetUp(object):
         self, aggregation_id, process_template_url, script_template=None
     ):
         if script_template:
-            logging.info("Using script template %s" % script_template)
+            logging.info("Using script template %s", script_template)
             return (open(script_template, "r").read(), None)
 
         if not process_template_url:
-            logging.critical(
-                "No process template for aggregation %d\n" % aggregation_id
-            )
+            logging.critical("No process template for aggregation %d\n", aggregation_id)
             return None
 
-        logging.info("Getting process template %s" % process_template_url)
+        logging.info("Getting process template %s", process_template_url)
 
         process_template = self.api_single_result(url=process_template_url)
 
         if not process_template:
             logging.critical(
-                "Could not find processing template for %s\n" % process_template_url
+                "Could not find processing template for %s\n", process_template_url
             )
             return None
 
@@ -450,16 +458,18 @@ class ProcessSetUp(object):
 
         if not lane:
             logging.critical(
-                "Was not able to fetch lane %s (Aggregation %d)"
-                % (aggregation_lane["lane"], aggregation_id)
+                "Was not able to fetch lane %s (Aggregation %d)",
+                aggregation_lane["lane"],
+                aggregation_id,
             )
             sys.exit(1)
 
         flowcell = self.api_single_result(url=lane["flowcell"])
         if not flowcell:
             logging.critical(
-                "Could not get flowcell at %s (Aggregation %d)"
-                % (lane["flowcell"], aggregation_id)
+                "Could not get flowcell at %s (Aggregation %d)",
+                lane["flowcell"],
+                aggregation_id,
             )
             sys.exit(1)
 
@@ -472,15 +482,17 @@ class ProcessSetUp(object):
                 lane = self.api_single_result(url=aggregation_lane["lane"])
                 if not lane:
                     logging.critical(
-                        "Was not able to fetch lane %s (Aggregation %d)"
-                        % (aggregation_lane["lane"], aggregation_id)
+                        "Was not able to fetch lane %s (Aggregation %d)",
+                        aggregation_lane["lane"],
+                        aggregation_id,
                     )
                     sys.exit(1)
                 flowcell = self.api_single_result(url=lane["flowcell"])
                 if not flowcell:
                     logging.critical(
-                        "Could not get flowcell at %s (Aggregation %d)"
-                        % (lane["flowcell"], aggregation_id)
+                        "Could not get flowcell at %s (Aggregation %d)",
+                        lane["flowcell"],
+                        aggregation_id,
                     )
                     sys.exit(1)
                 if not flowcell["paired_end"]:
@@ -491,7 +503,7 @@ class ProcessSetUp(object):
         assay_info = self.api_single_result(url=assay_url)
         category_url = assay_info["category"]
         if category_url is None:
-            logging.warn("Assay %s has no category" % (assay_info))
+            logging.warning("Assay %s has no category", assay_info)
             return None
         category_info = self.api_single_result(url=category_url)
         return category_info["slug"]
@@ -528,19 +540,19 @@ class ProcessSetUp(object):
         )
 
     def setup_project(self, project_id):
-        logging.info("Setting up project #%s" % project_id)
+        logging.info("Setting up project #%s", project_id)
         aggregations = self.api_list_result(
             "aggregation/?library__sample__project=%s" % project_id
         )
         self.setup_aggregations([a["id"] for a in aggregations])
 
     def setup_flowcell(self, flowcell_label):
-        logging.info("Setting up flowcell %s" % flowcell_label)
+        logging.info("Setting up flowcell %s", flowcell_label)
         aggregations = self.api_list_result(
             "aggregation/?in_flowcell=%s" % flowcell_label
         )
         if not aggregations:
-            logging.error("%s has no aggregations" % flowcell_label)
+            logging.error("%s has no aggregations", flowcell_label)
         self.setup_aggregations([a["id"] for a in aggregations])
 
     def setup_aggregations(self, aggregation_ids):
@@ -554,7 +566,7 @@ class ProcessSetUp(object):
             try:
                 self.setup_aggregation(agg_id)
             except Exception:
-                logging.exception("Something went wrong for AG%d" % agg_id)
+                logging.exception("Something went wrong for AG%d", agg_id)
 
         list(self.pool.map(try_setup, aggregation_ids))
 
@@ -565,7 +577,7 @@ class ProcessSetUp(object):
             return False
 
         if aggregation["locked"]:
-            logging.warn("Refusing to set up locked aggregation %d" % (aggregation_id))
+            logging.warning("Refusing to set up locked aggregation %d", aggregation_id)
             return False
 
         aggregation_lanes = self.get_aggregation_lanes(aggregation_id)
@@ -585,7 +597,7 @@ class ProcessSetUp(object):
 
         assay_category = self.get_category_for_assay(sample_info["assay"])
 
-        logging.info("Aggregation %d folder: %s" % (aggregation_id, aggregation_folder))
+        logging.info("Aggregation %d folder: %s", aggregation_id, aggregation_folder)
         logging.debug(aggregation)
 
         missing = False
@@ -594,16 +606,18 @@ class ProcessSetUp(object):
         for aggregation_lane in aggregation_lanes:
             if not aggregation_lane["include"]:
                 logging.info(
-                    "Not including lane %s (Aggregation %d)"
-                    % (aggregation_lane["lane"], aggregation_id)
+                    "Not including lane %s (Aggregation %d)",
+                    aggregation_lane["lane"],
+                    aggregation_id,
                 )
                 continue
             alignment_endpoint = aggregation_lane["alignment"]
 
             if not alignment_endpoint:
                 logging.info(
-                    "Not including lane %s because no alignment set (Aggregation %d)"
-                    % (aggregation_lane["lane"], aggregation_id)
+                    "Not including lane %s because no alignment set (Aggregation %d)",
+                    aggregation_lane["lane"],
+                    aggregation_id,
                 )
                 missing = True
                 continue
@@ -614,8 +628,10 @@ class ProcessSetUp(object):
 
             if not bamfile:
                 logging.critical(
-                    "No BAM alignment file for alignment %s for lane %s, skipping (Aggregation %d)"
-                    % (alignment_endpoint, aggregation_lane["lane"], aggregation_id)
+                    "No BAM alignment file for alignment %s for lane %s, skipping (Aggregation %d)",
+                    alignment_endpoint,
+                    aggregation_lane["lane"],
+                    aggregation_id,
                 )
                 missing = True
                 continue
@@ -672,23 +688,21 @@ class ProcessSetUp(object):
                     env_vars[var] = value
             except ValueError:
                 logging.error(
-                    "Could not parse process variables for aggregation %d (template %d): '%s'"
-                    % (
-                        aggregation_id,
-                        self.script_template["id"],
-                        self.script_template["process_variables"],
-                    )
+                    "Could not parse process variables for aggregation %d (template %d): '%s'",
+                    aggregation_id,
+                    self.script_template["id"],
+                    self.script_template["process_variables"],
                 )
                 return False
 
         logging.debug(
-            "Environment Variables:\n%s"
-            % "\n".join(["\t%s=%s" % (e, env_vars[e]) for e in env_vars])
+            "Environment Variables:\n%s",
+            "\n".join(["\t%s=%s" % (e, env_vars[e]) for e in env_vars]),
         )
 
         script_file = os.path.join(aggregation_folder, self.qsub_scriptname)
         if self.dry_run:
-            logging.info("Dry run, would have created: %s" % script_file)
+            logging.info("Dry run, would have created: %s", script_file)
             return True
 
         try:
@@ -700,7 +714,7 @@ class ProcessSetUp(object):
         file_record.write("\n".join(["\t".join(bamfile) for bamfile in files]))
         file_record.close()
 
-        logging.info("Creating script file %s" % script_file)
+        logging.info("Creating script file %s", script_file)
 
         script = open(script_file, "w")
 

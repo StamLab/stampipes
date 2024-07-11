@@ -69,12 +69,12 @@ class SymlinkMover(object):
         path = path.rstrip("/")
 
         if not os.path.islink(path):
-            logging.debug("%s not a symlink" % path)
+            logging.debug("%s not a symlink", path)
             return
 
         target_path = os.readlink(path)
         broken = False
-        logging.debug("checking %s" % path)
+        logging.debug("checking %s", path)
         # Resolve relative symlinks
         if not os.path.isabs(target_path):
             target_path_absolute = os.path.join(os.path.dirname(path), target_path)
@@ -82,7 +82,7 @@ class SymlinkMover(object):
             target_path_absolute = target_path
         self.alllinks.append(path)
         if self.olddir in target_path:
-            logging.debug("path %s target %s" % (path, target_path_absolute))
+            logging.debug("path %s target %s", path, target_path_absolute)
             self.movedlinks.append(path)
         if not os.path.exists(target_path_absolute):
             broken = True
@@ -99,24 +99,26 @@ class SymlinkMover(object):
         new_target_path = old_target_path.replace(self.olddir, self.newdir)
 
         logging.info(
-            "Moving %s pointer from %s to %s"
-            % (linkpath, old_target_path, new_target_path)
+            "Moving %s pointer from %s to %s",
+            linkpath,
+            old_target_path,
+            new_target_path,
         )
         try:
             if self.domove:
                 os.unlink(linkpath)
                 os.symlink(new_target_path, linkpath)
         except PermissionError:
-            logging.error("Couldn't move %s, permission denied" % linkpath)
+            logging.error("Couldn't move %s, permission denied", linkpath)
 
     def walk(self, directory):
         for root, dirs, files in os.walk(directory):
             if root.startswith("./.git"):
                 # Ignore the .git directory.
                 continue
-            logging.debug("walking through directories for %s" % root)
+            logging.debug("walking through directories for %s", root)
             [self.detect(os.path.join(root, dirname)) for dirname in dirs]
-            logging.debug("walking through files for %s" % root)
+            logging.debug("walking through files for %s", root)
             [self.detect(os.path.join(root, filename)) for filename in files]
 
     def run(self, report=None):
@@ -127,13 +129,13 @@ class SymlinkMover(object):
 
         logging.info("Detecting symlinks")
         self.walk(self.fromdir)
-        logging.info("%d symlinks found in total" % len(self.alllinks))
+        logging.info("%d symlinks found in total", len(self.alllinks))
         if self.brokenlinks:
             logging.info("broken symlink(s) found:")
             for link in self.brokenlinks:
-                logging.info("\t%s" % link)
+                logging.info("\t%s", link)
         if self.movedlinks:
-            logging.info("%s symlinks to move" % len(self.movedlinks))
+            logging.info("%s symlinks to move", len(self.movedlinks))
             logging.info("Symlink moves...")
             [self.move_link(link) for link in self.movedlinks]
 

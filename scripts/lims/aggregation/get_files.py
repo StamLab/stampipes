@@ -86,7 +86,7 @@ class FileFetch(object):
             logging.debug(request.json())
             return request.json()
         else:
-            logging.error("Could not get data from %s" % url)
+            logging.error("Could not get data from %s", url)
             logging.error(request)
             return None
 
@@ -98,7 +98,7 @@ class FileFetch(object):
             url = "%s/%s" % (self.api_url, url_addition)
 
         while more:
-            logging.debug("Fetching more results for query %s" % url)
+            logging.debug("Fetching more results for query %s", url)
 
             request = requests.get(url, headers=self.headers)
 
@@ -127,17 +127,17 @@ class FileFetch(object):
         if fetch_results.ok:
             results = fetch_results.json()
             if results["count"] > 1:
-                log.error("More than one matching item for fetch query: %s" % url)
+                log.error("More than one matching item for fetch query: %s", url)
             elif results["count"] == 0:
-                log.debug("No matching items for fetch query: %s" % url)
+                log.debug("No matching items for fetch query: %s", url)
             else:
                 result = results["results"][0]
-                log.debug("Single result fetched from %s: %s" % (url, str(result)))
+                log.debug("Single result fetched from %s: %s", url, result)
                 if field:
                     return result[field]
                 return result
         else:
-            log.error("Could not execute api query: %s" % url)
+            log.error("Could not execute api query: %s", url)
 
         return None
 
@@ -155,7 +155,7 @@ class FileFetch(object):
         aggregation = self.api_single_result("aggregation/%d" % aggregation_id)
 
         if not aggregation:
-            logging.critical("Cannot find aggregation %d" % aggregation_id)
+            logging.critical("Cannot find aggregation %d", aggregation_id)
             sys.exit(1)
 
         logging.debug(aggregation)
@@ -171,15 +171,19 @@ class FileFetch(object):
 
         if len(files) > 1:
             logging.critical(
-                "%d %s files found for aggregation %d"
-                % (len(files), file_purpose["slug"], aggregation_id)
+                "%d %s files found for aggregation %d",
+                len(files),
+                file_purpose["slug"],
+                aggregation_id,
             )
             sys.exit(1)
 
         if not files:
             logging.critical(
-                "%d %s files found for aggregation %d"
-                % (len(files), file_purpose["slug"], aggregation_id)
+                "%d %s files found for aggregation %d",
+                len(files),
+                file_purpose["slug"],
+                aggregation_id,
             )
             sys.exit(1)
 
@@ -196,7 +200,7 @@ class FileFetch(object):
         library = self.api_single_list_result("library/?number=%d" % library_number)
 
         if not library:
-            logging.critical("Could not find library %d" % library_number)
+            logging.critical("Could not find library %d", library_number)
             sys.exit(1)
 
         logging.debug(library)
@@ -207,22 +211,22 @@ class FileFetch(object):
             use_aggregation = self.find_single_aggregation(aggregations)
             if not use_aggregation:
                 logging.critical(
-                    "More than one aggregation for library %d and no default found, must specify aggregation id"
-                    % (library_number)
+                    "More than one aggregation for library %d and no default found, must specify aggregation id",
+                    library_number,
                 )
                 logging.critical(
-                    "Options: "
-                    + ", ".join([aggregation["id"] for aggregation in aggregations])
+                    "Options: %s",
+                    ", ".join([aggregation["id"] for aggregation in aggregations]),
                 )
                 return
             else:
-                logging.warn(
-                    "More than one aggregation for library %d, using default"
-                    % (library_number)
+                logging.warning(
+                    "More than one aggregation for library %d, using default",
+                    library_number,
                 )
         elif len(aggregations) == 0:
             logging.critical(
-                "Cannot find aggregations for library %d" % (library_number)
+                "Cannot find aggregations for library %d", (library_number)
             )
             return
         elif len(aggregations) == 1:
@@ -234,7 +238,7 @@ class FileFetch(object):
         file_purpose = self.get_file_purpose(file_purpose_slug)
 
         if not file_purpose:
-            logging.critical("Cannot find file purpose %s" % file_purpose_slug)
+            logging.critical("Cannot find file purpose %s", file_purpose_slug)
             sys.exit(1)
 
         if aggregation_id:
@@ -263,10 +267,10 @@ def main(args=sys.argv):
 
     if not poptions.base_api_url and "LIMS_API_URL" in os.environ:
         api_url = os.environ["LIMS_API_URL"]
-        log.debug("Using LIMS API endpoint: %s from environment" % api_url)
+        log.debug("Using LIMS API endpoint: %s from environment", api_url)
     elif poptions.base_api_url:
         api_url = poptions.base_api_url
-        log.debug("Using LIMS API endpoint: %s from options" % api_url)
+        log.debug("Using LIMS API endpoint: %s from options", api_url)
     else:
         sys.stderr.write("Could not find LIMS API URL.\n")
         sys.exit(1)
@@ -284,7 +288,7 @@ def main(args=sys.argv):
             library_number = int(poptions.library_number.strip(string.ascii_letters))
         except ValueError:
             logging.critical(
-                "Could not get library number from %s" % poptions.library_number
+                "Could not get library number from %s", poptions.library_number
             )
             sys.exit()
     else:

@@ -107,10 +107,10 @@ def get_folder_reads(sequencer_folder):
         runinfodoc = minidom.parse(runinfo_file)
         return len(runinfodoc.getElementsByTagName("Read"))
     except IOError:
-        logging.info("Could not read %s" % runinfo_file)
+        logging.info("Could not read %s", runinfo_file)
         return None
     except xml.parsers.expat.ExpatError:
-        logging.info("%s is malformatted" % runinfo_file)
+        logging.info("%s is malformatted", runinfo_file)
         return None
 
 
@@ -134,27 +134,28 @@ def load_folders():
 
         if flowcell_reads[sequencer_folder]:
             logging.info(
-                "Initial state of %s: %s"
-                % (sequencer_folder, str(check_folders[sequencer_folder]))
+                "Initial state of %s: %s",
+                sequencer_folder,
+                check_folders[sequencer_folder],
             )
         else:
-            logging.info("Initial state of %s: does not have reads" % sequencer_folder)
+            logging.info("Initial state of %s: does not have reads", sequencer_folder)
 
 
 def check_folder(sequencer_folder):
     """Check a sequencer folder and notify for changes"""
-    logging.debug("Checking folder: %s" % sequencer_folder)
+    logging.debug("Checking folder: %s", sequencer_folder)
 
     if sequencer_folder in check_folders:
         if not check_folders[sequencer_folder] and check_copy(sequencer_folder):
-            logging.info("Folder finished copying: %s" % sequencer_folder)
+            logging.info("Folder finished copying: %s", sequencer_folder)
             notify_copy(sequencer_folder)
             check_folders[sequencer_folder] = True
     else:
-        logging.info("New folder: %s" % sequencer_folder)
+        logging.info("New folder: %s", sequencer_folder)
         check_folders[sequencer_folder] = False
         flowcell_reads[sequencer_folder] = get_folder_reads(sequencer_folder)
-        logging.debug("Number of reads: %s" % str(flowcell_reads[sequencer_folder]))
+        logging.debug("Number of reads: %s", (flowcell_reads[sequencer_folder]))
         notify_new(sequencer_folder)
 
 
@@ -171,7 +172,7 @@ def run_check():
     # delete folders that don't exist anymore from checking
     for sequencer_folder in folders:
         if not os.path.exists(sequencer_folder):
-            logging.info("Deleting folder: %s" % sequencer_folder)
+            logging.info("Deleting folder: %s", sequencer_folder)
             del check_folders[sequencer_folder]
 
     # check each folder for being new or being copied
@@ -237,6 +238,6 @@ if __name__ == "__main__":
     while True:
         # because somebody running the script already has checked the state of things beforehand,
         # wait period goes first
-        logging.info("Waiting %d seconds before next check" % wait)
+        logging.info("Waiting %d seconds before next check", wait)
         time.sleep(wait)
         run_check()

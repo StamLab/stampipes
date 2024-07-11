@@ -148,7 +148,7 @@ def parse_processing_file(
     elif run_type.startswith("Novaseq 6000"):
         lane_libraries = [lib for lib in data["libraries"] if lib["lane"] == lane]
     else:
-        logging.warn("Run type %s not supported; using all libraries" % run_type)
+        logging.warning("Run type %s not supported; using all libraries", run_type)
         lane_libraries = data["libraries"]
 
     for library in lane_libraries:
@@ -162,7 +162,7 @@ def parse_processing_file(
             )
 
         if ignore_failed_lanes and library["failed"]:
-            logging.info("Ignoring failed library %s" % label)
+            logging.info("Ignoring failed library %s", label)
             continue
 
         project_dir = "Project_%s" % library["project"]
@@ -195,8 +195,10 @@ def parse_processing_file(
                 # TODO: This can be smarter
                 if barcode in barcodes:
                     logging.error(
-                        "Barcode %s already taken, lower --mismatches! (taken by %s+%s)"
-                        % (barcode, barcode1, barcode2)
+                        "Barcode %s already taken, lower --mismatches! (taken by %s+%s)",
+                        barcode,
+                        barcode1,
+                        barcode2,
                     )
                     sys.exit(1)
                 barcodes[barcode] = label
@@ -210,7 +212,7 @@ def parse_processing_file(
         )
 
     logging.info(
-        "Mapping %d barcodes to %s libraries" % (len(barcodes), len(lane_libraries))
+        "Mapping %d barcodes to %s libraries", len(barcodes), len(lane_libraries)
     )
     logging.debug(barcodes)
 
@@ -233,7 +235,7 @@ def split_file(filename, barcodes, labels):
     )
 
     tally = 0
-    logging.info("Demultiplexing file: %s" % filename)
+    logging.info("Demultiplexing file: %s", filename)
 
     if filename.endswith(".gz"):
         parsein = subprocess.Popen(
@@ -249,9 +251,9 @@ def split_file(filename, barcodes, labels):
         match = barcode_re.search(record)
 
         if not match:
-            logging.error("Could not match %s" % record)
+            logging.error("Could not match %s", record)
             logging.error(str(seq))
-            logging.error("Record %d in %s" % (tally, filename))
+            logging.error("Record %d in %s", tally, filename)
             sys.exit(1)
 
         matches = match.groups()
@@ -301,13 +303,13 @@ def main(argv):
     global lengths
     lengths = set([])
 
-    logging.info("File(s): %s" % args.infile)
-    logging.info("OutDir:  %s" % args.outdir)
-    logging.info("JSON:    %s" % args.processing_file)
+    logging.info("File(s): %s", args.infile)
+    logging.info("OutDir:  %s", args.outdir)
+    logging.info("JSON:    %s", args.processing_file)
 
     if args.autosuffix:
         args.suffix = guess_suffix(args.infile[0])
-        logging.info("--autosuffix, guessing suffix as %s" % args.suffix)
+        logging.info("--autosuffix, guessing suffix as %s", args.suffix)
 
     barcodes, labels = parse_processing_file(
         args.processing_file,

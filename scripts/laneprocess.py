@@ -15,7 +15,7 @@ except ImportError:
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
-logging.warn("This script is deprecated - consider using apilaneprocess.py instead!")
+logging.warning("This script is deprecated - consider using apilaneprocess.py instead!")
 
 STAMPIPES = os.getenv("STAMPIPES", "~/stampipes")
 
@@ -144,7 +144,7 @@ class ProcessSetUp(object):
             logging.debug(request.json())
             return request.json()
         else:
-            logging.error("Could not get data from %s" % url)
+            logging.error("Could not get data from %s", url)
             logging.error(request)
             return None
 
@@ -156,7 +156,7 @@ class ProcessSetUp(object):
             url = "%s/%s" % (self.api_url, url_addition)
 
         while more:
-            logging.debug("Fetching more results for query %s" % url)
+            logging.debug("Fetching more results for query %s", url)
 
             request = self.session.get(url)
 
@@ -181,14 +181,14 @@ class ProcessSetUp(object):
             logging.debug(info.json())
             return info.json()
         else:
-            logging.error("Could not find processing info for lane %d\n" % lane_id)
+            logging.error("Could not find processing info for lane %d\n", lane_id)
             logging.error(info)
             sys.exit(1)
 
     def get_process_template(self, process_template_id):
         if not process_template_id:
             logging.critical(
-                "No process template for alignment %d\n" % self.alignment_id
+                "No process template for alignment %d\n", self.alignment_id
             )
             sys.exit(1)
 
@@ -201,7 +201,7 @@ class ProcessSetUp(object):
             return info.json()
         else:
             logging.error(
-                "Could not find processing template for ID %d\n" % process_template_id
+                "Could not find processing template for ID %d\n", process_template_id
             )
             sys.exit(1)
 
@@ -232,7 +232,7 @@ class ProcessSetUp(object):
             logging.debug("Writing script to stdout")
             outfile = sys.stdout
         else:
-            logging.debug("Logging script to %s" % self.outfile)
+            logging.debug("Logging script to %s", self.outfile)
             outfile = open(self.outfile, "a")
 
         outfile.write("cd %s && " % os.path.dirname(script_file))
@@ -255,7 +255,7 @@ class ProcessSetUp(object):
         lane = processing_info["libraries"][0]
 
         if "directory" not in lane:
-            logging.critical("No directory for lane %d" % lane["id"])
+            logging.critical("No directory for lane %d", lane["id"])
             return False
 
         fastq_directory = lane["directory"]
@@ -273,12 +273,12 @@ class ProcessSetUp(object):
                 lane["lane"],
             )
             logging.warning(
-                "No alignment sample_name for lane, using %s instead" % spreadsheet_name
+                "No alignment sample_name for lane, using %s instead", spreadsheet_name
             )
 
         if not os.path.exists(fastq_directory):
             logging.critical(
-                "fastq directory %s does not exist, cannot continue" % fastq_directory
+                "fastq directory %s does not exist, cannot continue", fastq_directory
             )
             return False
 
@@ -287,13 +287,13 @@ class ProcessSetUp(object):
         )
 
         if self.dry_run:
-            logging.info("Dry run, would have created: %s" % script_file)
+            logging.info("Dry run, would have created: %s", script_file)
             return True
 
         try:
             outfile = open(script_file, "w")
         except FileNotFoundError:
-            logging.critical("Could not create script file %s" % script_file)
+            logging.critical("Could not create script file %s", script_file)
             return False
 
         self.add_script(

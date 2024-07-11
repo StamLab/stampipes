@@ -162,9 +162,9 @@ class MakeBrowserLoad(object):
 
     def load(self):
         # set up folder
-        logging.info("Checking for trackhub folder: %s" % self.aggregation_link_folder)
+        logging.info("Checking for trackhub folder: %s", self.aggregation_link_folder)
         foldercheck(self.aggregation_link_folder)
-        logging.info("Checking for project trackhub folder: %s" % self.outdir)
+        logging.info("Checking for project trackhub folder: %s", self.outdir)
         foldercheck(self.outdir)
 
         # prepare tracks for writing
@@ -178,7 +178,7 @@ class MakeBrowserLoad(object):
 
     def create_hubtxt(self):
         hubfile = os.path.join(self.outdir, "hub.txt")
-        logging.info("Creating hub.txt file: %s" % hubfile)
+        logging.info("Creating hub.txt file: %s", hubfile)
         hub = open(hubfile, "w")
         hub.write("hub %s\n" % self.projectname)
         hub.write("shortLabel %s\n" % self.projectname)
@@ -189,7 +189,7 @@ class MakeBrowserLoad(object):
 
     def create_genometxt(self):
         genomefile = os.path.join(self.outdir, "genomes.txt")
-        logging.info("Creating genome.txt file: %s" % genomefile)
+        logging.info("Creating genome.txt file: %s", genomefile)
         genomes = open(genomefile, "w")
         for key in self.all_tracks:
             genomes.write("\ngenome %s\n" % key)
@@ -207,7 +207,7 @@ class MakeBrowserLoad(object):
                 continue
 
             tracks = {}
-            logging.debug("Preparing tracks for AGG: %s" % agg["id"])
+            logging.debug("Preparing tracks for AGG: %s", agg["id"])
             tracks["agg_id"] = agg["id"]
             tracks["agg_ln"] = agg["library_name"]
             tracks["agg_taxonomy"] = agg["taxonomy_name"]
@@ -249,7 +249,7 @@ class MakeBrowserLoad(object):
                     tracks["dnase_align"] = agg["files"]["all-alignments-bam"]
                     tracks["dnase_cutconts"] = agg["files"]["cutcounts-bw"]
                 else:
-                    logging.info("Unable to locate AGG files for: %s" % (agg["id"]))
+                    logging.info("Unable to locate AGG files for: %s", (agg["id"]))
             # rna (processes are seperate for each genome)
             elif (
                 agg["aggregation_process_template_id"] == 30
@@ -266,19 +266,20 @@ class MakeBrowserLoad(object):
                     tracks["rna_poscov"] = agg["files"]["pos-coverage-bigwig"]
                     tracks["rna_negcov"] = agg["files"]["neg-coverage-bigwig"]
                 else:
-                    logging.info("Unable to locate AGG files for: %s" % (agg["id"]))
+                    logging.info("Unable to locate AGG files for: %s", (agg["id"]))
                 # coverage across both strands still new, seperate from the rest for now
                 if "all-coverage-bigwig" in agg["files"]:
                     tracks["rna_bothcov"] = agg["files"]["all-coverage-bigwig"]
                 else:
                     logging.info(
-                        "Unable to locate combined stranded AGG files for: %s"
-                        % (agg["id"])
+                        "Unable to locate combined stranded AGG files for: %s",
+                        (agg["id"]),
                     )
             else:
                 logging.info(
-                    "Unknown template type, %s, for %s"
-                    % (agg["aggregation_process_template_id"], agg["id"])
+                    "Unknown template type, %s, for %s",
+                    agg["aggregation_process_template_id"],
+                    agg["id"],
                 )
             if tracks["agg_genome"] not in self.all_tracks:
                 self.all_tracks[tracks["agg_genome"]] = []
@@ -299,7 +300,7 @@ class MakeBrowserLoad(object):
             self.create_ra(key)
 
     def create_ra(self, genome):
-        logging.info("Creating RA file for genome, %s" % genome)
+        logging.info("Creating RA file for genome, %s", genome)
 
         subtracks = self.all_tracks[genome]
 

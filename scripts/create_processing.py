@@ -205,27 +205,25 @@ class ProcessSetUp(object):
 
         if self.ignore_failed_lanes and lane["failed"]:
             logging.debug(
-                "Skipping %s, failed and we are ignoring failed lanes"
-                % lane["samplesheet_name"]
+                "Skipping %s, failed and we are ignoring failed lanes",
+                lane["samplesheet_name"],
             )
             return False
 
         if self.project_filter and lane["project"] not in self.project_filter:
             logging.debug(
-                "Skipping %s, not in project filter" % lane["samplesheet_name"]
+                "Skipping %s, not in project filter", lane["samplesheet_name"]
             )
             return False
 
         if self.library_filter and lane["library"] not in self.library_filter:
             logging.debug(
-                "Skipping %s, not in library filter" % lane["samplesheet_name"]
+                "Skipping %s, not in library filter", lane["samplesheet_name"]
             )
             return False
 
         if self.sample_filter and lane["sample"] not in self.sample_filter:
-            logging.debug(
-                "Skipping %s, not in sample filter" % lane["samplesheet_name"]
-            )
+            logging.debug("Skipping %s, not in sample filter", lane["samplesheet_name"])
             return False
 
         if (
@@ -234,7 +232,7 @@ class ProcessSetUp(object):
             and lane["alignments"][0]["id"] not in self.alignment_filter
         ):
             logging.debug(
-                "Skipping %s, not in alignment filter" % lane["samplesheet_name"]
+                "Skipping %s, not in alignment filter", lane["samplesheet_name"]
             )
             return False
 
@@ -289,11 +287,11 @@ class ProcessSetUp(object):
 
         alignment = lane["alignments"][0]
         if not alignment["aligner"]:
-            logging.info("# FastQC only %s" % lane["sample"])
+            logging.info("# FastQC only %s", lane["sample"])
             base_script = "fastqc"
         else:
             base_script = alignment["aligner"]
-            logging.info("# Aligning %s with %s" % (lane["sample"], base_script))
+            logging.info("# Aligning %s with %s", lane["sample"], base_script)
 
         if base_script not in script_contents:
             script_contents[base_script] = open(script_files[base_script], "r").read()
@@ -307,7 +305,7 @@ class ProcessSetUp(object):
         )
 
         if not os.path.exists(script_directory):
-            logging.info("Creating directory %s" % script_directory)
+            logging.info("Creating directory %s", script_directory)
             os.makedirs(script_directory)
 
         script_file = os.path.join(script_directory, os.path.basename(inscript))
@@ -367,7 +365,7 @@ class ProcessSetUp(object):
         script_directory = "%s/%s" % (fastq_directory, align_dir)
 
         if not os.path.exists(script_directory):
-            logging.info("Creating directory %s" % script_directory)
+            logging.info("Creating directory %s", script_directory)
             os.makedirs(script_directory)
 
         script_file = os.path.join(

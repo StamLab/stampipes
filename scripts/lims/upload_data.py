@@ -250,7 +250,7 @@ def split_sample_name(samplename):
     )
 
     if not m:
-        log.error("Could not parse sample name: %s" % samplename)
+        log.error("Could not parse sample name: %s", samplename)
         return None
 
     return {
@@ -284,7 +284,7 @@ def get_dup_score(spotdup_file):
 
         return percent_duplication
     except UnboundLocalError as e:
-        log.error("Unbound Local Error for %s" % spotdup_file)
+        log.error("Unbound Local Error for %s", spotdup_file)
         log.error(e)
     except IndexError as e:
         log.error(e)
@@ -404,23 +404,23 @@ class UploadLIMS(object):
     def clear_flowcell_cache(self, flowcell):
         url = self.get_flowcell_url_by_label(flowcell)
         if url is None:
-            log.error("Failure to reset flowcell cache for %s" % flowcell)
+            log.error("Failure to reset flowcell cache for %s", flowcell)
             return
         log.debug(self.api.post_single_result(url=url + "clear_cache/"))
 
     def clear_alignment_stats(self, alignment_id):
         url = "flowcell_lane_alignment/%d/clear_stats/" % alignment_id
-        log.debug("Clearing stats: %s" % url)
+        log.debug("Clearing stats: %s", url)
         results = self.post(url)
         if results is None:
-            log.error("Could not clear alignment stats for ALN%s" % alignment_id)
+            log.error("Could not clear alignment stats for ALN%s", alignment_id)
 
     def clear_aggregation_stats(self, aggregation_id):
         url = "aggregation/%d/clear_stats/" % aggregation_id
-        log.debug("Clearing stats: %s" % url)
+        log.debug("Clearing stats: %s", url)
         results = self.post(url)
         if results is None:
-            log.error("Could not clear aggregation stats for AGG%s" % aggregation_id)
+            log.error("Could not clear aggregation stats for AGG%s", aggregation_id)
 
     def start_aggregation(self, aggregation_id):
         url = "aggregation/%d/" % aggregation_id
@@ -429,7 +429,7 @@ class UploadLIMS(object):
         }
         results = self.patch(url, data=data)
         if results is None:
-            log.error("Could not 'start' AGG%s" % aggregation_id)
+            log.error("Could not 'start' AGG%s", aggregation_id)
 
     def complete_aggregation(self, aggregation_id):
         url = "aggregation/%d/" % aggregation_id
@@ -442,7 +442,7 @@ class UploadLIMS(object):
         results = self.patch(url, data=data)
 
         if results is None:
-            log.error("Could not complete AGG%s" % aggregation_id)
+            log.error("Could not complete AGG%s", aggregation_id)
 
     def get_fastqc_tags(self):
         if not self.fastqc_tags:
@@ -479,7 +479,7 @@ class UploadLIMS(object):
         }
         ct = self.get_single_result("content_type/", query=query)
         if not ct:
-            log.critical("Could not fetch content type %s" % contenttype_name)
+            log.critical("Could not fetch content type %s", contenttype_name)
 
         return ct
 
@@ -498,26 +498,27 @@ class UploadLIMS(object):
 
         if not (contenttype_name and object_id):
             log.error(
-                "Cannot attach file %s without both content type and object_id" % path
+                "Cannot attach file %s without both content type and object_id", path
             )
             return False
 
         contenttype = self.get_contenttype(contenttype_name)
 
         if not contenttype:
-            log.error("Cannot attach file %s without contenttype result" % path)
+            log.error("Cannot attach file %s without contenttype result", path)
             return False
 
         purpose = self.get_file_purpose_url(file_purpose)
 
         if file_purpose and not purpose:
             log.error(
-                "Could not find file purpose %s for uploading directory %s"
-                % (file_purpose, path)
+                "Could not find file purpose %s for uploading directory %s",
+                file_purpose,
+                path,
             )
             return False
         elif purpose:
-            log.debug("File purpose: %s" % purpose)
+            log.debug("File purpose: %s", purpose)
 
         exists = self.get_single_result("directory/", query={"path": path})
 
@@ -536,14 +537,14 @@ class UploadLIMS(object):
         )
 
         if exists:
-            log.info("Updating information for directory %s" % path)
+            log.info("Updating information for directory %s", path)
             result = self.put(url=data["url"], data=data)
         else:
-            log.info("Uploading information for directory %s" % path)
+            log.info("Uploading information for directory %s", path)
             result = self.post("directory/", data=data)
 
         if not result:
-            log.error("Could not upload directory %s" % path)
+            log.error("Could not upload directory %s", path)
             log.debug(data)
         else:
             log.debug(result)
@@ -562,42 +563,45 @@ class UploadLIMS(object):
         path = os.path.abspath(path)
 
         log.info(
-            "Attaching file %s to object %d (contenttype %s)"
-            % (path, object_id, contenttype_name)
+            "Attaching file %s to object %d (contenttype %s)",
+            path,
+            object_id,
+            contenttype_name,
         )
 
         if not (contenttype_name and object_id):
             log.error(
-                "Cannot attach file %s without both content type and object_id" % path
+                "Cannot attach file %s without both content type and object_id", path
             )
             return False
 
         contenttype = self.get_contenttype(contenttype_name)
 
         if not contenttype:
-            log.error("Cannot attach file %s without contenttype result" % path)
+            log.error("Cannot attach file %s without contenttype result", path)
             return False
 
         purpose = self.get_file_purpose_url(file_purpose)
 
         if file_purpose and not purpose:
             log.error(
-                "Could not find file purpose %s for uploading file %s"
-                % (file_purpose, path)
+                "Could not find file purpose %s for uploading file %s",
+                file_purpose,
+                path,
             )
             return False
         elif purpose:
-            log.debug("File Purpose: %s" % purpose)
+            log.debug("File Purpose: %s", purpose)
 
         ftype = self.get_file_type(file_type)
 
         if file_type and not ftype:
             log.error(
-                "Could not find file type %s for uploading file %s" % (file_type, path)
+                "Could not find file type %s for uploading file %s", file_type, path
             )
             return False
         elif purpose:
-            log.debug("File Type: %s" % ftype)
+            log.debug("File Type: %s", ftype)
 
         exists = self.get_single_result(
             "file/",
@@ -624,14 +628,16 @@ class UploadLIMS(object):
                 <= difference
                 <= datetime.timedelta(minutes=1)
             ):
-                log.info("File exists and matches recorded size, skipping %s" % path)
+                log.info("File exists and matches recorded size, skipping %s", path)
             return
 
         md5sum = md5sum_file(path)
 
         log.info(
-            "MD5sum: %s\tFile size: %d\tLast modified: %s"
-            % (md5sum, file_size, str(last_modified))
+            "MD5sum: %s\tFile size: %d\tLast modified: %s",
+            md5sum,
+            file_size,
+            str(last_modified),
         )
 
         data = {
@@ -648,14 +654,14 @@ class UploadLIMS(object):
         log.debug(data)
 
         if exists:
-            log.info("Updating information for file %s" % path)
+            log.info("Updating information for file %s", path)
             result = self.put(url=exists["url"], data=data)
         else:
-            log.info("Uploading information for file %s" % path)
+            log.info("Uploading information for file %s", path)
             result = self.post("file/", data=data)
 
         if not result:
-            log.error("Could not upload file %s" % path)
+            log.error("Could not upload file %s", path)
             log.debug(data)
         else:
             log.debug(result)
@@ -680,7 +686,7 @@ class UploadLIMS(object):
         return self.aggregation_contenttype
 
     def create_count_type(self, name):
-        log.info("Creating count type %s" % name)
+        log.info("Creating count type %s", name)
 
         is_mapq = name.startswith("mapq")
         is_samflag = name.startswith("samflag")
@@ -703,18 +709,18 @@ class UploadLIMS(object):
             self.count_types[name] = result
         else:
             self.count_types[name] = None
-            log.warn("Could not create count type %s (%s)" % (name, str(result)))
+            log.warning("Could not create count type %s (%s)", name, result)
         return self.count_types[name]
 
     # TODO : make sure that no more of one count type exists
     def get_alignment_counts(self, alignment_id):
-        log.info("Getting alignment counts for %d" % alignment_id)
+        log.info("Getting alignment counts for %d", alignment_id)
         if alignment_id not in self.alignment_counts:
             counts = self.get_list_result(
                 "flowcell_lane_count/", query={"alignment": alignment_id}
             )
             if counts is None:
-                log.critical("Could not get counts for ALN%d" % alignment_id)
+                log.critical("Could not get counts for ALN%d", alignment_id)
             self.alignment_counts[alignment_id] = dict(
                 [(count["count_type_name"], count) for count in counts]
             )
@@ -735,7 +741,7 @@ class UploadLIMS(object):
             "rna_alignment_metrics/", query={"alignment": alignment_id}
         )
         if not exists:
-            log.error("Error finding RNA metrics for alignment %d" % alignment_id)
+            log.error("Error finding RNA metrics for alignment %d", alignment_id)
         return exists
 
     def upload_rna_metrics(self, alignment_id, rna_file):
@@ -772,10 +778,10 @@ class UploadLIMS(object):
 
         if exists:
             # Currently (2014-12-22) this will fail, but that's a TODO on the LIMS side.
-            log.info("Updating RNA metrics for alignment ID %d" % alignment_id)
+            log.info("Updating RNA metrics for alignment ID %d", alignment_id)
             result = self.put(url=data["url"], data=data)
         else:
-            log.info("Uploading RNA metrics for alignment ID %d" % alignment_id)
+            log.info("Uploading RNA metrics for alignment ID %d", alignment_id)
             result = self.post("rna_alignment_metrics/", data=data)
         log.debug(result)
         if not result:
@@ -786,7 +792,7 @@ class UploadLIMS(object):
         try:
             jsondata = json.loads(datastring)
         except ValueError:
-            log.error("Barcode report %s is not valid JSON" % barcode_file)
+            log.error("Barcode report %s is not valid JSON", barcode_file)
             return
 
         if jsondata["Sequencer"] == "MiniSeq":
@@ -827,9 +833,9 @@ class UploadLIMS(object):
         response = self.bulk_upload_counts(alignment_id, self.parse_counts(counts_file))
         if response is None:
             log.error(
-                "Bulk upload failed: Counts file {} for ALN{}".format(
-                    counts_file, alignment_id
-                )
+                "Bulk upload failed: Counts file %s for ALN%s",
+                counts_file,
+                alignment_id,
             )
         else:
             log.info("Upload successful.")
@@ -897,7 +903,7 @@ class UploadLIMS(object):
         start_time=False,
         complete_time=False,
     ):
-        log.info("Uploading alignment records for %d" % alignment_id)
+        log.info("Uploading alignment records for %d", alignment_id)
 
         if not (adapter_file or version_file or start_time or complete_time):
             log.debug("No data to upload.")
@@ -920,18 +926,16 @@ class UploadLIMS(object):
         result = self.patch(url=alignment["url"], data=alignment)
 
         if result:
-            log.info("Alignment %d updated" % alignment_id)
+            log.info("Alignment %d updated", alignment_id)
             log.debug(result)
         else:
-            log.debug(
-                "No result for uploading %s to %s" % (str(alignment), alignment["url"])
-            )
+            log.debug("No result for uploading %s to %s", alignment, alignment["url"])
 
         return True
 
     def upload_spot(self, alignment_id, spot_file, dup_file):
         if not spot_file and dup_file:
-            log.error("Error, do not have both files for alignment %s" % alignment_id)
+            log.error("Error, do not have both files for alignment %s", alignment_id)
 
         spot_stats = get_spot_score(spot_file)
         percent_dup = get_dup_score(dup_file)
@@ -954,7 +958,7 @@ class UploadLIMS(object):
         if len(origspots) > 1:
             log.error("Could not figure out which SPOT score to upload to!")
         elif len(origspots) == 0:
-            log.info("Uploading new spot for %d" % alignment_id)
+            log.info("Uploading new spot for %d", alignment_id)
             result = self.post("flowcell_lane_spot/", data=data)
             if not result:
                 log.error("Could not upload SPOT")
@@ -966,7 +970,7 @@ class UploadLIMS(object):
                 or data["tags_in_hotspots"] != origspot["tags_in_hotspots"]
                 or data["percent_duplication"] != origspot["percent_duplication"]
             ):
-                log.info("Updating SPOT score for %d" % alignment_id)
+                log.info("Updating SPOT score for %d", alignment_id)
                 result = self.patch(url=origspot["url"], data=data)
                 if not result:
                     log.error("Could not upload SPOT")
@@ -993,7 +997,7 @@ class UploadLIMS(object):
         )
 
         if not m:
-            log.error("Could not figure out information for %s" % filename)
+            log.error("Could not figure out information for %s", filename)
             return False
 
         log.info(m.groups())
@@ -1001,7 +1005,7 @@ class UploadLIMS(object):
         fastqc_report = self.get_fastqc_contents(filename)
 
         if not fastqc_report:
-            log.error("Could not read fastqc report %s" % filename)
+            log.error("Could not read fastqc report %s", filename)
             return False
 
         samplename = m.group("samplename")
@@ -1041,15 +1045,15 @@ class UploadLIMS(object):
         if report:
             # replace content
             if "raw_data" not in report or report["raw_data"] != upload["raw_data"]:
-                log.info("Updating report %s" % upload["label"])
+                log.info("Updating report %s", upload["label"])
                 result = self.patch(url=report["url"], data=upload)
 
                 if result:
                     log.debug(result)
                 else:
-                    log.error("Could not update FastQC report %s" % report["url"])
+                    log.error("Could not update FastQC report %s", report["url"])
         else:
-            log.info("Uploading new fastqc report %s" % upload["label"])
+            log.info("Uploading new fastqc report %s", upload["label"])
             result = self.post("fastqc_report/", data=upload)
 
             if result:
@@ -1071,7 +1075,7 @@ class UploadLIMS(object):
 
         for fastqc_file, fastqc_counts in self.fastqc_counts.items():
             if not fastqc_counts:
-                log.error("Could not get counts from %s for uploading" % fastqc_file)
+                log.error("Could not get counts from %s for uploading", fastqc_file)
                 return
 
             total += fastqc_counts["total"]
@@ -1093,14 +1097,14 @@ class UploadLIMS(object):
         try:
             picard_metric = open(filename, "r").read()
         except Exception:
-            log.error("Could not read picard metric file %s" % filename)
+            log.error("Could not read picard metric file %s", filename)
             return None
 
-        log.debug("Uploading metric contents from: %s" % filename)
+        log.debug("Uploading metric contents from: %s", filename)
         log.debug(picard_metric)
 
         if metric_name not in self.picard_metrics:
-            log.error("Could not find metrics type %s" % metric_name)
+            log.error("Could not find metrics type %s", metric_name)
             return False
 
         metric = self.picard_metrics[metric_name]
@@ -1133,7 +1137,7 @@ class UploadLIMS(object):
             if library_info:
                 log.debug(library_info)
             else:
-                log.error("Could not fetch %s" % aggregation_info["library"])
+                log.error("Could not fetch %s", aggregation_info["library"])
                 return False
             label = "AGG%d LN%d %s" % (
                 aggregation_id,
@@ -1172,11 +1176,11 @@ class UploadLIMS(object):
         if existing is not None:
             result = self.patch(url=existing["url"], json=upload)
         else:
-            log.info("Uploading new picard report %s" % upload["label"])
+            log.info("Uploading new picard report %s", upload["label"])
             result = self.post("picard_report/", json=upload)
 
         if not result:
-            log.error("Could not upload new Picard report %s" % filename)
+            log.error("Could not upload new Picard report %s", filename)
         else:
             log.debug(result)
 
@@ -1201,10 +1205,10 @@ def main(args=sys.argv):
 
     if not poptions.base_api_url and "LIMS_API_URL" in os.environ:
         api_url = os.environ["LIMS_API_URL"]
-        log.debug("Using LIMS API endpoint: %s from environment" % api_url)
+        log.debug("Using LIMS API endpoint: %s from environment", api_url)
     elif poptions.base_api_url:
         api_url = poptions.base_api_url
-        log.debug("Using LIMS API endpoint: %s from options" % api_url)
+        log.debug("Using LIMS API endpoint: %s from options", api_url)
     else:
         sys.stderr.write("Could not find LIMS API URL.\n")
         sys.exit(1)

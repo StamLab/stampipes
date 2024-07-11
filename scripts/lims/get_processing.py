@@ -92,7 +92,7 @@ def get_processing_info_project(api_url, token, id, outfile):
     # then get all AGGs
     # then get all AGG info
 
-    logging.info("Setting up project #%s" % id)
+    logging.info("Setting up project #%s", id)
 
     info = requests.get(
         "%s/aggregation/file_detail/?library__sample__tissue_culture__project=%s&page_size=1000"
@@ -111,7 +111,7 @@ def get_processing_info_project(api_url, token, id, outfile):
 
 
 def get_processing_info_experiment(api_url, token, id, outfile):
-    logging.info("Setting up experiment #%s" % id)
+    logging.info("Setting up experiment #%s", id)
 
     info = requests.get(
         "%s/experiment/%s/schema" % (api_url, id),
@@ -128,20 +128,21 @@ def get_processing_info_experiment(api_url, token, id, outfile):
     return
 
 
-def get_processing_info_alignment_group(api_url, token, id, outfile):
+def get_processing_info_alignment_group(api_url, token, group_id, outfile):
     info = requests.get(
-        "%s/flowcell_lane_alignment_group/%d/processing_information/" % (api_url, id),
+        "%s/flowcell_lane_alignment_group/%d/processing_information/"
+        % (api_url, group_id),
         headers={"Authorization": "Token %s" % token},
     )
 
     if info.ok:
         result = info.json()
-        logging.info("Writing results to %s" % outfile)
+        logging.info("Writing results to %s", outfile)
         with open(outfile, "w") as output:
             json.dump(result, output, sort_keys=True, indent=4, separators=(",", ": "))
     else:
         logging.error(
-            "Could not find processing info for alignment group %s\n" % str(id)
+            "Could not find processing info for alignment group %s\n", group_id
         )
 
     return
@@ -181,12 +182,12 @@ def main(args=sys.argv):
 
     if poptions.project:
         logging.info(
-            "Getting aggregation information for project #%s" % poptions.project
+            "Getting aggregation information for project #%s", poptions.project
         )
         get_processing_info_project(api_url, token, poptions.project, poptions.outfile)
 
     if poptions.flowcell:
-        logging.info("Getting alignment groups for %s" % poptions.flowcell)
+        logging.info("Getting alignment groups for %s", poptions.flowcell)
 
         alignment_groups = requests.get(
             "%s/flowcell_lane_alignment_group/?flowcell__label=%s"
@@ -202,14 +203,13 @@ def main(args=sys.argv):
         results = alignment_groups.json()
         if results["count"] == 0:
             logging.error(
-                "Could not find an alignment group for flowcell %s\n"
-                % poptions.flowcell
+                "Could not find an alignment group for flowcell %s\n", poptions.flowcell
             )
             sys.exit(1)
         if results["count"] > 1:
             logging.error(
-                "More than one alignment group found: %s"
-                % ", ".join(["%d" % ag["id"] for ag in results["results"]])
+                "More than one alignment group found: %s",
+                ", ".join(["%d" % ag["id"] for ag in results["results"]]),
             )
             sys.exit(1)
 
@@ -224,7 +224,7 @@ def main(args=sys.argv):
 
     if poptions.experiment:
         logging.info(
-            "Getting aggregation information for experiment #%s" % poptions.experiment
+            "Getting aggregation information for experiment #%s", poptions.experiment
         )
         get_processing_info_experiment(
             api_url, token, poptions.experiment, poptions.outfile

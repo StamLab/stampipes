@@ -140,7 +140,7 @@ class ProcessSetUp(object):
 
         if not results:
             logging.error(
-                "Could not find information for aggregation %d" % aggregation_id
+                "Could not find information for aggregation %d", aggregation_id
             )
             return None
 
@@ -152,15 +152,14 @@ class ProcessSetUp(object):
         )
 
         if not results:
-            logging.error("Could not find lanes for aggregation %d" % aggregation_id)
+            logging.error("Could not find lanes for aggregation %d", aggregation_id)
             return []
 
         return results
 
     def get_lane_fastq_file(self, aggregation_id, lane_id, file_purpose):
         logging.info(
-            "Fetching files for alignment %d (Aggregation %d)"
-            % (lane_id, aggregation_id)
+            "Fetching files for alignment %d (Aggregation %d)", lane_id, aggregation_id
         )
 
         results = files.get_object_files(
@@ -176,8 +175,10 @@ class ProcessSetUp(object):
 
         if len(results) != 1:
             logging.error(
-                "Found %d files for alignment %d, require 1 (Aggregation %d)"
-                % (len(results), lane_id, aggregation_id)
+                "Found %d files for alignment %d, require 1 (Aggregation %d)",
+                len(results),
+                lane_id,
+                aggregation_id,
             )
             logging.error(results)
             return None
@@ -189,14 +190,15 @@ class ProcessSetUp(object):
         library_info = self.api.single_result(url=aggregation_info["library"])
         if not library_info:
             logging.critical(
-                "Cannot proceed without library!  Could not get info from %s (Aggregation %d)"
-                % (aggregation_info["library"], aggregation_info["id"])
+                "Cannot proceed without library!  Could not get info from %s (Aggregation %d)",
+                aggregation_info["library"],
+                aggregation_info["id"],
             )
             sys.exit(1)
         return library_info
 
     def get_script_template(self, script_template):
-        logging.info("Using script template %s" % script_template)
+        logging.info("Using script template %s", script_template)
         return open(script_template, "r").read()
 
     def get_example_flowcell(self, aggregation_id, aggregation_lanes):
@@ -215,16 +217,18 @@ class ProcessSetUp(object):
 
         if not lane:
             logging.critical(
-                "Was not able to fetch lane %s (Aggregation %d)"
-                % (aggregation_lane["lane"], aggregation_id)
+                "Was not able to fetch lane %s (Aggregation %d)",
+                aggregation_lane["lane"],
+                aggregation_id,
             )
             sys.exit(1)
 
         flowcell = self.api.single_result(url=lane["flowcell"])
         if not flowcell:
             logging.critical(
-                "Could not get flowcell at %d (Aggregation %d)"
-                % (lane["flowcell"], aggregation_id)
+                "Could not get flowcell at %d (Aggregation %d)",
+                lane["flowcell"],
+                aggregation_id,
             )
             sys.exit(1)
 
@@ -280,7 +284,7 @@ class ProcessSetUp(object):
         aggregation_folder = self.get_aggregation_directory(aggregation)
         # flowcell = self.get_example_flowcell(aggregation_id, aggregation_lanes)
 
-        logging.info("Aggregation %d folder: %s" % (aggregation_id, aggregation_folder))
+        logging.info("Aggregation %d folder: %s", aggregation_id, aggregation_folder)
         logging.debug(aggregation)
 
         missing = False
@@ -291,15 +295,16 @@ class ProcessSetUp(object):
             lane_id = int(aggregation_lane["lane"].strip("/").split("/")[-1])
             if not aggregation_lane["include"]:
                 logging.info(
-                    "Not including lane %s (Aggregation %d)" % (lane_id, aggregation_id)
+                    "Not including lane %s (Aggregation %d)", lane_id, aggregation_id
                 )
                 continue
             alignment_endpoint = aggregation_lane["alignment"]
 
             if not alignment_endpoint:
                 logging.info(
-                    "Not including lane %s because no alignment set (Aggregation %d)"
-                    % (lane_id, aggregation_id)
+                    "Not including lane %s because no alignment set (Aggregation %d)",
+                    lane_id,
+                    aggregation_id,
                 )
 
             # alignment_id = int(alignment_endpoint.strip("/").split("/")[-1])
@@ -309,14 +314,12 @@ class ProcessSetUp(object):
 
             if not r1_fastq or not r2_fastq:
                 logging.critical(
-                    "Missing either R1: %s or R2: %s for alignment %s for lane %s, skipping (Aggregation %d)"
-                    % (
-                        str(r1_fastq),
-                        str(r2_fastq),
-                        alignment_endpoint,
-                        lane_id,
-                        aggregation_id,
-                    )
+                    "Missing either R1: %s or R2: %s for alignment %s for lane %s, skipping (Aggregation %d)",
+                    str(r1_fastq),
+                    str(r2_fastq),
+                    alignment_endpoint,
+                    lane_id,
+                    aggregation_id,
                 )
                 missing = True
                 continue
@@ -346,7 +349,7 @@ class ProcessSetUp(object):
         file_record.close()
 
         script_file = os.path.join(aggregation_folder, self.qsub_scriptname)
-        logging.info("Creating script file %s" % script_file)
+        logging.info("Creating script file %s", script_file)
 
         script = open(script_file, "w")
         script.write("export AGGREGATION_ID=%d\n" % aggregation_id)
