@@ -46,7 +46,7 @@ def mysql_clean(input):
     # Mysql names can contain only 0-9, a-z, A-Z, _, or $
     # So we replace all other characters with an underscore,
     # after removing leading/trailing whitespace.
-    output = re.sub("[^\w$]", "_", input.strip())
+    output = re.sub(r"[^\w$]", "_", input.strip())
     return output
 
 
