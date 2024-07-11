@@ -8,11 +8,11 @@
 #   For each setting (most permissive to least), generate all possible barcodes for each lane
 #     If there are any collisions, check the next tighter mismatch setting
 
-import sys
-import re
 import argparse
 import itertools
 import json
+import re
+import sys
 
 MAX_MISMATCH_LEVEL = 1  # Nextseq can allow 2, Hiseq 2500 allows only 1
 POSSIBLE_MISMATCH_LEVELS = range(MAX_MISMATCH_LEVEL, -1, -1)

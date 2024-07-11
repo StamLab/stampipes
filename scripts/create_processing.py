@@ -1,8 +1,8 @@
+import argparse
 import json
+import logging
 import os
 import sys
-import argparse
-import logging
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 

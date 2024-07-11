@@ -1,7 +1,7 @@
-import os
 import glob
-import sys
+import os
 import re
+import sys
 
 if len(sys.argv) != 3:
     print("Usage: rename_by_prefix OLD_CONTENT NEW_CONTENT")

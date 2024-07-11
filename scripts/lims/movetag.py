@@ -1,8 +1,9 @@
+import argparse
+import logging
 import os
 import sys
-import logging
+
 import requests
-import argparse
 
 token = None
 headers = None

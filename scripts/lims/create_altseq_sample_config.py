@@ -1,7 +1,6 @@
-import json
 import argparse
+import json
 import logging
-
 from collections import defaultdict
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

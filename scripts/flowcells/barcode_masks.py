@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-import sys
-import json
 import argparse
+import json
 import logging
+import sys
 
 script_options = {
     "processing": "processing.json",

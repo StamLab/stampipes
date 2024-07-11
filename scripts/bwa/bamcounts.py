@@ -7,11 +7,12 @@ paired reads.
 Useful SAM flag reference: http://broadinstitute.github.io/picard/explain-flags.html
 """
 
-import sys
-import logging
-from collections import defaultdict
-from pysam import Samfile
 import argparse
+import logging
+import sys
+from collections import defaultdict
+
+from pysam import Samfile
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 

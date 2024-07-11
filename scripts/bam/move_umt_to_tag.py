@@ -7,6 +7,7 @@ Preserves order, and is a no-op on reads without a UMT tag (no '#' in name)
 """
 
 import argparse
+
 import pysam
 
 

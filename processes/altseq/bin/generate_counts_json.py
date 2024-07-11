@@ -2,10 +2,10 @@
 
 import argparse
 import csv
-import os
 
 # import pprint
 import json
+import os
 
 
 def parse_args():

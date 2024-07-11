@@ -1,7 +1,8 @@
 #!/bin/env python3
 
-import pysam
 import argparse
+
+import pysam
 
 parser = argparse.ArgumentParser(description="Set read pair status")
 parser.add_argument(

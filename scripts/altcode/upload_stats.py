@@ -3,18 +3,18 @@
 Uploads all the results of alt-code processing to LIMS
 """
 
-import re
 import argparse
 import datetime
+import glob
 import hashlib
 import json
 import logging
 import os
+import re
 import sys
-import glob
-from functools import lru_cache
 from collections import defaultdict
 from distutils.version import LooseVersion
+from functools import lru_cache
 
 # Make sure we can load our vendored stamlims_api dependency
 sys.path.insert(

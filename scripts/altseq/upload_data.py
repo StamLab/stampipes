@@ -3,17 +3,17 @@
 Uploads all the results of alt-seq processing to LIMS
 """
 
-import re
-import csv
 import argparse
+import csv
 import datetime
 import hashlib
 import json
 import logging
 import os
+import re
 import sys
-from functools import lru_cache
 from collections import defaultdict
+from functools import lru_cache
 
 # Make sure we can load our vendored stamlims_api dependency
 sys.path.insert(

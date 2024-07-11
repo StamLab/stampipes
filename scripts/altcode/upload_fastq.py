@@ -3,12 +3,12 @@
 Uploads alt-code fastq files to LIMS
 """
 
-import re
 import argparse
 import datetime
 import hashlib
 import logging
 import os
+import re
 import sys
 from functools import lru_cache
 

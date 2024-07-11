@@ -2,8 +2,9 @@
 
 import argparse
 import sys
-import pysam
 from collections import defaultdict
+
+import pysam
 
 UMI_TAG = "XD:Z"
 

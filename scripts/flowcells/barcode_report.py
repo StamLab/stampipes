@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
-import os
-import sys
-import re
-import json
 import argparse
 import glob
+import json
+import os
+import re
+import sys
 
 script_options = {
     "quiet": False,

@@ -1,6 +1,6 @@
-import sys
 import argparse
 import json
+import sys
 
 MAX_BARCODE_LENGTH = 10
 

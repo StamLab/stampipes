@@ -1,11 +1,12 @@
-import os
-import sys
-import logging
-import re
-import requests
 import argparse
+import logging
+import os
+import re
 import subprocess
+import sys
 import xml.dom.minidom
+
+import requests
 
 token = None
 headers = None

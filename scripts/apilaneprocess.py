@@ -1,16 +1,16 @@
-import os
-import sys
 import argparse
-import logging
-import re
 import collections
+import logging
+import os
+import re
+import sys
 
 try:
     from concurrent.futures import ThreadPoolExecutor
 except ImportError:
     from futures import ThreadPoolExecutor
 
-from stamlims_api import rest, lims
+from stamlims_api import lims, rest
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 

@@ -1,11 +1,12 @@
 from __future__ import unicode_literals
 
+import argparse
+import json
+import logging
 import os
 import sys
-import logging
+
 import requests
-import json
-import argparse
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 

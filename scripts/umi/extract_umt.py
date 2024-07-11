@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
-from Bio import SeqIO
 import argparse
 import itertools
 import logging
 import sys
+
+from Bio import SeqIO
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 

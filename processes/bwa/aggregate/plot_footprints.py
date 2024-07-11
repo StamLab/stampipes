@@ -5,26 +5,23 @@
 
 
 import sys
+
+import matplotlib
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy
 import scipy.stats
-
 from footprint_tools.modeling import dispersion
-
+from matplotlib.ticker import MaxNLocator
+from pylab import rcParams
 
 # In[3]:
 
 
 # get_ipython().magic(u'matplotlib inline')
-import matplotlib
-
 matplotlib.use("agg")
 
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
-import matplotlib.gridspec as gridspec
-
-from pylab import rcParams
 
 rcParams["pdf.fonttype"] = 42
 

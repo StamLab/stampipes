@@ -1,8 +1,9 @@
 def main():
     import argparse
     import random
-    import pysam
     import shutil
+
+    import pysam
 
     parser = argparse.ArgumentParser()
     parser.add_argument("infile")

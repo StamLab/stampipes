@@ -1,7 +1,7 @@
-import numpy
 import sys
-
 from copy import copy
+
+import numpy
 
 
 # returns the convolutional or statistical autocorrelation of the passed histogram

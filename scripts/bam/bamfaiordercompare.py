@@ -4,8 +4,8 @@ of references in the header of a BAM file with the order in a FAI
 file.  Prints "ORDERED" if they are equal and "UNORDERED" otherwise.
 """
 
-import sys
 import os
+import sys
 
 import pysam
 

@@ -6,14 +6,14 @@ new sequencer folders and for sequencer folders that have finished copying.
 TODO: Generalize some of these functions into a library.
 TODO: This might be more robust as a cron job."""
 
+import json
+import logging
 import os
 import re
-import time
-import logging
 import smtplib
-import json
-from email.mime.text import MIMEText
+import time
 import xml
+from email.mime.text import MIMEText
 from xml.dom import minidom
 
 """

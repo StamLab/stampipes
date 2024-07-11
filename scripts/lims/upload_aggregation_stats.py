@@ -1,7 +1,6 @@
-import sys
 import argparse
-
 import logging
+import sys
 
 from stamlims_api.rest import setup_api
 

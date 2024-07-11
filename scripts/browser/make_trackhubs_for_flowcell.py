@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
-import json
-import os
-import sys
 import argparse
+import json
 import logging
+import os
 import re
+import sys
+
 import requests
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

@@ -6,7 +6,6 @@ import json
 import re
 import sys
 import textwrap
-
 from collections import defaultdict
 
 # requires BioPython which seems to be in our environment

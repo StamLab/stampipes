@@ -11,8 +11,9 @@ Criteria:
 """
 
 import argparse
-import sys
 import logging
+import sys
+
 import pysam
 
 """

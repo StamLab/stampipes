@@ -1,10 +1,11 @@
+import argparse
 import json
+import logging
 import os
 import sys
-import argparse
-import logging
-import requests
 from collections import OrderedDict
+
+import requests
 
 try:
     from concurrent.futures import ThreadPoolExecutor

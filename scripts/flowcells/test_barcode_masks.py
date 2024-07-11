@@ -1,8 +1,7 @@
 import random
-
 from typing import List, Tuple
-import pytest
 
+import pytest
 from barcode_masks import get_barcode_masks
 
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 
-from collections import namedtuple
-import sys
 import copy
+import sys
+from collections import namedtuple
 
 
 def process_line(line):

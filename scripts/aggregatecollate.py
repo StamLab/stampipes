@@ -1,13 +1,12 @@
-import os
-import sys
 import argparse
 import logging
+import os
+import sys
 
 sys.path.append("/home/audrakj/stamlims_api")
 print(sys.path)
 from stamlims_api import rest  # noqa: E402
 from stamlims_api.lims import files  # noqa: E402
-
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
