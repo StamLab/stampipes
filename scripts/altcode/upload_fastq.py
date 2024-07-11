@@ -83,17 +83,17 @@ def parser_setup():
         "-t", "--token", dest="token", help="Your authentication token."
     )
 
-    #run_opts.add_argument("sample_config", help="The sample_config.tsv file")
-    #run_opts.add_argument("processing_json", help="The processing.json file")
-    #run_opts.add_argument(
-        #"--output_file_directory",
-        #default=".",
-        #help="The output directory files are stored in. Defaults to cwd.",
-    #)
+    # run_opts.add_argument("sample_config", help="The sample_config.tsv file")
+    # run_opts.add_argument("processing_json", help="The processing.json file")
+    # run_opts.add_argument(
+    # "--output_file_directory",
+    # default=".",
+    # help="The output directory files are stored in. Defaults to cwd.",
+    # )
     run_opts.add_argument("--r1", dest="r1_fastq", help="the r1 file to upload")
     run_opts.add_argument("--r2", dest="r2_fastq", help="the r2 file to upload")
     run_opts.add_argument("--lane", dest="lane_id", help="the ID of the lane")
-    #run_opts.add_argument("--flowcell", dest="flowcell_name", help="the name of the flowcell")
+    # run_opts.add_argument("--flowcell", dest="flowcell_name", help="the name of the flowcell")
 
     run_opts.add_argument(
         "--skip_md5",
@@ -127,7 +127,7 @@ def md5sum_file(path):
     return md5sum.hexdigest()
 
 
-#def parse_counts_file(counts_file: str):
+# def parse_counts_file(counts_file: str):
 #    """
 #    Given a file name, reads a stats file
 #    format: one stat per line: `name value` (separated by whitespace)
@@ -145,7 +145,7 @@ def md5sum_file(path):
 #    return stats
 #
 #
-#def build_counts(alignment_id, counts_file):
+# def build_counts(alignment_id, counts_file):
 #    """
 #    Convert stats into a form ready to be uploaded to LIMS with the
 #    bulk-stat-create endpoint
@@ -173,7 +173,7 @@ class UploadLIMS:
             {
                 rest.LIMS_URL_OPT_VAR: api_url,
                 rest.LIMS_TOKEN_OPT_VAR: token,
-                #rest.RAISE_ON_ERROR_VAR: True,
+                # rest.RAISE_ON_ERROR_VAR: True,
             }
         )
         self.dry_run = dry_run
@@ -343,8 +343,20 @@ class UploadLIMS:
 
     def upload_files(self, r1, r2, lane_id):
         lane_ids = self.get_lane_ids(lane_id)
-        self.upload_file(r1, "SequencingData.flowcelllane", lane_ids, file_purpose="r1-fastq", file_type="gzipped-fastq")
-        self.upload_file(r2, "SequencingData.flowcelllane", lane_ids, file_purpose="r2-fastq", file_type="gzipped-fastq")
+        self.upload_file(
+            r1,
+            "SequencingData.flowcelllane",
+            lane_ids,
+            file_purpose="r1-fastq",
+            file_type="gzipped-fastq",
+        )
+        self.upload_file(
+            r2,
+            "SequencingData.flowcelllane",
+            lane_ids,
+            file_purpose="r2-fastq",
+            file_type="gzipped-fastq",
+        )
 
     def upload_file(
         self, path, contenttype_name, object_ids, file_purpose=None, file_type=None
@@ -394,7 +406,12 @@ class UploadLIMS:
                     )
                     result = self.put(url=exists["url"], data=upload_data)
             else:
-                LOG.info("Uploading information for file %s: lane %d, data=%s", path, object_id, upload_data)
+                LOG.info(
+                    "Uploading information for file %s: lane %d, data=%s",
+                    path,
+                    object_id,
+                    upload_data,
+                )
                 result = self.post("file/", data=upload_data)
 
             if not result:
@@ -461,20 +478,22 @@ class UploadLIMS:
         """Gets the library by ID (NOT library number)"""
         return self.get_by_id("library", library_id)
 
-
     # gets the other lane ids for this lane/pool
     def get_lane_ids(self, lane_id):
         def extract_id_from_url(url):
-            return re.sub(r'[^\d]', "", url)
+            return re.sub(r"[^\d]", "", url)
+
         lane_info = self.get_by_id("flowcell_lane", int(lane_id))
         logging.info("lane %s info:\n%s", lane_id, lane_info)
-        assert lane_info["library_pool"] is not None, "library_pool for lane %s must not be None" % lane_id
+        assert lane_info["library_pool"] is not None, (
+            "library_pool for lane %s must not be None" % lane_id
+        )
         pool_info = self.api.get_single_result(url=lane_info["library_pool"])
         lib_ids = []
         flowcell_id = extract_id_from_url(lane_info["flowcell"])
         for lib_url in pool_info["libraries"]:
-           lib_id = extract_id_from_url(lib_url)
-           lib_ids.append(lib_id)
+            lib_id = extract_id_from_url(lib_url)
+            lib_ids.append(lib_id)
 
         lanes_query = "flowcell_lane/?flowcell=%s&lane=%d&page_size=1000" % (
             flowcell_id,
@@ -490,8 +509,7 @@ class UploadLIMS:
                     lanes_in_pool.add(l["id"])
         return list(lanes_in_pool)
 
-
-    #def upload_flowcell_report(self, data):
+    # def upload_flowcell_report(self, data):
     #    flowcell_labels = set(pool["flowcell_label"] for pool in data)
     #    assert len(flowcell_labels) == 1
     #    flowcell_label = flowcell_labels.pop()
@@ -533,8 +551,7 @@ class UploadLIMS:
     #        LOG.critical("Too many JSON reports exist")
     #        raise "Too many JSON reports exist, exiting"
 
-
-    #def upload_altseq_flowcell(self, sample_config, processing_dict, outdir):
+    # def upload_altseq_flowcell(self, sample_config, processing_dict, outdir):
     #    """
     #    Main function for this script.
     #    Given paths to the sample_config file, processing_dict, and outdir,
@@ -660,13 +677,13 @@ def main():
 
     uploader.upload_files(poptions.r1_fastq, poptions.r2_fastq, poptions.lane_id)
 
-    #with open(poptions.sample_config) as f:
+    # with open(poptions.sample_config) as f:
     #    sample_config = list(csv.DictReader(f, delimiter="\t"))
-    #with open(poptions.processing_json) as f:
+    # with open(poptions.processing_json) as f:
     #    processing = json.loads(f.read())
-    #uploader.upload_altseq_flowcell(
+    # uploader.upload_altseq_flowcell(
     #    sample_config, processing, poptions.output_file_directory
-    #)
+    # )
 
 
 # This is the main body of the program that only runs when running this script

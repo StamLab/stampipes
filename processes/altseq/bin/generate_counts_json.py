@@ -4,8 +4,10 @@ import argparse
 import csv
 import os
 import pathlib
+
 # import pprint
 import json
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -17,10 +19,12 @@ def parse_args():
     parser.add_argument("pool_name")
     return parser.parse_args()
 
+
 def parse_tsv(filename):
     """Parses a TSV with header, return list of dicts"""
     with open(filename) as f:
         return [*csv.DictReader(f, delimiter="\t")]
+
 
 def parse_linewise_stats(filename):
     """Parses a file with a name-value pair on each line, separated by whitespace"""
@@ -30,6 +34,7 @@ def parse_linewise_stats(filename):
             (key, value) = line.strip().split()
             d[key] = value
     return d
+
 
 def parse_linewise_csv_stats(filename):
     """Parses a file with a name-value pair on each line, separated by comma"""
@@ -51,8 +56,9 @@ def parse_barcode_config(filename):
             cfg[cell_barcode] = sample_name
     return cfg
 
+
 def modify_sample_info(info):
-    """ Rewrite the sample stats a bit """
+    """Rewrite the sample stats a bit"""
     # Keys to delete from the table
     deletes = [
         "CB",
@@ -69,6 +75,7 @@ def modify_sample_info(info):
         del out[old]
     return out
 
+
 def get_sample_stats(opts):
     """
     Gets per-sample stats from the CellReads.stats file
@@ -78,33 +85,38 @@ def get_sample_stats(opts):
     sample_counts = parse_tsv(cellreads_path)
 
     sample_stats = {
-        #cfg.get(info['CB']): modify_sample_info(info)
-        info['CB']: modify_sample_info(info)
+        # cfg.get(info['CB']): modify_sample_info(info)
+        info["CB"]: modify_sample_info(info)
         for info in sample_counts
-        if info['CB'] in cfg
+        if info["CB"] in cfg
     }
-    #del sample_stats[None]
+    # del sample_stats[None]
     return sample_stats
 
+
 def get_barcode_stats(opts):
-    """ Gets the stats about barcode mapping """
+    """Gets the stats about barcode mapping"""
     barcode_path = os.path.join(opts.cellranger_directory, "..", "Barcodes.stats")
     return parse_linewise_stats(barcode_path)
 
+
 def get_summary_stats(opts):
-    """ Gets the Summary stats produced by StarSOLO """
+    """Gets the Summary stats produced by StarSOLO"""
     barcode_path = os.path.join(opts.cellranger_directory, "Summary.csv")
     return parse_linewise_csv_stats(barcode_path)
 
+
 def get_library_pool_info(opts):
-    """ Gets the metadata about the library and pool """
+    """Gets the metadata about the library and pool"""
     (flowcell, pool) = opts.pool_name.split("_")
     return {"flowcell_label": flowcell, "pool": pool}
 
+
 def get_barcode_mapping(opts):
-    """ Returns the mapping of barcodes to sample names """
+    """Returns the mapping of barcodes to sample names"""
     cfg = parse_barcode_config(opts.barcode_config_file)
     return cfg
+
 
 def get_all_stats(opts):
     """
@@ -123,10 +135,11 @@ def get_all_stats(opts):
 
 
 def main():
-    """ Run it all and write to stdout """
+    """Run it all and write to stdout"""
     opts = parse_args()
     data = get_all_stats(opts)
     print(json.dumps(data))
+
 
 if __name__ == "__main__":
     main()

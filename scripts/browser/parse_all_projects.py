@@ -21,28 +21,37 @@ script_options = {
     "outfile": "project_list.txt",
 }
 
+
 def parser_setup():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-a", "--api", dest="base_api_url",
-        help="The base API url, if not the default live LIMS.")
-    parser.add_argument("-t", "--token", dest="token",
-        help="Your authentication token.  Required.")
-    parser.add_argument("-o", "--outfile", dest="outfile",
-        help="The outfile to save to.")
-    parser.set_defaults( **script_options )
-    parser.set_defaults( quiet=False, debug=False )
+    parser.add_argument(
+        "-a",
+        "--api",
+        dest="base_api_url",
+        help="The base API url, if not the default live LIMS.",
+    )
+    parser.add_argument(
+        "-t", "--token", dest="token", help="Your authentication token.  Required."
+    )
+    parser.add_argument(
+        "-o", "--outfile", dest="outfile", help="The outfile to save to."
+    )
+    parser.set_defaults(**script_options)
+    parser.set_defaults(quiet=False, debug=False)
     return parser
 
-def get_projects(api_url, token, outfile):
 
-    info = requests.get("%s/project/?page_size=1000" % (api_url),
-        headers={'Authorization': "Token %s" % token})
+def get_projects(api_url, token, outfile):
+    info = requests.get(
+        "%s/project/?page_size=1000" % (api_url),
+        headers={"Authorization": "Token %s" % token},
+    )
 
     if info.ok:
         result = info.json()
-        out = open(outfile, 'w')
-        for proj in result['results']:
-            outstring = "%s\t%s\n" % (proj['id'], proj['slug'])
+        out = open(outfile, "w")
+        for proj in result["results"]:
+            outstring = "%s\t%s\n" % (proj["id"], proj["slug"])
             out.write(outstring)
 
     else:
@@ -50,9 +59,10 @@ def get_projects(api_url, token, outfile):
 
     return
 
-def main(args = sys.argv):
+
+def main(args=sys.argv):
     """This is the main body of the program that by default uses the arguments
-from the command line."""
+    from the command line."""
 
     parser = parser_setup()
     poptions = parser.parse_args()
@@ -90,5 +100,3 @@ from the command line."""
 # without automatically running it
 if __name__ == "__main__":
     main()
-
-

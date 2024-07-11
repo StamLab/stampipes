@@ -28,13 +28,13 @@ with open(hotspots) as file:
         else:
             newrow = [0] * len(fimos)
         rows.append(newrow)
-labels = range(0,len(hotspot_names))
+labels = range(0, len(hotspot_names))
 
 # write
 dump_svmlight_file(rows, y=labels, f=outfile, zero_based=True)
-file1 = open(outfile_rows, 'w')
+file1 = open(outfile_rows, "w")
 for item in hotspot_names:
     file1.write("%s\n" % item)
-file2 = open(outfile_cols,'w')
+file2 = open(outfile_cols, "w")
 for item in fimos:
     file2.write("%s\n" % item)

@@ -9,7 +9,6 @@ UMI_TAG = "XD:Z"
 
 
 def parser_setup():
-
     script_options = {
         "infile": "/dev/stdin",
         "outfile": "/dev/stdout",
@@ -18,13 +17,12 @@ def parser_setup():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--hist", dest="histfile",
-                        help="Write histogram of duplicates to this file")
+    parser.add_argument(
+        "--hist", dest="histfile", help="Write histogram of duplicates to this file"
+    )
 
-    parser.add_argument("-i", "--infile", dest="infile",
-                        help="Read from this file")
-    parser.add_argument("-o", "--outfile", dest="outfile",
-                        help="Write to this file")
+    parser.add_argument("-i", "--infile", dest="infile", help="Read from this file")
+    parser.add_argument("-o", "--outfile", dest="outfile", help="Write to this file")
 
     parser.set_defaults(**script_options)
     parser.set_defaults(quiet=False, debug=False)
@@ -68,8 +66,7 @@ def set_dup(read, is_dup):
     return read
 
 
-class DupMarker():
-
+class DupMarker:
     read_histo = defaultdict(int)
     pair_map = {}
     input = None
@@ -138,9 +135,9 @@ def main(args=sys.argv):
     parser = parser_setup()
     poptions = parser.parse_args()
 
-    input = pysam.AlignmentFile(poptions.infile, 'r')
-    output = pysam.AlignmentFile(poptions.outfile, 'wb0', template=input)
-    histo = open(poptions.histfile, 'w') if poptions.histfile else None
+    input = pysam.AlignmentFile(poptions.infile, "r")
+    output = pysam.AlignmentFile(poptions.outfile, "wb0", template=input)
+    histo = open(poptions.histfile, "w") if poptions.histfile else None
 
     try:
         dupmarker = DupMarker(input=input, output=output, histo=histo)

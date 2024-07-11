@@ -4,16 +4,33 @@ import json
 
 MAX_BARCODE_LENGTH = 10
 
+
 def parseArgs():
-    parser = argparse.ArgumentParser(description='Split up fastq files by barcode')
-    parser.add_argument('--processing', dest='processing_file', action='store', required=True,
-            help='processing.json to use (mandatory)')
-    parser.add_argument('--barcodes', dest='barcodes_file', action='store',required=True,
-            help='barcode output to compare')
-    parser.add_argument('--bcmask', dest='barcodes_mask', action='store',required=True,
-            help='barcode mask to assess')
+    parser = argparse.ArgumentParser(description="Split up fastq files by barcode")
+    parser.add_argument(
+        "--processing",
+        dest="processing_file",
+        action="store",
+        required=True,
+        help="processing.json to use (mandatory)",
+    )
+    parser.add_argument(
+        "--barcodes",
+        dest="barcodes_file",
+        action="store",
+        required=True,
+        help="barcode output to compare",
+    )
+    parser.add_argument(
+        "--bcmask",
+        dest="barcodes_mask",
+        action="store",
+        required=True,
+        help="barcode mask to assess",
+    )
     args = parser.parse_args()
     return args
+
 
 # Generates the barcode reporting mask from processing.json
 # Returns a list of all barcode lengths represented in the data
@@ -43,28 +60,33 @@ def get_barcode_masks(json_data):
 
     return masks
 
+
 # format length
 def format_length(x):
-    if (x):
+    if x:
         return len(x["sequence"])
     else:
-        return '0'
+        return "0"
+
 
 # Determines how many different sizes of barcodes there are and returns a set of them
 def get_barcode_lengths(json_data):
-
     # set of each unique length in the data
-    lengths = set([ "{}-{}".format(
-        format_length(lib["barcode1"]),
-        format_length(lib["barcode2"]))
-        for lib in json_data["libraries"] ])
+    lengths = set(
+        [
+            "{}-{}".format(
+                format_length(lib["barcode1"]), format_length(lib["barcode2"])
+            )
+            for lib in json_data["libraries"]
+        ]
+    )
 
     # Make sure only 1 report is run each for single/dual indexed barcodes until reporting is more flexible
     tempbc1, tempbc2 = [], []
     finalList = []
 
     for n in lengths:
-        if n[2] == '0':
+        if n[2] == "0":
             tempbc1.append(n)
         else:
             tempbc2.append(n)
@@ -74,6 +96,7 @@ def get_barcode_lengths(json_data):
         finalList.append(sorted(tempbc2)[0])
 
     return finalList
+
 
 def main(argv):
     args = parseArgs()
@@ -85,29 +108,27 @@ def main(argv):
     barcode_lengths = get_barcode_lengths(process)
     masks = get_barcode_masks(process)
 
-    for lib in process['libraries']:
-        
+    for lib in process["libraries"]:
         # only look at libraries with the same mask
         length1 = format_length(lib["barcode1"])
         length2 = format_length(lib["barcode2"])
         lengths = str(length1) + "-" + str(length2)
         index = barcode_lengths.index(lengths)
         if mask == masks[index]:
-            
             # check to see if the barcode is represent in the report
             bcs = ""
-            if lib['barcode2'] is not None:
-               bc1 = lib['barcode1']['reverse_sequence']
-               bc2 = lib['barcode2']['sequence']
-               bcs = bc1 + bc2
+            if lib["barcode2"] is not None:
+                bc1 = lib["barcode1"]["reverse_sequence"]
+                bc2 = lib["barcode2"]["sequence"]
+                bcs = bc1 + bc2
             else:
-               bc1 = lib['barcode1']['reverse_sequence']
-               bcs = bc1
+                bc1 = lib["barcode1"]["reverse_sequence"]
+                bcs = bc1
 
-            lane = lib['lane']
-            for l in barcodes['Lanes']:
-                if lane == l['LaneIndex']:
-                    if bcs in l['Counts']:
+            lane = lib["lane"]
+            for l in barcodes["Lanes"]:
+                if lane == l["LaneIndex"]:
+                    if bcs in l["Counts"]:
                         next
                     else:
                         print(lib)
@@ -116,6 +137,7 @@ def main(argv):
             next
 
     print(success)
+
 
 if __name__ == "__main__":
     main(sys.argv)

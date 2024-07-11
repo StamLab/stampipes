@@ -18,14 +18,14 @@ mismatched_stems = set()
 
 
 def parseArgs():
-    parser = argparse.ArgumentParser(
-        description='Annotate read names with UMT')
-    parser.add_argument('--mismatches', type=int, default=1,
-                        help='number of mismatches')
-    parser.add_argument('r1_fastq')
-    parser.add_argument('r2_fastq')
-    parser.add_argument('out_r1')
-    parser.add_argument('out_r2')
+    parser = argparse.ArgumentParser(description="Annotate read names with UMT")
+    parser.add_argument(
+        "--mismatches", type=int, default=1, help="number of mismatches"
+    )
+    parser.add_argument("r1_fastq")
+    parser.add_argument("r2_fastq")
+    parser.add_argument("out_r1")
+    parser.add_argument("out_r2")
 
     args = parser.parse_args()
     return args
@@ -50,7 +50,7 @@ def mismatch(word, mismatches):
 # mismatched_stems, stem_lengths, and UMI_LEN
 def find_stem_len(read):
     for len in stem_lengths:
-        if str(read.seq[UMI_LEN:len + UMI_LEN]) in mismatched_stems:
+        if str(read.seq[UMI_LEN : len + UMI_LEN]) in mismatched_stems:
             return len
     return 0
 
@@ -78,12 +78,12 @@ def attach_umt(r1, r2):
     # Check for presence of UMT in mate - this indicates a short fragment that needs trimmed
 
     # Save stem & UMT for trimming use
-    stem1 = r1[:UMI_LEN + r1_len]
-    stem2 = r2[:UMI_LEN + r2_len]
+    stem1 = r1[: UMI_LEN + r1_len]
+    stem2 = r2[: UMI_LEN + r2_len]
 
     # Trim UMT & stem out of start of read
-    r1 = r1[UMI_LEN + r1_len:]
-    r2 = r2[UMI_LEN + r2_len:]
+    r1 = r1[UMI_LEN + r1_len :]
+    r2 = r2[UMI_LEN + r2_len :]
 
     # Trim ends, if necessary
     rev_stem1 = str(stem1.seq.reverse_complement())
@@ -98,11 +98,14 @@ def attach_umt(r1, r2):
             r2 = r2[:-x2]
             return (r1, r2)
     # Check specifically for "we didn't trim off one base of adapter sequence"
-    x1 = UMI_LEN+r2_len
-    x2 = UMI_LEN+r1_len
-    if str_r1[-x1-1:-1] == rev_stem2[:x1] and str_r2[-x2-1:-1] == rev_stem1[:x2]:
-        r1 = r1[:-x1-1]
-        r2 = r2[:-x2-1]
+    x1 = UMI_LEN + r2_len
+    x2 = UMI_LEN + r1_len
+    if (
+        str_r1[-x1 - 1 : -1] == rev_stem2[:x1]
+        and str_r2[-x2 - 1 : -1] == rev_stem1[:x2]
+    ):
+        r1 = r1[: -x1 - 1]
+        r2 = r2[: -x2 - 1]
 
     return (r1, r2)
 
@@ -119,11 +122,9 @@ def main(argv):
     logging.basicConfig(level=logging.WARN, format=log_format)
     setup_mismatches(args.mismatches)
 
-    with open(args.r1_fastq) as r1_in, \
-            open(args.r2_fastq) as r2_in, \
-            open(args.out_r1, 'wt') as r1_out, \
-            open(args.out_r2, 'wt') as r2_out:
-
+    with open(args.r1_fastq) as r1_in, open(args.r2_fastq) as r2_in, open(
+        args.out_r1, "wt"
+    ) as r1_out, open(args.out_r2, "wt") as r2_out:
         r1_seqIO = SeqIO.parse(r1_in, "fastq")
         r2_seqIO = SeqIO.parse(r2_in, "fastq")
         try:
@@ -135,6 +136,7 @@ def main(argv):
                     r2_out.write(r2.format("fastq"))
         except StopIteration:
             logging.info("EOF reached")
+
 
 if __name__ == "__main__":
     main(sys.argv)

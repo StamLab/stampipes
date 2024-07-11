@@ -88,20 +88,20 @@ def parser_setup():
     # TODO: Should we allow registering each align dir by itself?
     run_opts.add_argument("flowcell_dir", help="The flowcell directory")
 
-    #run_opts.add_argument("sample_config", help="The sample_config.tsv file")
-    #run_opts.add_argument("processing_json", help="The processing.json file")
-    #run_opts.add_argument(
+    # run_opts.add_argument("sample_config", help="The sample_config.tsv file")
+    # run_opts.add_argument("processing_json", help="The processing.json file")
+    # run_opts.add_argument(
     #    "--output_file_directory",
     #    default=".",
     #    help="The output directory files are stored in. Defaults to cwd.",
-    #)
+    # )
 
-    #run_opts.add_argument(
+    # run_opts.add_argument(
     #    "--skip_md5",
     #    dest="skip_md5",
     #    action="store_true",
     #    help="Don't calculate md5sum (debug/dev only)",
-    #)
+    # )
 
     run_opts.add_argument(
         "-n",
@@ -174,7 +174,7 @@ class UploadLIMS:
             {
                 rest.LIMS_URL_OPT_VAR: api_url,
                 rest.LIMS_TOKEN_OPT_VAR: token,
-                #rest.RAISE_ON_ERROR_VAR: True,
+                # rest.RAISE_ON_ERROR_VAR: True,
             }
         )
         self.dry_run = dry_run
@@ -390,7 +390,12 @@ class UploadLIMS:
                     )
                     result = self.put(url=exists["url"], data=upload_data)
             else:
-                LOG.info("Uploading information for file %s: lane %d, data=%s", path, object_id, upload_data)
+                LOG.info(
+                    "Uploading information for file %s: lane %d, data=%s",
+                    path,
+                    object_id,
+                    upload_data,
+                )
                 result = self.post("file/", data=upload_data)
 
             if not result:
@@ -465,20 +470,25 @@ class UploadLIMS:
         report_name = "Alt-code stats: FC%s" % flowcell_label
 
         flowcell_lims_info = self.get_single_result(
-            "flowcell_run/?label=%s" % flowcell_label)
-        content_type_id = flowcell_lims_info['object_content_type']
+            "flowcell_run/?label=%s" % flowcell_label
+        )
+        content_type_id = flowcell_lims_info["object_content_type"]
         content_type = self.get_by_id("content_type", content_type_id)
-        object_id = flowcell_lims_info['id']
+        object_id = flowcell_lims_info["id"]
         json_report_class = self.get_single_result(
-            "json_report_class/", query={"slug": JSON_REPORT_CLASS_SLUG})
+            "json_report_class/", query={"slug": JSON_REPORT_CLASS_SLUG}
+        )
 
         # See if report already exists
-        existing_reports = self.get_list_result("json_report/", query={
-            "object_id": object_id,
-            "content_type": content_type["id"],
-            "report_class": json_report_class["id"],
-            "page_size": 2,
-        })
+        existing_reports = self.get_list_result(
+            "json_report/",
+            query={
+                "object_id": object_id,
+                "content_type": content_type["id"],
+                "report_class": json_report_class["id"],
+                "page_size": 2,
+            },
+        )
 
         data_to_send = {
             "object_id": object_id,
@@ -498,7 +508,6 @@ class UploadLIMS:
             # Error! too many reports
             LOG.critical("Too many JSON reports exist")
             raise "Too many JSON reports exist, exiting"
-
 
     def upload_altcode_flowcell(self, sample_config, processing_dict, outdir):
         """
@@ -547,7 +556,7 @@ class UploadLIMS:
             files_to_upload[(r2_file, "r2-fastq")].extend(lane_ids)
 
         # Upload files.
-        for ((path, purpose), lane_ids) in files_to_upload.items():
+        for (path, purpose), lane_ids in files_to_upload.items():
             # print(path, purpose, len(lane_ids))
             self.upload_file(
                 path,
@@ -581,6 +590,7 @@ class UploadLIMS:
             flowcell_data = json.loads(json_file.read())
             self.upload_flowcell_report(flowcell_data)
 
+
 def find_stat_files_in_dir(flowcell_directory):
     """
     Given a directory to search, finds the newest alt-code stats files
@@ -598,7 +608,10 @@ def find_stat_files_in_dir(flowcell_directory):
         (?P<greek>[a-z]+)?
         [_-]?
         (?P<teeny>[0-9.]*)
-        """, re.VERBOSE | re.IGNORECASE)
+        """,
+        re.VERBOSE | re.IGNORECASE,
+    )
+
     def sortkey(a):
         # Logic: there are up to 3 parts
         # 1) Regular version, like "2.0" or "3.2.1".
@@ -606,9 +619,11 @@ def find_stat_files_in_dir(flowcell_directory):
         # 3) teeny suffix after alpha, like "3" or "1"
         match = version_regex.match(os.path.basename(a))
         versn = match.group("versn") if match and match.group("versn") else 0
-        greek = match.group("greek") if match and match.group("greek") else "zzzzzz"  # last
+        greek = (
+            match.group("greek") if match and match.group("greek") else "zzzzzz"
+        )  # last
         teeny = match.group("teeny") if match and match.group("teeny") else 0
-        length = -1 * len(a) # Prefer shorter names to longer
+        length = -1 * len(a)  # Prefer shorter names to longer
         return (LooseVersion(versn), greek, LooseVersion(teeny), length)
 
     for align_dir in align_dirs:
@@ -664,7 +679,9 @@ def main():
         sys.exit(1)
 
     uploader = UploadLIMS(
-        api_url, token, dry_run=poptions.dry_run,
+        api_url,
+        token,
+        dry_run=poptions.dry_run,
     )
 
     stats_files = find_stat_files_in_dir(poptions.flowcell_dir)
@@ -680,14 +697,13 @@ def main():
 
     uploader.upload_flowcell_report(all_stats)
 
-
-    #with open(poptions.sample_config) as f:
+    # with open(poptions.sample_config) as f:
     #    sample_config = list(csv.DictReader(f, delimiter="\t"))
-    #with open(poptions.processing_json) as f:
+    # with open(poptions.processing_json) as f:
     #    processing = json.loads(f.read())
-    #uploader.upload_altcode_flowcell(
+    # uploader.upload_altcode_flowcell(
     #    sample_config, processing, poptions.output_file_directory
-    #)
+    # )
 
 
 # This is the main body of the program that only runs when running this script

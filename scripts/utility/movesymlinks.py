@@ -13,24 +13,46 @@ log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 def parser_setup():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-q", "--quiet", dest="quiet", action="store_true",
-        help="Don't print info messages to standard out.")
-    parser.add_argument("-d", "--debug", dest="debug", action="store_true",
-        help="Print all debug messages to standard out.")
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        dest="quiet",
+        action="store_true",
+        help="Don't print info messages to standard out.",
+    )
+    parser.add_argument(
+        "-d",
+        "--debug",
+        dest="debug",
+        action="store_true",
+        help="Print all debug messages to standard out.",
+    )
 
-    parser.add_argument('--fromdir', default=os.getcwd(),
-                        help="The directory we're changing all the symlinks in, defaults to current working directory")
-    parser.add_argument('--olddir', required=True,
-                        help="The old directory we don't want symlinks going to")
-    parser.add_argument('--newdir', required=True,
-                        help="The new base directory the symlinks should go to")
-    parser.add_argument('--report', help="The outfile to write down all symlinks", default=None)
-    parser.add_argument("--move", dest="move", action="store_true",
-                        help="Actually perform the move")
+    parser.add_argument(
+        "--fromdir",
+        default=os.getcwd(),
+        help="The directory we're changing all the symlinks in, defaults to current working directory",
+    )
+    parser.add_argument(
+        "--olddir",
+        required=True,
+        help="The old directory we don't want symlinks going to",
+    )
+    parser.add_argument(
+        "--newdir",
+        required=True,
+        help="The new base directory the symlinks should go to",
+    )
+    parser.add_argument(
+        "--report", help="The outfile to write down all symlinks", default=None
+    )
+    parser.add_argument(
+        "--move", dest="move", action="store_true", help="Actually perform the move"
+    )
     return parser
 
+
 class SymlinkMover(object):
-    
     def __init__(self, fromdir, olddir, newdir, move=False, report=None):
         self.fromdir = fromdir
         self.olddir = olddir
@@ -44,8 +66,8 @@ class SymlinkMover(object):
         path = path.rstrip("/")
 
         if not os.path.islink(path):
-           logging.debug("%s not a symlink" % path)
-           return
+            logging.debug("%s not a symlink" % path)
+            return
 
         target_path = os.readlink(path)
         broken = False
@@ -64,13 +86,19 @@ class SymlinkMover(object):
             self.brokenlinks.append(path)
 
         if self.report:
-            self.report.write("%s\t%s\t%s\t%s\n" % (path, target_path, target_path_absolute, str(broken)))
+            self.report.write(
+                "%s\t%s\t%s\t%s\n"
+                % (path, target_path, target_path_absolute, str(broken))
+            )
 
     def move_link(self, linkpath):
         old_target_path = os.readlink(linkpath)
         new_target_path = old_target_path.replace(self.olddir, self.newdir)
 
-        logging.info("Moving %s pointer from %s to %s" % (linkpath, old_target_path, new_target_path))
+        logging.info(
+            "Moving %s pointer from %s to %s"
+            % (linkpath, old_target_path, new_target_path)
+        )
         try:
             if self.domove:
                 os.unlink(linkpath)
@@ -80,7 +108,7 @@ class SymlinkMover(object):
 
     def walk(self, directory):
         for root, dirs, files in os.walk(directory):
-            if root.startswith('./.git'):
+            if root.startswith("./.git"):
                 # Ignore the .git directory.
                 continue
             logging.debug("walking through directories for %s" % root)
@@ -89,9 +117,8 @@ class SymlinkMover(object):
             [self.detect(os.path.join(root, filename)) for filename in files]
 
     def run(self, report=None):
-
         if report:
-            self.report = open(report, 'w')
+            self.report = open(report, "w")
         else:
             self.report = None
 
@@ -110,8 +137,8 @@ class SymlinkMover(object):
         if self.report:
             self.report.close()
 
-def main(args=sys.argv):
 
+def main(args=sys.argv):
     parser = parser_setup()
     args = parser.parse_args()
 
@@ -125,6 +152,7 @@ def main(args=sys.argv):
 
     mover = SymlinkMover(args.fromdir, args.olddir, args.newdir, args.move)
     mover.run(report=args.report)
+
 
 if __name__ == "__main__":
     main()

@@ -1,5 +1,4 @@
 def main():
-
     import argparse
     import random
     import pysam
@@ -28,20 +27,22 @@ def main():
         shutil.copyfile(infile, outfile)
         return
 
-    sorted_read_indexes = random.sample(range(paired_reads_count), paired_reads_count_to_select)
+    sorted_read_indexes = random.sample(
+        range(paired_reads_count), paired_reads_count_to_select
+    )
     sorted_read_indexes.sort()
 
-    print('Selecting %d read pairs' % len(sorted_read_indexes))
+    print("Selecting %d read pairs" % len(sorted_read_indexes))
 
     if paired_reads_count_to_select > 100:
-        print('First 100 indexes to be selected', sorted_read_indexes[:100])
+        print("First 100 indexes to be selected", sorted_read_indexes[:100])
     else:
-        print('Indexes to be selected', sorted_read_indexes)
+        print("Indexes to be selected", sorted_read_indexes)
 
     # input pysam file
-    in_alignment_file = pysam.AlignmentFile(infile, 'rb')
+    in_alignment_file = pysam.AlignmentFile(infile, "rb")
     # output pysam file
-    out_alignment_file = pysam.AlignmentFile(outfile, 'wb', template=in_alignment_file)
+    out_alignment_file = pysam.AlignmentFile(outfile, "wb", template=in_alignment_file)
     # current index of the next paired read in the input file
     current_index_in_file = 0
     # current index of random indexes to select
@@ -92,5 +93,6 @@ def main():
     out_alignment_file.close()
     in_alignment_file.close()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

@@ -385,7 +385,12 @@ class UploadLIMS:
                     )
                     result = self.put(url=exists["url"], data=upload_data)
             else:
-                LOG.info("Uploading information for file %s: lane %d, data=%s", path, object_id, upload_data)
+                LOG.info(
+                    "Uploading information for file %s: lane %d, data=%s",
+                    path,
+                    object_id,
+                    upload_data,
+                )
                 result = self.post("file/", data=upload_data)
 
             if not result:
@@ -460,27 +465,32 @@ class UploadLIMS:
         report_name = "Alt-seq stats: FC%s" % flowcell_label
 
         flowcell_lims_info = self.get_single_result(
-            "flowcell_run/?label=%s" % flowcell_label)
-        content_type_id = flowcell_lims_info['object_content_type']
+            "flowcell_run/?label=%s" % flowcell_label
+        )
+        content_type_id = flowcell_lims_info["object_content_type"]
         content_type = self.get_by_id("content_type", content_type_id)
-        object_id = flowcell_lims_info['id']
+        object_id = flowcell_lims_info["id"]
         json_report_class = self.get_single_result(
-            "json_report_class/", query={"slug": JSON_REPORT_CLASS_SLUG})
+            "json_report_class/", query={"slug": JSON_REPORT_CLASS_SLUG}
+        )
 
         # See if report already exists
-        existing_reports = self.get_list_result("json_report/", query={
-            "object_id": object_id,
-            "content_type": content_type["id"],
-            "report_class": json_report_class["id"],
-            "page_size": 2,
-        })
+        existing_reports = self.get_list_result(
+            "json_report/",
+            query={
+                "object_id": object_id,
+                "content_type": content_type["id"],
+                "report_class": json_report_class["id"],
+                "page_size": 2,
+            },
+        )
 
         data_to_send = {
-                "object_id": object_id,
-                "content_type": content_type["url"],
-                "report_class": json_report_class["url"],
-                "name": report_name,
-                "json_content": json.dumps(data),
+            "object_id": object_id,
+            "content_type": content_type["url"],
+            "report_class": json_report_class["url"],
+            "name": report_name,
+            "json_content": json.dumps(data),
         }
         if len(existing_reports) == 0:
             self.post("json_report/", data=data_to_send)
@@ -493,7 +503,6 @@ class UploadLIMS:
             # Error! too many reports
             LOG.critical("Too many JSON reports exist")
             raise "Too many JSON reports exist, exiting"
-
 
     def upload_altseq_flowcell(self, sample_config, processing_dict, outdir):
         """
@@ -542,7 +551,7 @@ class UploadLIMS:
             files_to_upload[(r2_file, "r2-fastq")].extend(lane_ids)
 
         # Upload files.
-        for ((path, purpose), lane_ids) in files_to_upload.items():
+        for (path, purpose), lane_ids in files_to_upload.items():
             # print(path, purpose, len(lane_ids))
             self.upload_file(
                 path,
