@@ -21,7 +21,7 @@ SCRIPT_OPTIONS = {
 
 
 def parser_setup():
-    """ Sets up parser """
+    """Sets up parser"""
 
     parser = argparse.ArgumentParser()
 
@@ -72,8 +72,15 @@ def parser_setup():
 
 
 def create_links(
-        lane, read, input_basedir, output_basedir, dry_run=False, undetermined=False, is_pool=False, merge_across_lanes=False,
-    ):
+    lane,
+    read,
+    input_basedir,
+    output_basedir,
+    dry_run=False,
+    undetermined=False,
+    is_pool=False,
+    merge_across_lanes=False,
+):
     """
     Create the links between the input directories and output dir
     If dry_run is passed, will print them instead of creating them
@@ -95,7 +102,6 @@ def create_links(
         else:
             sample_name = "%s_L%03d" % (short_name, lane_num)
 
-
     if lane.get("library_pool"):
         is_pool = True
 
@@ -112,7 +118,11 @@ def create_links(
         )
 
     short_name = re.sub(r"_", "-", short_name)
-    lane_lane = "*" if (merge_across_lanes or "lane" not in lane) else "_L%03d" % int(lane["lane"])
+    lane_lane = (
+        "*"
+        if (merge_across_lanes or "lane" not in lane)
+        else "_L%03d" % int(lane["lane"])
+    )
     input_wildcard = os.path.join(
         input_basedir, "%s_S*%s_%s_???.fastq.gz" % (short_name, lane_lane, read)
     )
@@ -134,7 +144,7 @@ def create_links(
 
         rel_path = os.path.relpath(input_file, output_dir)
 
-        logging.info("Linking %s => %s" % (rel_path, output_file))
+        logging.info("Linking %s => %s", rel_path, output_file)
         if not dry_run and not os.path.exists(output_file):
             os.symlink(rel_path, output_file)
 
@@ -159,8 +169,22 @@ def main():
     data = json.loads(open(poptions.processing_file, "r").read())
 
     for lane in data["libraries"]:
-        create_links(lane, "R1", input_dir, poptions.output_dir, poptions.dry_run, merge_across_lanes=poptions.merge_across_lanes)
-        create_links(lane, "R2", input_dir, poptions.output_dir, poptions.dry_run, merge_across_lanes=poptions.merge_across_lanes)
+        create_links(
+            lane,
+            "R1",
+            input_dir,
+            poptions.output_dir,
+            poptions.dry_run,
+            merge_across_lanes=poptions.merge_across_lanes,
+        )
+        create_links(
+            lane,
+            "R2",
+            input_dir,
+            poptions.output_dir,
+            poptions.dry_run,
+            merge_across_lanes=poptions.merge_across_lanes,
+        )
 
     undet_lane = {
         "alignments": [{"sample_name": "lane1_Undetermined_L001"}],
@@ -168,22 +192,27 @@ def main():
     }
     for read in ["R1", "R2"]:
         create_links(
-            undet_lane, read, input_dir, poptions.output_dir, poptions.dry_run, undetermined=True,
+            undet_lane,
+            read,
+            input_dir,
+            poptions.output_dir,
+            poptions.dry_run,
+            undetermined=True,
             merge_across_lanes=poptions.merge_across_lanes,
         )
 
     # Set up conversion table
     libs_to_lanes = defaultdict(set)
     for lane in data["libraries"]:
-        libs_to_lanes[lane['library']].add(lane['lane'])
+        libs_to_lanes[lane["library"]].add(lane["lane"])
 
-    for (pool, info) in data["library_pools"].items():
+    for pool, info in data["library_pools"].items():
         barcode = info["barcode1"]
         if info.get("barcode2"):
             barcode = "%s_%s" % (barcode, info["barcode2"])
         lane_nums = set()
         for lib in info["libraries"]:
-            lib_num = int(re.sub(r'[^\d]+', '', lib))
+            lib_num = int(re.sub(r"[^\d]+", "", lib))
             lane_nums.update(libs_to_lanes[lib_num])
 
         for lane_num in sorted(lane_nums):
@@ -195,7 +224,13 @@ def main():
             }
             for read in ["R1", "R2"]:
                 create_links(
-                    lane, read, input_dir, poptions.output_dir, poptions.dry_run, is_pool=True, merge_across_lanes=poptions.merge_across_lanes,
+                    lane,
+                    read,
+                    input_dir,
+                    poptions.output_dir,
+                    poptions.dry_run,
+                    is_pool=True,
+                    merge_across_lanes=poptions.merge_across_lanes,
                 )
 
 

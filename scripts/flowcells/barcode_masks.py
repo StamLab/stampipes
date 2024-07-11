@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-import sys
-import json
 import argparse
+import json
 import logging
+import sys
 
 script_options = {
     "processing": "processing.json",
@@ -12,8 +12,12 @@ script_options = {
 
 def parser_setup():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-p", "--processing", dest="processing",
-                        help="The JSON file to read barcodes from")
+    parser.add_argument(
+        "-p",
+        "--processing",
+        dest="processing",
+        help="The JSON file to read barcodes from",
+    )
 
     parser.set_defaults(**script_options)
     return parser
@@ -53,33 +57,38 @@ def get_barcode_masks(json_data):
 def get_barcode_lengths(json_data):
     # in case barcode sequence is null
     max_len = json_data["flowcell"]["index_length"]
+
     def format_length(x):
-        if (x):
+        if x:
             return min(max_len, len(x["sequence"]))
         else:
             return 0
 
     # set of each unique length in the data
-    lengths = set(["{}-{}".format(
-        format_length(lib["barcode1"]),
-        format_length(lib["barcode2"]))
-        for lib in json_data["libraries"]])
+    lengths = set(
+        [
+            "{}-{}".format(
+                format_length(lib["barcode1"]), format_length(lib["barcode2"])
+            )
+            for lib in json_data["libraries"]
+        ]
+    )
 
     # Make sure only 1 report is run each for single/dual indexed barcodes until reporting is more flexible
     tempbc1, tempbc2 = [], []
-    finalList = []
+    final_list = []
 
     for n in lengths:
-        if n[2] == '0':
+        if n[2] == "0":
             tempbc1.append(n)
         else:
             tempbc2.append(n)
     if tempbc1 != []:
-        finalList.append(sorted(tempbc1)[0])
+        final_list.append(sorted(tempbc1)[0])
     if tempbc2 != []:
-        finalList.append(sorted(tempbc2)[0])
+        final_list.append(sorted(tempbc2)[0])
 
-    return finalList
+    return final_list
 
 
 # Detects if there are barcode collisions per lane
@@ -88,13 +97,18 @@ def detect_collisions(json_data):
     num_lanes = max([lib["lane"] for lib in json_data["libraries"]])
 
     for i in range(num_lanes):
-        barcodes = sorted(lib["barcode_index"] for lib in json_data["libraries"]
-                          if lib["lane"] == i+1 and not lib["failed"])
-        if (len(barcodes) != len(set(barcodes))):
-            collision = [barcode for x, barcode in enumerate(
-                barcodes) if barcode == barcodes[x-1]]
-            logging.error(
-                "Collision on lane {}. Barcode(s): {}\n".format(i+1, collision))
+        barcodes = sorted(
+            lib["barcode_index"]
+            for lib in json_data["libraries"]
+            if lib["lane"] == i + 1 and not lib["failed"]
+        )
+        if len(barcodes) != len(set(barcodes)):
+            collision = [
+                barcode
+                for x, barcode in enumerate(barcodes)
+                if barcode == barcodes[x - 1]
+            ]
+            logging.error("Collision on lane %d. Barcode(s): %s\n", i + 1, collision)
             sys.exit(1)
             return True
     return False
@@ -115,7 +129,7 @@ def main():
     json_data = json.load(process_json)
     process_json.close()
 
-    #detect_collisions(json_data)
+    # detect_collisions(json_data)
     print(" ".join(get_barcode_masks(json_data)))
 
 

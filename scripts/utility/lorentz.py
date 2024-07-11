@@ -24,8 +24,8 @@ def lorentz(seen):
         width += w
         height += delta_h
         if delta_h > slope and robinhood_pos == 0:
-            robinhood_pos = (width-1) / total_width
-            robinhood_idx = (slope*(width-1) - height) / total_height
+            robinhood_pos = (width - 1) / total_width
+            robinhood_idx = (slope * (width - 1) - height) / total_height
         area += w * (height - delta_h / 2.0)
 
     ideal = total_width * total_height / 2.0
@@ -46,8 +46,9 @@ def main():
         seen[int(count)] = int(times)
 
     # Print results
-    for (key, value) in sorted(lorentz(seen).items()):
+    for key, value in sorted(lorentz(seen).items()):
         print("%s\t%.4f" % (key, value))
+
 
 if __name__ == "__main__":
     main()

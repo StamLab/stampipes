@@ -27,6 +27,7 @@ environments/
 !.gitattributes
 !.gitmodules
 !.pylintrc
+!.pre-commit-config.yaml
 
 work
 genome_build

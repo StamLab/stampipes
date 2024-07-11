@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
-from Bio import SeqIO
 import argparse
 import itertools
 import logging
-import string
 import sys
+
+from Bio import SeqIO
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
@@ -17,15 +17,15 @@ stem_lengths = [11, 10, 9, 8]
 mismatched_stems = set()
 
 
-def parseArgs():
-    parser = argparse.ArgumentParser(
-        description='Annotate read names with UMT')
-    parser.add_argument('--mismatches', type=int, default=1,
-                        help='number of mismatches')
-    parser.add_argument('r1_fastq')
-    parser.add_argument('r2_fastq')
-    parser.add_argument('out_r1')
-    parser.add_argument('out_r2')
+def parse_args():
+    parser = argparse.ArgumentParser(description="Annotate read names with UMT")
+    parser.add_argument(
+        "--mismatches", type=int, default=1, help="number of mismatches"
+    )
+    parser.add_argument("r1_fastq")
+    parser.add_argument("r2_fastq")
+    parser.add_argument("out_r1")
+    parser.add_argument("out_r2")
 
     args = parser.parse_args()
     return args
@@ -37,11 +37,11 @@ def parseArgs():
 def mismatch(word, mismatches):
     for d in range(mismatches + 1):
         for locs in itertools.combinations(range(len(word)), d):
-            thisWord = [[char] for char in word]
+            this_word = [[char] for char in word]
             for loc in locs:
-                origChar = word[loc]
-                thisWord[loc] = [l for l in "ACGTN" if l != origChar]
-            for poss in itertools.product(*thisWord):
+                orig_char = word[loc]
+                this_word[loc] = [letter for letter in "ACGTN" if letter != orig_char]
+            for poss in itertools.product(*this_word):
                 yield "".join(poss)
 
 
@@ -50,7 +50,7 @@ def mismatch(word, mismatches):
 # mismatched_stems, stem_lengths, and UMI_LEN
 def find_stem_len(read):
     for len in stem_lengths:
-        if str(read.seq[UMI_LEN:len + UMI_LEN]) in mismatched_stems:
+        if str(read.seq[UMI_LEN : len + UMI_LEN]) in mismatched_stems:
             return len
     return 0
 
@@ -78,12 +78,12 @@ def attach_umt(r1, r2):
     # Check for presence of UMT in mate - this indicates a short fragment that needs trimmed
 
     # Save stem & UMT for trimming use
-    stem1 = r1[:UMI_LEN + r1_len]
-    stem2 = r2[:UMI_LEN + r2_len]
+    stem1 = r1[: UMI_LEN + r1_len]
+    stem2 = r2[: UMI_LEN + r2_len]
 
     # Trim UMT & stem out of start of read
-    r1 = r1[UMI_LEN + r1_len:]
-    r2 = r2[UMI_LEN + r2_len:]
+    r1 = r1[UMI_LEN + r1_len :]
+    r2 = r2[UMI_LEN + r2_len :]
 
     # Trim ends, if necessary
     rev_stem1 = str(stem1.seq.reverse_complement())
@@ -98,11 +98,14 @@ def attach_umt(r1, r2):
             r2 = r2[:-x2]
             return (r1, r2)
     # Check specifically for "we didn't trim off one base of adapter sequence"
-    x1 = UMI_LEN+r2_len
-    x2 = UMI_LEN+r1_len
-    if str_r1[-x1-1:-1] == rev_stem2[:x1] and str_r2[-x2-1:-1] == rev_stem1[:x2]:
-        r1 = r1[:-x1-1]
-        r2 = r2[:-x2-1]
+    x1 = UMI_LEN + r2_len
+    x2 = UMI_LEN + r1_len
+    if (
+        str_r1[-x1 - 1 : -1] == rev_stem2[:x1]
+        and str_r2[-x2 - 1 : -1] == rev_stem1[:x2]
+    ):
+        r1 = r1[: -x1 - 1]
+        r2 = r2[: -x2 - 1]
 
     return (r1, r2)
 
@@ -115,26 +118,25 @@ def setup_mismatches(num_mismatches):
 
 
 def main(argv):
-    args = parseArgs()
+    args = parse_args()
     logging.basicConfig(level=logging.WARN, format=log_format)
     setup_mismatches(args.mismatches)
 
-    with open(args.r1_fastq) as r1_in, \
-            open(args.r2_fastq) as r2_in, \
-            open(args.out_r1, 'wt') as r1_out, \
-            open(args.out_r2, 'wt') as r2_out:
-
-        r1_seqIO = SeqIO.parse(r1_in, "fastq")
-        r2_seqIO = SeqIO.parse(r2_in, "fastq")
+    with open(args.r1_fastq) as r1_in, open(args.r2_fastq) as r2_in, open(
+        args.out_r1, "wt"
+    ) as r1_out, open(args.out_r2, "wt") as r2_out:
+        r1_seq_io = SeqIO.parse(r1_in, "fastq")
+        r2_seq_io = SeqIO.parse(r2_in, "fastq")
         try:
             while True:
-                (r1, r2) = attach_umt(next(r1_seqIO), next(r2_seqIO))
+                (r1, r2) = attach_umt(next(r1_seq_io), next(r2_seq_io))
                 # Only write Fastq records for which we find stems
                 if r1 is not None and r2 is not None:
                     r1_out.write(r1.format("fastq"))
                     r2_out.write(r2.format("fastq"))
         except StopIteration:
             logging.info("EOF reached")
+
 
 if __name__ == "__main__":
     main(sys.argv)

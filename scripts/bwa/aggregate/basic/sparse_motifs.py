@@ -1,5 +1,6 @@
+#!/usr/bin/env python3
 import sys
-import numpy as np
+
 from sklearn.datasets import dump_svmlight_file
 
 clusternames = sys.argv[1]
@@ -23,18 +24,18 @@ with open(hotspots) as file:
             motifs = line_split[9].split(";")
             newrow = [0] * len(fimos)
             for motif in motifs:
-                index = [n for n, l in enumerate(fimos) if l == motif]
+                index = [n for n, candidate in enumerate(fimos) if candidate == motif]
                 newrow[index[0]] = 1
         else:
             newrow = [0] * len(fimos)
         rows.append(newrow)
-labels = range(0,len(hotspot_names))
+labels = range(0, len(hotspot_names))
 
 # write
 dump_svmlight_file(rows, y=labels, f=outfile, zero_based=True)
-file1 = open(outfile_rows, 'w')
+file1 = open(outfile_rows, "w")
 for item in hotspot_names:
     file1.write("%s\n" % item)
-file2 = open(outfile_cols,'w')
+file2 = open(outfile_cols, "w")
 for item in fimos:
     file2.write("%s\n" % item)

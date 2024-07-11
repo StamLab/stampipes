@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
-import json
-import os
-import sys
 import argparse
+import json
 import logging
+import os
 import re
-import copy
+import sys
+
 import requests
 
 log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -17,11 +17,13 @@ options = {
     "debug": False,
     "process_config": "processing.json",
     "priority": None,
-    "api_url": os.getenv('LIMS_API_URL'),
-    "api_token": os.getenv('LIMS_API_TOKEN'),
+    "api_url": os.getenv("LIMS_API_URL"),
+    "api_token": os.getenv("LIMS_API_TOKEN"),
 }
 
 util_log = logging.getLogger("StamPy.util")
+
+
 def foldercheck(*args):
     """Checks to see if the folders exist, creates them if they are not."""
 
@@ -30,70 +32,107 @@ def foldercheck(*args):
             try:
                 os.mkdir(folder)
                 util_log.info("Created folder: %s" % folder)
-            except OSError as x:
+            except OSError:
                 util_log.error("ERROR: Could not create directory: %s" % folder)
-                util_log.warn("Please make sure all nonexistant parent directories have been created.")
+                util_log.warn(
+                    "Please make sure all nonexistant parent directories have been created."
+                )
                 sys.exit(0)
+
 
 def mysql_clean(input):
     # Mysql names can contain only 0-9, a-z, A-Z, _, or $
     # So we replace all other characters with an underscore,
     # after removing leading/trailing whitespace.
-    output = re.sub("[^\w$]", "_", input.strip())
+    output = re.sub(r"[^\w$]", "_", input.strip())
     return output
+
 
 def parser_setup():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-q", "--quiet", dest="quiet", action="store_true",
-        help="Don't print info messages to standard out.")
-    parser.add_argument("-d", "--debug", dest="debug", action="store_true",
-        help="Print all debug messages to standard out.")
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        dest="quiet",
+        action="store_true",
+        help="Don't print info messages to standard out.",
+    )
+    parser.add_argument(
+        "-d",
+        "--debug",
+        dest="debug",
+        action="store_true",
+        help="Print all debug messages to standard out.",
+    )
 
-    parser.add_argument("-j", "--json-config", dest="process_config",
-        help="The process config to work off of.")
-    parser.add_argument("-p", "--priority", dest="priority", required=True,
-        help="The priority of this flowcell")
-    parser.add_argument("--pre-align-dir", dest="pre_align_dir", action="store_true",
-        help="This flowcell was made before per-alignment directories")
+    parser.add_argument(
+        "-j",
+        "--json-config",
+        dest="process_config",
+        help="The process config to work off of.",
+    )
+    parser.add_argument(
+        "-p",
+        "--priority",
+        dest="priority",
+        required=True,
+        help="The priority of this flowcell",
+    )
+    parser.add_argument(
+        "--pre-align-dir",
+        dest="pre_align_dir",
+        action="store_true",
+        help="This flowcell was made before per-alignment directories",
+    )
 
-    parser.set_defaults( **options )
-    parser.set_defaults( quiet=False, debug=False )
+    parser.set_defaults(**options)
+    parser.set_defaults(quiet=False, debug=False)
 
     return parser
 
+
 class MakeBrowserload(object):
     genome_organisms = {
-      "hg19": "human",
-      "rn5": "rat",
-      "mm9": "mouse",
-      "TAIR9": "arabidopsis",
-      "sacCer2": "sacCer",
-      "sacCer3": "sacCer",
-      "ce4": "worm",
-      "cb3": "worm",
-      "K12": "e.coli",
-      "NC_000913.2": "e.coli",
-      "hera1": "butterfly",
-      "hmel1a": "butterfly",
-      "panu2a": "baboon",
-      "felCat5": "cat",
-      "borrBurg": "bacteria",
-      "danRer7": "zebrafish",
+        "hg19": "human",
+        "rn5": "rat",
+        "mm9": "mouse",
+        "TAIR9": "arabidopsis",
+        "sacCer2": "sacCer",
+        "sacCer3": "sacCer",
+        "ce4": "worm",
+        "cb3": "worm",
+        "K12": "e.coli",
+        "NC_000913.2": "e.coli",
+        "hera1": "butterfly",
+        "hmel1a": "butterfly",
+        "panu2a": "baboon",
+        "felCat5": "cat",
+        "borrBurg": "bacteria",
+        "danRer7": "zebrafish",
     }
 
-    rna_strands = [ "all", "pos", "neg" ]
+    rna_strands = ["all", "pos", "neg"]
 
-    #def __init__(self, browserconfig, browsersheet, basedir, outdir, priority, paired_end, project, project_dir = "",
-        #maintrackname = None, bigwig = True, date = None):
-    def __init__(self, group_data, browserconfig, basedir, outdir, priority, paired_end, project, date):
-
+    # def __init__(self, browserconfig, browsersheet, basedir, outdir, priority, paired_end, project, project_dir = "",
+    # maintrackname = None, bigwig = True, date = None):
+    def __init__(
+        self,
+        group_data,
+        browserconfig,
+        basedir,
+        outdir,
+        priority,
+        paired_end,
+        project,
+        date,
+    ):
         self.basedir = basedir
         self.flowcell_date = date
         self.outdir = outdir
         self.mersize = 36
-        self.win=75
-        self.binI=20
+        self.win = 75
+        self.binI = 20
         self.priority = priority
         self.paired_end = paired_end
         self.bigwig = True
@@ -105,35 +144,42 @@ class MakeBrowserload(object):
 
         if len(self.projects) == 1 and project_dir:
             self.project_dirs[project] = project_dir
-            logging.info("Using project dir: %s" % self.project_dirs[project])
+            logging.info("Using project dir: %s", self.project_dirs[project])
         else:
             for project in self.projects:
-                self.project_dirs[project] = os.path.join(self.basedir, "Project_" + project)
+                self.project_dirs[project] = os.path.join(
+                    self.basedir, "Project_" + project
+                )
 
         self.load_config(browserconfig)
 
     def load_config(self, browserconfig):
-       import configparser
-       Config = configparser.ConfigParser()
-       Config.read(browserconfig)
-       self.server = Config.get("browser", "server")
-       self.browser_url = Config.get("browser", "browser_url")
-       self.flowcell_link_folder = Config.get("browser", "flowcell_link_folder")
-       self.track_basedir = Config.get("browser", "track_basedir")
-       self.browser_excludes_file = Config.get("browser", "browser_excludes_file")
-       self.group = Config.get('browser', 'browser_group')
-       self.file_label = Config.get('browser', 'file_label')
+        import configparser
+
+        config = configparser.ConfigParser()
+        config.read(browserconfig)
+        self.server = config.get("browser", "server")
+        self.browser_url = config.get("browser", "browser_url")
+        self.flowcell_link_folder = config.get("browser", "flowcell_link_folder")
+        self.track_basedir = config.get("browser", "track_basedir")
+        self.browser_excludes_file = config.get("browser", "browser_excludes_file")
+        self.group = config.get("browser", "browser_group")
+        self.file_label = config.get("browser", "file_label")
 
     def load(self):
-        #self.browsersheet = SampleSheet(file=self.browsersheet_file)
+        # self.browsersheet = SampleSheet(file=self.browsersheet_file)
         self.basedir_name = os.path.basename(self.basedir)
         foldercheck(self.outdir)
 
-        #if self.maintrackname:
+        # if self.maintrackname:
         if False:
-           self.main_label = "%s%son%s" % (self.file_label, self.maintrackname, self.date)
-           self.flowcell_name = self.maintrackname
-           self.flowcell_date = self.date
+            self.main_label = "%s%son%s" % (
+                self.file_label,
+                self.maintrackname,
+                self.date,
+            )
+            self.flowcell_name = self.maintrackname
+            self.flowcell_date = self.date
         else:
             match = re.search("(FC[A-Z0-9]+)_([0-9]{6})_tag", self.basedir)
 
@@ -143,24 +189,32 @@ class MakeBrowserload(object):
 
             self.flowcell_name = match.groups()[0]
             if not self.flowcell_date:
-                 self.flowcell_date = match.groups()[1]
+                self.flowcell_date = match.groups()[1]
 
-            logging.info("FLOWCELL DATE: %s" % self.flowcell_date)
+            logging.info("FLOWCELL DATE: %s", self.flowcell_date)
 
-            self.main_label = "%s%son%s" % (self.file_label, self.flowcell_name, self.flowcell_date)
+            self.main_label = "%s%son%s" % (
+                self.file_label,
+                self.flowcell_name,
+                self.flowcell_date,
+            )
 
-        logging.info("Main track name: %s" % self.main_label)
+        logging.info("Main track name: %s", self.main_label)
 
         self.excludes_file = os.path.join(self.outdir, "excludes.%s" % self.main_label)
 
         if self.flowcell_link_folder:
-            logging.debug("link folder: " + self.flowcell_link_folder + " base folder: " + self.basedir_name)
+            logging.debug(
+                "link folder: %s base_folder: %s",
+                self.flowcell_link_folder,
+                self.basedir_name,
+            )
             self.link_dir = os.path.join(self.flowcell_link_folder, self.basedir_name)
         else:
             self.link_dir = ""
 
         self.prepare_tracks()
-        logging.info("Main label: %s" % self.main_label)
+        logging.info("Main label: %s", self.main_label)
 
         self.create_ras()
         self.create_htmls()
@@ -174,16 +228,15 @@ class MakeBrowserload(object):
         self.tracks = []
 
         for lane in self.data:
-
-            logging.debug("preparing tracks for lane: " + str(lane))
-            if not "hgdb" in lane:
-                logging.error("Not using lane %s: no hgdb value" % lane )
+            logging.debug("preparing tracks for lane: %s", str(lane))
+            if "hgdb" not in lane:
+                logging.error("Not using lane %s: no hgdb value", lane)
                 continue
 
             if lane["Index"] == "":
                 lane["Index"] = "NoIndex"
 
-            if not lane["hgdb"] in self.subtrack_sets:
+            if lane["hgdb"] not in self.subtrack_sets:
                 self.subtrack_sets[lane["hgdb"]] = []
 
             if lane["aligner"] == "bwa":
@@ -200,44 +253,70 @@ class MakeBrowserload(object):
         for track in self.tracks:
             hgdb = track["hgdb"]
 
-            trackname_suffix = "L%s%s%s%sm%d" % (track["Lane"], track["Index"], track["SampleID"].lower(), track["strand"], self.mersize)
-            track["tagtrackname"] = mysql_clean("%stag%s" % (self.main_label, trackname_suffix))
-            track["dentrackname"] = mysql_clean("%sden%s" % (self.main_label, trackname_suffix))
+            trackname_suffix = "L%s%s%s%sm%d" % (
+                track["Lane"],
+                track["Index"],
+                track["SampleID"].lower(),
+                track["strand"],
+                self.mersize,
+            )
+            track["tagtrackname"] = mysql_clean(
+                "%stag%s" % (self.main_label, trackname_suffix)
+            )
+            track["dentrackname"] = mysql_clean(
+                "%sden%s" % (self.main_label, trackname_suffix)
+            )
 
-            logging.debug("tag track name: " + track["tagtrackname"])
-            logging.debug("den track name: " + track["dentrackname"])
+            logging.debug("tag track name: %s", track["tagtrackname"])
+            logging.debug("den track name: %s", track["dentrackname"])
 
             project = track["SampleProject"]
 
             if self.link_dir:
-                track["sampleDir"] = os.path.join("Project_%s" % project,
-                                                  "Sample_%s" % track["SampleID"],
-                                                  track["AlignDir"] if not poptions.pre_align_dir else "")
+                track["sampleDir"] = os.path.join(
+                    "Project_%s" % project,
+                    "Sample_%s" % track["SampleID"],
+                    track["AlignDir"] if not poptions.pre_align_dir else "",
+                )
                 track["pathPrefix"] = "%s/%s" % (self.link_dir, track["sampleDir"])
             else:
-                track["sampleDir"] = os.path.join(self.basedir, self.project_dir[project],
-                                                  "Sample_%s" % track["SampleID"],
-                                                  track["AlignDir"] if not poptions.pre_align_dir else "")
+                track["sampleDir"] = os.path.join(
+                    self.basedir,
+                    self.project_dir[project],
+                    "Sample_%s" % track["SampleID"],
+                    track["AlignDir"] if not poptions.pre_align_dir else "",
+                )
                 track["pathPrefix"] = track["sampleDir"]
 
             if track["aligner"] == "bwa":
-                track["wigfilename"]    = "%s.75_20.%s.wig"       % (track["SampleName"], hgdb)
-                track["bigwigfilename"] = "%s.75_20.%s.bw"        % (track["SampleName"], hgdb)
-                track["bamfilename"]    = "%s.uniques.sorted.bam" % (track["SampleName"])
+                track["wigfilename"] = "%s.75_20.%s.wig" % (track["SampleName"], hgdb)
+                track["bigwigfilename"] = "%s.75_20.%s.bw" % (track["SampleName"], hgdb)
+                track["bamfilename"] = "%s.uniques.sorted.bam" % (track["SampleName"])
             elif track["aligner"] == "tophat":
-                filename_prefix = "%s.%s.%s"     % (track["SampleName"], track["strand"], hgdb)
-                track["wigfilename"]    = "%s.wig" % filename_prefix  # NYI
-                track["bigwigfilename"] = "%s.bw"  % filename_prefix
-                track["bamfilename"]    = "%s.bam" % filename_prefix
-
+                filename_prefix = "%s.%s.%s" % (
+                    track["SampleName"],
+                    track["strand"],
+                    hgdb,
+                )
+                track["wigfilename"] = "%s.wig" % filename_prefix  # NYI
+                track["bigwigfilename"] = "%s.bw" % filename_prefix
+                track["bamfilename"] = "%s.bam" % filename_prefix
 
             # TODO: Make the RNA pipeline aware of this
             # this is to deal with the mouse with human hg19 chr11
-            if( hgdb == "hg19" and track["hgdb"] == "Mus_musculus" ):
-                track["bamfilename"] = "%s_%s_L00%s.uniques.sorted.hg19.bam" % (track["SampleID"], track["Index"], track["Lane"])
+            if hgdb == "hg19" and track["hgdb"] == "Mus_musculus":
+                track["bamfilename"] = "%s_%s_L00%s.uniques.sorted.hg19.bam" % (
+                    track["SampleID"],
+                    track["Index"],
+                    track["Lane"],
+                )
 
-            if( hgdb == "hg19" and track["SampleRef"] == "Saccharomyces_cerevisiae" ):
-                track["bamfilename"] = "%s_%s_L00%s.uniques.sorted.hg19.bam" % (track["SampleID"], track["Index"], track["Lane"])
+            if hgdb == "hg19" and track["SampleRef"] == "Saccharomyces_cerevisiae":
+                track["bamfilename"] = "%s_%s_L00%s.uniques.sorted.hg19.bam" % (
+                    track["SampleID"],
+                    track["Index"],
+                    track["Lane"],
+                )
 
             track["hasTags"] = False
             track["hasDensities"] = False
@@ -245,25 +324,42 @@ class MakeBrowserload(object):
             if "Extra" in track and track["Extra"] is not None:
                 track["Extra"] = track["Extra"].strip()
 
-            if os.path.exists(os.path.join(track["sampleDir"], track["wigfilename"])) and not self.bigwig:
+            if (
+                os.path.exists(os.path.join(track["sampleDir"], track["wigfilename"]))
+                and not self.bigwig
+            ):
                 track["hasDensities"] = True
-            if os.path.exists(os.path.join(track["sampleDir"], track["bigwigfilename"])) and self.bigwig:
+            if (
+                os.path.exists(
+                    os.path.join(track["sampleDir"], track["bigwigfilename"])
+                )
+                and self.bigwig
+            ):
                 track["hasDensities"] = True
             if os.path.exists(os.path.join(track["sampleDir"], track["bamfilename"])):
                 track["hasTags"] = True
 
             if not track["hasDensities"] or not track["hasTags"]:
-                logging.error("%s does not have all files" % track["SampleID"])
+                logging.error("%s does not have all files", track["SampleID"])
                 if not track["hasDensities"]:
-                    logging.error( "Missing densities" )
+                    logging.error("Missing densities")
                     if self.bigwig:
-                        logging.error("Wanted: " + os.path.join(track["sampleDir"], track["bigwigfilename"]))
+                        logging.error(
+                            "Wanted: %s",
+                            os.path.join(track["sampleDir"], track["bigwigfilename"]),
+                        )
                     else:
-                        logging.error("Wanted: " + os.path.join(track["sampleDir"], track["wigfilename"]))
+                        logging.error(
+                            "Wanted: %s",
+                            os.path.join(track["sampleDir"], track["wigfilename"]),
+                        )
                 if not track["hasTags"]:
                     logging.error("Missing tags")
-                    logging.error("Wanted: " + os.path.join(track["sampleDir"], track["bamfilename"]))
-                logging.info("%s" % str(track))
+                    logging.error(
+                        "Wanted: %s",
+                        os.path.join(track["sampleDir"], track["bamfilename"]),
+                    )
+                logging.info("%s", str(track))
 
             if track["hasDensities"] or track["hasTags"]:
                 self.subtrack_sets[hgdb].append(track)
@@ -271,18 +367,34 @@ class MakeBrowserload(object):
     def create_htmls(self):
         self.html_files = {}
 
-        for hgdb, subtracks in self.subtrack_sets.items():
+        for hgdb in self.subtrack_sets.keys():
             self.create_html(hgdb)
 
     def create_html(self, hgdb):
-        self.html_files[hgdb] = os.path.join(self.outdir, hgdb, "%s.html" % self.main_label)
+        self.html_files[hgdb] = os.path.join(
+            self.outdir, hgdb, "%s.html" % self.main_label
+        )
 
-        html = open( self.html_files[hgdb], 'w')
+        html = open(self.html_files[hgdb], "w")
 
-        columns = ["Lane", "Index", "SampleID", "SampleRef", "CellType", "Assay", "Factors", "Extra",
-            "wellmapping", "wellmapping-no-mito", "SPOT"]
+        columns = [
+            "Lane",
+            "Index",
+            "SampleID",
+            "SampleRef",
+            "CellType",
+            "Assay",
+            "Factors",
+            "Extra",
+            "wellmapping",
+            "wellmapping-no-mito",
+            "SPOT",
+        ]
 
-        html.write("<p>Total number of lanes from this flowcell for this genome: %d </p>\n" % len(self.subtrack_sets[hgdb]))
+        html.write(
+            "<p>Total number of lanes from this flowcell for this genome: %d </p>\n"
+            % len(self.subtrack_sets[hgdb])
+        )
 
         html.write("<table>\n")
         html.write("<thead>\n")
@@ -303,32 +415,36 @@ class MakeBrowserload(object):
     def create_ras(self):
         self.ra_files = {}
 
-        for hgdb, subtracks in self.subtrack_sets.items():
+        for hgdb in self.subtrack_sets.keys():
             self.create_ra(hgdb)
 
     def create_commands(self):
         makefile = os.path.join(self.outdir, "make.%s.doc" % self.main_label)
-        logging.info("Makefile: %s" % makefile)
-        commands = open( makefile, 'w')
+        logging.info("Makefile: %s", makefile)
+        commands = open(makefile, "w")
 
         commands.write("# %s\n" % makefile)
         commands.write("# %s\n\n" % ", ".join(self.subtrack_sets.keys()))
 
         if self.link_dir:
-            commands.write("""
+            commands.write(
+                """
 if [ ! -e %(link_dir)s ]; then
   ln -s %(base_dir)s %(link_dir)s
 else
   echo %(link_dir)s already exists
 fi
-\n""" % {"base_dir": self.basedir, "link_dir": self.link_dir})
+\n"""
+                % {"base_dir": self.basedir, "link_dir": self.link_dir}
+            )
 
-        for hgdb, subtracks in self.subtrack_sets.items():
-            self.create_genome_commands( hgdb, commands)
+        for hgdb in self.subtrack_sets.keys():
+            self.create_genome_commands(hgdb, commands)
 
         # commands.write("\ncat %s >> %s\n" % (self.excludes_file, self.browser_excludes_file))
 
-        commands.write("""
+        commands.write(
+            """
 for EXCLUDE_FILE in `cat %(excludes_file)s`; do
   if ! grep -q "$EXCLUDE_FILE" %(browser_excludes_file)s; then
     echo "$EXCLUDE_FILE" >> %(browser_excludes_file)s
@@ -336,37 +452,64 @@ for EXCLUDE_FILE in `cat %(excludes_file)s`; do
     echo "$EXCLUDE_FILE already exists in %(browser_excludes_file)s"
   fi
 done
-""" % {"excludes_file": self.excludes_file, "browser_excludes_file": self.browser_excludes_file})
+"""
+            % {
+                "excludes_file": self.excludes_file,
+                "browser_excludes_file": self.browser_excludes_file,
+            }
+        )
 
         commands.close()
 
     def create_subtrack_commands(self, subtrack, commandsout):
         if subtrack["hasDensities"] and not self.bigwig:
-            commandsout.write("hgLoadWiggle -pathPrefix=%s %s %s %s/%s\n" % (
-            subtrack["pathPrefix"], subtrack["hgdb"], subtrack["dentrackname"], subtrack["pathPrefix"], subtrack["wigfilename"]))
+            commandsout.write(
+                "hgLoadWiggle -pathPrefix=%s %s %s %s/%s\n"
+                % (
+                    subtrack["pathPrefix"],
+                    subtrack["hgdb"],
+                    subtrack["dentrackname"],
+                    subtrack["pathPrefix"],
+                    subtrack["wigfilename"],
+                )
+            )
         # hgLoadWiggle -pathPrefix=/usr/local/UW/flowcell-density/FCB0BLA_110620_tag/005 hg19 STAM_FCB0BLA_110620_IT_DEN_L005_6_DS18466_36_DNaseI /usr/local/UW/flowcell-density/FCB0BLA_110620_tag/005/FCB0BLA_lane6_75_20.wig
 
         if subtrack["hasDensities"] and self.bigwig:
-            commandsout.write("hgBbiDbLink %s %s %s/%s\n" % (subtrack["hgdb"], subtrack["dentrackname"], subtrack["pathPrefix"], subtrack["bigwigfilename"]))
+            commandsout.write(
+                "hgBbiDbLink %s %s %s/%s\n"
+                % (
+                    subtrack["hgdb"],
+                    subtrack["dentrackname"],
+                    subtrack["pathPrefix"],
+                    subtrack["bigwigfilename"],
+                )
+            )
 
         if subtrack["hasTags"]:
             hgsqlcommand = "hgsql %s -e '" % subtrack["hgdb"]
             hgsqlcommand += "drop table if exists %s; " % subtrack["tagtrackname"]
-            hgsqlcommand += "create table %s (filename varchar(255) not null); " % subtrack["tagtrackname"]
+            hgsqlcommand += (
+                "create table %s (filename varchar(255) not null); "
+                % subtrack["tagtrackname"]
+            )
             hgsqlcommand += "insert into %s values " % subtrack["tagtrackname"]
-            hgsqlcommand += "(\"%s/%s\");'\n" % (subtrack["pathPrefix"], subtrack["bamfilename"])
+            hgsqlcommand += '("%s/%s");\'\n' % (
+                subtrack["pathPrefix"],
+                subtrack["bamfilename"],
+            )
 
             commandsout.write(hgsqlcommand)
 
-#ln -s $datafile bam-links/Rudensky/Rudensky_bams/$data.bam
-#ln -s $indexfile bam-links/Rudensky/Rudensky_bams/$data.bam.bai
-#hgsql $forg -e 'drop table if exists $trackType; create table
-#$trackType (fileName varchar(255) not null); insert into $trackType
-#values (\"/usr/local/UW/bam-links/Rudensky/Rudensky_bams/$data.bam\");'"
+    # ln -s $datafile bam-links/Rudensky/Rudensky_bams/$data.bam
+    # ln -s $indexfile bam-links/Rudensky/Rudensky_bams/$data.bam.bai
+    # hgsql $forg -e 'drop table if exists $trackType; create table
+    # $trackType (fileName varchar(255) not null); insert into $trackType
+    # values (\"/usr/local/UW/bam-links/Rudensky/Rudensky_bams/$data.bam\");'"
 
     def create_genome_commands(self, hgdb, commandsout):
-        if not hgdb in self.genome_organisms:
-            logging.error(hgdb + " not in " + str(self.genome_organisms))
+        if hgdb not in self.genome_organisms:
+            logging.error("%s not in %s", hgdb, self.genome_organisms)
             commandsout.write("\n ERROR: no " + hgdb + " genome\n")
             return
 
@@ -376,11 +519,23 @@ done
         for subtrack in self.subtrack_sets[hgdb]:
             self.create_subtrack_commands(subtrack, commandsout)
 
-        commandsout.write("\ncp %s %s/%s/%s\n" % (self.html_files[hgdb], self.track_basedir, organism, hgdb))
-        commandsout.write("cp %s %s/%s/%s\n\n" % (self.ra_files[hgdb], self.track_basedir, organism, hgdb))
+        commandsout.write(
+            "\ncp %s %s/%s/%s\n"
+            % (self.html_files[hgdb], self.track_basedir, organism, hgdb)
+        )
+        commandsout.write(
+            "cp %s %s/%s/%s\n\n"
+            % (self.ra_files[hgdb], self.track_basedir, organism, hgdb)
+        )
         include_name = "trackDb.%s.%s.ra" % (self.file_label, self.main_label)
-        include_file = "%s/%s/%s/trackDb.%s.ra" % (self.track_basedir, organism, hgdb, self.file_label)
-        commandsout.write("""
+        include_file = "%s/%s/%s/trackDb.%s.ra" % (
+            self.track_basedir,
+            organism,
+            hgdb,
+            self.file_label,
+        )
+        commandsout.write(
+            """
 if ! grep -q "include %(include_name)s" %(include_file)s
 then
      echo "Adding %(include_name)s to %(include_file)s"
@@ -388,36 +543,47 @@ then
 else
      echo "%(include_name)s already in %(include_file)s"
 fi
-""" % { "include_name": include_name, "include_file": include_file })
+"""
+            % {"include_name": include_name, "include_file": include_file}
+        )
         # commandsout.write('# add line "include trackDb.%s.%s.ra" to %s/%s/%s/trackDb.%s.ra\n\n' % (self.file_label, self.main_label, self.track_basedir, organism, hgdb, self.file_label))
 
     def create_excludes(self):
-        excludes = open( self.excludes_file, 'w')
+        excludes = open(self.excludes_file, "w")
 
         for subtrack in self.tracks:
             for suffix in ["frm", "MYD", "MYI"]:
-                logging.debug( "subtrack contents: " + str(subtrack))
+                logging.debug("subtrack contents: %s", str(subtrack))
                 excludes.write("%s.%s\n" % (subtrack["tagtrackname"], suffix))
                 excludes.write("%s.%s\n" % (subtrack["dentrackname"], suffix))
 
         excludes.close()
 
     def create_ra(self, hgdb):
-        logging.info("CREATING RA FOR %s" % hgdb)
+        logging.info("CREATING RA FOR %s", hgdb)
         subtracks = self.subtrack_sets[hgdb]
 
         foldercheck(os.path.join(self.outdir, hgdb))
 
-        self.ra_files[hgdb] = os.path.join(self.outdir, hgdb, "trackDb.%s.%s.ra" % (self.file_label, self.main_label))
-        ra = open( self.ra_files[hgdb], 'w' )
+        self.ra_files[hgdb] = os.path.join(
+            self.outdir, hgdb, "trackDb.%s.%s.ra" % (self.file_label, self.main_label)
+        )
+        ra = open(self.ra_files[hgdb], "w")
 
         samples = set([subtrack["SampleID"] for subtrack in subtracks])
 
         samples = dict()
         for subtrack in subtracks:
-            if not subtrack["SampleID"] in subtrack:
-                samples[subtrack["SampleID"]] = "%s %s %s %s" % (subtrack["SampleID"], subtrack["CellType"], subtrack["Assay"], subtrack["Factors"])
-                samples[subtrack["SampleID"]] = samples[subtrack["SampleID"]].strip().replace(" ", "_")
+            if subtrack["SampleID"] not in subtrack:
+                samples[subtrack["SampleID"]] = "%s %s %s %s" % (
+                    subtrack["SampleID"],
+                    subtrack["CellType"],
+                    subtrack["Assay"],
+                    subtrack["Factors"],
+                )
+                samples[subtrack["SampleID"]] = (
+                    samples[subtrack["SampleID"]].strip().replace(" ", "_")
+                )
 
         ra.write("track %s\n" % self.main_label)
         ra.write("compositeTrack on\n")
@@ -426,7 +592,12 @@ fi
         ra.write("group %s\n" % self.group)
         ra.write("priority %s\n" % self.priority)
         ra.write("subGroup1 view Views TAG=Tags DEN=Density\n")
-        ra.write("subGroup2 sample Sample %s\n" % " ".join(sorted(['%s=%s' % (id, display) for id, display in samples.items()])))
+        ra.write(
+            "subGroup2 sample Sample %s\n"
+            % " ".join(
+                sorted(["%s=%s" % (id, display) for id, display in samples.items()])
+            )
+        )
         ra.write("dimensions dimensionX=view dimensionY=sample\n")
         ra.write("sortOrder view=+ sample=+\n")
         ra.write("dragAndDrop subTracks\n")
@@ -440,17 +611,19 @@ fi
         ra.write("\tvisibility hide\n\n")
 
         for subtrack in subtracks:
-            if not "wellmapping-no-mito" in subtrack:
-                logging.warn("%s has no wellmapping-no-mito count" % subtrack["dentrackname"] )
+            if "wellmapping-no-mito" not in subtrack:
+                logging.warning(
+                    "%s has no wellmapping-no-mito count", subtrack["dentrackname"]
+                )
                 subtrack["wellmapping-no-mito"] = "N/A"
-            if not "wellmapping" in subtrack:
-                logging.warn("%s has no wellmapping count" % subtrack["dentrackname"] )
+            if "wellmapping" not in subtrack:
+                logging.warning("%s has no wellmapping count", subtrack["dentrackname"])
                 subtrack["wellmapping"] = "N/A"
-            if not "SPOT" in subtrack:
-                logging.warn("%s has no SPOT score" % subtrack["dentrackname"] )
-                subtrack["SPOT"] = "N/A";
+            if "SPOT" not in subtrack:
+                logging.warning("%s has no SPOT score", subtrack["dentrackname"])
+                subtrack["SPOT"] = "N/A"
 
-        #track STAM_FC630D3_110711_IT_TAG_L5_DS18900_36_
+        # track STAM_FC630D3_110711_IT_TAG_L5_DS18900_36_
         #       subTrack STAM_FC630D3_110711_IT_TAG
         #       subGroups view=TAG
         #       shortLabel DS18900 5 tags
@@ -461,23 +634,45 @@ fi
         for subtrack in subtracks:
             ra.write("\t\ttrack %s\n" % subtrack["tagtrackname"])
             ra.write("\t\tsubTrack %stag\n" % self.main_label)
-            ra.write("\t\tshortLabel %s %s:%s %s tags\n" % (subtrack["SampleID"], subtrack["Lane"], subtrack["Index"], subtrack["strand"]))
+            ra.write(
+                "\t\tshortLabel %s %s:%s %s tags\n"
+                % (
+                    subtrack["SampleID"],
+                    subtrack["Lane"],
+                    subtrack["Index"],
+                    subtrack["strand"],
+                )
+            )
             ra.write("\t\tsubGroups view=TAG sample=%s\n" % subtrack["SampleID"])
             ra.write("\t\tbamColorMode strand\n")
-            ra.write("\t\tlongLabel %s %s %s %s:%s %dm %s %s %s %s tags: %s (%s), spot: %s\n" % (
-                subtrack["CellType"], subtrack["SampleID"], self.flowcell_name, subtrack["Lane"],
-                subtrack["Index"], self.mersize, subtrack["Assay"], subtrack["Factors"], subtrack["Extra"], subtrack["strand"], subtrack["wellmapping"],
-                subtrack["wellmapping-no-mito"], subtrack["SPOT"]))
+            ra.write(
+                "\t\tlongLabel %s %s %s %s:%s %dm %s %s %s %s tags: %s (%s), spot: %s\n"
+                % (
+                    subtrack["CellType"],
+                    subtrack["SampleID"],
+                    self.flowcell_name,
+                    subtrack["Lane"],
+                    subtrack["Index"],
+                    self.mersize,
+                    subtrack["Assay"],
+                    subtrack["Factors"],
+                    subtrack["Extra"],
+                    subtrack["strand"],
+                    subtrack["wellmapping"],
+                    subtrack["wellmapping-no-mito"],
+                    subtrack["SPOT"],
+                )
+            )
             if self.paired_end:
                 ra.write("\t\tpairEndsByName .\n")
             ra.write("\t\ttype bam\n\n")
 
         logging.info("DEN SUBTRACK GROUP")
 
-        ra.write( "\ttrack %sden\n" % self.main_label)
-        ra.write( "\tsubTrack %s\n" % self.main_label)
-#        track STAM_FC630D3_110711_IT_DEN
- #       subTrack STAM_FC630D3_110711_IT
+        ra.write("\ttrack %sden\n" % self.main_label)
+        ra.write("\tsubTrack %s\n" % self.main_label)
+        #        track STAM_FC630D3_110711_IT_DEN
+        #       subTrack STAM_FC630D3_110711_IT
 
         ra.write("\tview DEN\n")
         ra.write("\tshortLabel Density\n")
@@ -498,11 +693,32 @@ fi
             ra.write("\t\ttrack %s\n" % subtrack["dentrackname"])
             ra.write("\t\tsubTrack %sden\n" % self.main_label)
             ra.write("\t\tsubGroups view=DEN sample=%s\n" % subtrack["SampleID"])
-            ra.write("\t\tshortLabel %s %s:%s density\n" % (subtrack["SampleID"], subtrack["Lane"], subtrack["Index"],))
-            ra.write("\t\tlongLabel %s %s %s %s:%s %dm %s %s %s %s tags: %s (%s), spot: %s\n" % (
-                subtrack["CellType"], subtrack["SampleID"], self.flowcell_name, subtrack["Lane"],
-                subtrack["Index"], self.mersize, subtrack["Assay"], subtrack["Factors"], subtrack["Extra"], subtrack["strand"], subtrack["wellmapping"],
-                subtrack["wellmapping-no-mito"], subtrack["SPOT"]))
+            ra.write(
+                "\t\tshortLabel %s %s:%s density\n"
+                % (
+                    subtrack["SampleID"],
+                    subtrack["Lane"],
+                    subtrack["Index"],
+                )
+            )
+            ra.write(
+                "\t\tlongLabel %s %s %s %s:%s %dm %s %s %s %s tags: %s (%s), spot: %s\n"
+                % (
+                    subtrack["CellType"],
+                    subtrack["SampleID"],
+                    self.flowcell_name,
+                    subtrack["Lane"],
+                    subtrack["Index"],
+                    self.mersize,
+                    subtrack["Assay"],
+                    subtrack["Factors"],
+                    subtrack["Extra"],
+                    subtrack["strand"],
+                    subtrack["wellmapping"],
+                    subtrack["wellmapping-no-mito"],
+                    subtrack["SPOT"],
+                )
+            )
             ra.write("\t\tgroup %s\n" % self.group)
             if self.bigwig:
                 ra.write("\t\ttype bigWig\n\n")
@@ -525,23 +741,25 @@ class LimsQuery(object):
         self.cache = dict()
         self.cache[None] = None
 
-        self.count_types = set(['u-pf-n-mm2', 'u-pf-n-mm2-mito'])
+        self.count_types = set(["u-pf-n-mm2", "u-pf-n-mm2-mito"])
 
     def get(self, query):
-        return self.get_by_url( "%s/%s" % ( self.api_url, query ) )
+        return self.get_by_url("%s/%s" % (self.api_url, query))
 
     def get_by_url(self, url):
-        if not url in self.cache:
-            #print url
-            self.cache[url] = requests.get(url, headers={'Authorization': "Token %s" % self.api_token}).json()
+        if url not in self.cache:
+            # print url
+            self.cache[url] = requests.get(
+                url, headers={"Authorization": "Token %s" % self.api_token}
+            ).json()
         return self.cache[url]
 
     def get_all(self, query):
         data = self.get(query)
-        results = data['results']
-        while data['next'] is not None:
-            data = self.get_by_url(data['next'])
-            results += data['results']
+        results = data["results"]
+        while data["next"] is not None:
+            data = self.get_by_url(data["next"])
+            results += data["results"]
         return results
 
     def get_counttype_by_codename(self, codename):
@@ -550,24 +768,28 @@ class LimsQuery(object):
     def get_counts_for_alignment(self, alignment):
         counts = dict()
         for type in self.count_types:
-            type_id = self.get_counttype_by_codename(type)['id']
-            count_vals = self.get_all("flowcell_lane_count/?alignment=%s&count_type=%d" % (alignment, type_id))
+            type_id = self.get_counttype_by_codename(type)["id"]
+            count_vals = self.get_all(
+                "flowcell_lane_count/?alignment=%s&count_type=%d" % (alignment, type_id)
+            )
             if count_vals:
-                counts[type] = count_vals[0]['count']
+                counts[type] = count_vals[0]["count"]
 
         # Check to see if we got all the types we wanted
         for count in self.count_types:
             if count not in counts:
-                logging.warn("Could not fetch count %s for alignment: %s" % (count, alignment))
+                logging.warning(
+                    "Could not fetch count %s for alignment: %s", (count, alignment)
+                )
 
         return counts
 
     def get_rna_metrics_for_alignment(self, alignment):
         results = self.get("rna_alignment_metrics/?alignment=%s" % alignment)
-        if not results['results']:
-            logging.warn("Could not fetch RNA metrics for alignment: %s" % alignment)
+        if not results["results"]:
+            logging.warning("Could not fetch RNA metrics for alignment: %s", alignment)
             return None
-        return results['results'][0]
+        return results["results"][0]
 
     def get_alignment(self, id):
         return self.get("flowcell_lane_alignment/%s/" % id)
@@ -575,67 +797,74 @@ class LimsQuery(object):
     def get_spot_for_alignment(self, alignment):
         # TODO: This assumes one spot per alignment.
         results = self.get("flowcell_lane_spot/?alignment=%s" % alignment)
-        if not results['results']:
+        if not results["results"]:
             return None
-        return results['results'][0]
+        return results["results"][0]
 
 
 def get_alignment_data(library, alignment, lims):
     # This is mainly a shim.
 
-    logging.debug("Fetching data for library: %s" % library)
+    logging.debug("Fetching data for library: %s", library)
 
     d = dict()
-    d['project']       = library['project']
-    d['hgdb']          = alignment['genome_index']
-    d['aligner']       = alignment['aligner']
-    d['SampleName']    = alignment['sample_name']
-    d['AlignDir']      = alignment['align_dir']
-    d['Index']         = library['barcode_index']
-    d['SampleID']      = library['samplesheet_name']
+    d["project"] = library["project"]
+    d["hgdb"] = alignment["genome_index"]
+    d["aligner"] = alignment["aligner"]
+    d["SampleName"] = alignment["sample_name"]
+    d["AlignDir"] = alignment["align_dir"]
+    d["Index"] = library["barcode_index"]
+    d["SampleID"] = library["samplesheet_name"]
     # cell_type included for backwards compatibility with older processing files (before Feb 2016)
-    d['CellType']      = library.get('sample_taxonomy') or library.get('cell_type')
-    d['Assay']         = library['assay']
-    d['Lane']          = library['lane']
-    d['SampleProject'] = library['project']
+    d["CellType"] = library.get("sample_taxonomy") or library.get("cell_type")
+    d["Assay"] = library["assay"]
+    d["Lane"] = library["lane"]
+    d["SampleProject"] = library["project"]
 
-    lims_lane = lims.get("flowcell_lane/%s" % library['id'])
-    lims_sample = lims.get_by_url( lims_lane['sample'] )
-    #lims_library = lims.get_by_url( lims_lane['library'] )
+    lims_lane = lims.get("flowcell_lane/%s" % library["id"])
+    lims_sample = lims.get_by_url(lims_lane["sample"])
+    # lims_library = lims.get_by_url( lims_lane['library'] )
 
-    d['failed_lane'] = lims_lane['failed']
-    if d['failed_lane']:
-        logging.warn("Lane marked as failed, not using: %s" % library['id'])
+    d["failed_lane"] = lims_lane["failed"]
+    if d["failed_lane"]:
+        logging.warning("Lane marked as failed, not using: %s", library["id"])
         return d
 
-    if d['aligner'] == 'bwa':
-        lims_counts = lims.get_counts_for_alignment(alignment['id'])
-        d['wellmapping']         = lims_counts.get('u-pf-n-mm2', None)
-        d['wellmapping-no-mito'] = lims_counts.get('u-pf-n-mm2-mito', None)
+    if d["aligner"] == "bwa":
+        lims_counts = lims.get_counts_for_alignment(alignment["id"])
+        d["wellmapping"] = lims_counts.get("u-pf-n-mm2", None)
+        d["wellmapping-no-mito"] = lims_counts.get("u-pf-n-mm2-mito", None)
 
     # RNA doesn't have u-pf-no-mito counts
     # So we set those properties from the rna metrics
-    elif d['aligner'] == 'tophat':
-        r = lims.get_rna_metrics_for_alignment(alignment['id'])
+    elif d["aligner"] == "tophat":
+        r = lims.get_rna_metrics_for_alignment(alignment["id"])
         if r is not None:
             # Subtract off ribosomal RNA
-            d['wellmapping']         = int(r['mapped_reads'])
-            d['wellmapping-no-mito'] = int(int(r['mapped_reads']) * (1 - (float(r['percent_chrM']) / 100.0)))
+            d["wellmapping"] = int(r["mapped_reads"])
+            d["wellmapping-no-mito"] = int(
+                int(r["mapped_reads"]) * (1 - (float(r["percent_chrM"]) / 100.0))
+            )
 
-    d['Extra']         = lims_lane['extra']
-    d['SampleRef']     = ""  #NYI
+    d["Extra"] = lims_lane["extra"]
+    d["SampleRef"] = ""  # NYI
     if lims_sample is not None:
-        d['Factors']       = ", ".join([ lims.get_by_url(factor)['display_name'] for factor in lims_sample['factors'] ])
+        d["Factors"] = ", ".join(
+            [
+                lims.get_by_url(factor)["display_name"]
+                for factor in lims_sample["factors"]
+            ]
+        )
     else:
-        d['Factors'] = None
+        d["Factors"] = None
 
-
-    lims_spot = lims.get_spot_for_alignment(alignment['id'])
-    d['SPOT'] = lims_spot['spot_score'] if lims_spot else "N/A"
+    lims_spot = lims.get_spot_for_alignment(alignment["id"])
+    d["SPOT"] = lims_spot["spot_score"] if lims_spot else "N/A"
 
     return d
 
-def main(args = sys.argv):
+
+def main(args=sys.argv):
     parser = parser_setup()
     global poptions
     poptions = parser.parse_args()
@@ -648,53 +877,69 @@ def main(args = sys.argv):
         # Set up the logging levels
         logging.basicConfig(level=logging.INFO, format=log_format)
 
-    data = json.loads(open(poptions.process_config, 'r').read())
+    data = json.loads(open(poptions.process_config, "r").read())
 
-    projects = [ d['code_name'] for d in data['projects'] ]
+    # projects = [d["code_name"] for d in data["projects"]]
 
     # get basedir
-    basedir = data['alignment_group']['directory']
+    basedir = data["alignment_group"]["directory"]
     # Fetch paired endedness?
-    paired_end = data['flowcell']['paired_end']
-    date = data['alignment_group']['label'].split('_')[1]
+    paired_end = data["flowcell"]["paired_end"]
+    date = data["alignment_group"]["label"].split("_")[1]
 
     # get browsersheet information!
 
-    lims = LimsQuery( poptions.api_url, poptions.api_token )
+    lims = LimsQuery(poptions.api_url, poptions.api_token)
 
     browsers = set()
     load_groups = dict()
-    for l in data['libraries']:
-        for a in l['alignments']:
-            if a['browsers']:    # Only process alignments that map to a browser
-                align_data = get_alignment_data(l, a, lims)
-                if not align_data['failed_lane']:
-                    for b in a['browsers']:
+    for lib in data["libraries"]:
+        for a in lib["alignments"]:
+            if a["browsers"]:  # Only process alignments that map to a browser
+                align_data = get_alignment_data(lib, a, lims)
+                if not align_data["failed_lane"]:
+                    for b in a["browsers"]:
                         browsers.add(b)
-                        key = ( align_data['project'], b )
-                        if not key in load_groups:
+                        key = (align_data["project"], b)
+                        if key not in load_groups:
                             load_groups[key] = []
-                        load_groups[key].append( align_data )
-
+                        load_groups[key].append(align_data)
 
     for group_key in load_groups.keys():
         (project, browser) = group_key
 
         lane_group = load_groups[group_key]
 
-        browserconfig = os.path.join( os.getenv("STAMPIPES"), "config", "ucsc_browser", "%s-%s.config" % (browser, project) )
+        browserconfig = os.path.join(
+            os.getenv("STAMPIPES"),
+            "config",
+            "ucsc_browser",
+            "%s-%s.config" % (browser, project),
+        )
 
         if not os.path.isfile(browserconfig):
-            logging.error("No configuration file '%s' exists, don't know how to load project %s into browser %s"
-                          % (browserconfig, project, browser ))
+            logging.error(
+                "No configuration file '%s' exists, don't know how to load project %s into browser %s",
+                browserconfig,
+                project,
+                browser,
+            )
             sys.exit(1)
 
+        logging.info("Reading browser configuration from %s", browserconfig)
 
-        logging.info("Reading browser configuration from %s" % browserconfig)
+        outdir = os.path.join(basedir, "browser-load-%s-%s" % (project, browser))
 
-        outdir = os.path.join( basedir, "browser-load-%s-%s" % (project, browser))
-
-        loader = MakeBrowserload(lane_group, browserconfig, basedir, outdir, poptions.priority, paired_end, project, date)
+        loader = MakeBrowserload(
+            lane_group,
+            browserconfig,
+            basedir,
+            outdir,
+            poptions.priority,
+            paired_end,
+            project,
+            date,
+        )
         loader.load()
 
 

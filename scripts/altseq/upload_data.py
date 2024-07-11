@@ -3,18 +3,21 @@
 Uploads all the results of alt-seq processing to LIMS
 """
 
-import pprint
-import re
-import csv
+# Ignore B019, because we don't care about the upload class leaking into
+# memory after use, because we only construct one
+# ruff: noqa: B019
+
 import argparse
+import csv
 import datetime
 import hashlib
 import json
 import logging
 import os
+import re
 import sys
-from functools import lru_cache
 from collections import defaultdict
+from functools import lru_cache
 
 # Make sure we can load our vendored stamlims_api dependency
 sys.path.insert(
@@ -385,7 +388,12 @@ class UploadLIMS:
                     )
                     result = self.put(url=exists["url"], data=upload_data)
             else:
-                LOG.info("Uploading information for file %s: lane %d, data=%s", path, object_id, upload_data)
+                LOG.info(
+                    "Uploading information for file %s: lane %d, data=%s",
+                    path,
+                    object_id,
+                    upload_data,
+                )
                 result = self.post("file/", data=upload_data)
 
             if not result:
@@ -460,27 +468,32 @@ class UploadLIMS:
         report_name = "Alt-seq stats: FC%s" % flowcell_label
 
         flowcell_lims_info = self.get_single_result(
-            "flowcell_run/?label=%s" % flowcell_label)
-        content_type_id = flowcell_lims_info['object_content_type']
+            "flowcell_run/?label=%s" % flowcell_label
+        )
+        content_type_id = flowcell_lims_info["object_content_type"]
         content_type = self.get_by_id("content_type", content_type_id)
-        object_id = flowcell_lims_info['id']
+        object_id = flowcell_lims_info["id"]
         json_report_class = self.get_single_result(
-            "json_report_class/", query={"slug": JSON_REPORT_CLASS_SLUG})
+            "json_report_class/", query={"slug": JSON_REPORT_CLASS_SLUG}
+        )
 
         # See if report already exists
-        existing_reports = self.get_list_result("json_report/", query={
-            "object_id": object_id,
-            "content_type": content_type["id"],
-            "report_class": json_report_class["id"],
-            "page_size": 2,
-        })
+        existing_reports = self.get_list_result(
+            "json_report/",
+            query={
+                "object_id": object_id,
+                "content_type": content_type["id"],
+                "report_class": json_report_class["id"],
+                "page_size": 2,
+            },
+        )
 
         data_to_send = {
-                "object_id": object_id,
-                "content_type": content_type["url"],
-                "report_class": json_report_class["url"],
-                "name": report_name,
-                "json_content": json.dumps(data),
+            "object_id": object_id,
+            "content_type": content_type["url"],
+            "report_class": json_report_class["url"],
+            "name": report_name,
+            "json_content": json.dumps(data),
         }
         if len(existing_reports) == 0:
             self.post("json_report/", data=data_to_send)
@@ -492,8 +505,7 @@ class UploadLIMS:
         else:
             # Error! too many reports
             LOG.critical("Too many JSON reports exist")
-            raise "Too many JSON reports exist, exiting"
-
+            raise Exception("Too many JSON reports exist, exiting")
 
     def upload_altseq_flowcell(self, sample_config, processing_dict, outdir):
         """
@@ -514,7 +526,7 @@ class UploadLIMS:
             lane = int(row["lane"])
             pool_name = row["pool_name"]
             sample_name = row["sample_name"]
-            for idx, lib in enumerate(processing_dict["libraries"]):
+            for lib in processing_dict["libraries"]:
                 if int(lib["lane"]) == lane and lib["barcode_index"] == barcode_index:
                     lib.update({"pool_name": pool_name, "sample_name": sample_name})
                     processing_info.append(lib)
@@ -527,9 +539,10 @@ class UploadLIMS:
             LOG.debug("idx=%s, lane=%d, name=%s", idx, lane, name)
             # Get lane IDs for each file
             lane_ids = [
-                l["id"]
-                for l in processing_dict["libraries"]
-                if l["barcode1"]["reverse_sequence"] == idx and int(l["lane"]) == lane
+                lib["id"]
+                for lib in processing_dict["libraries"]
+                if lib["barcode1"]["reverse_sequence"] == idx
+                and int(lib["lane"]) == lane
             ]
             r1_file = os.path.join(outdir, name, "R1.fq.gz")
             r2_file = os.path.join(outdir, name, "R2.fq.gz")
@@ -542,7 +555,7 @@ class UploadLIMS:
             files_to_upload[(r2_file, "r2-fastq")].extend(lane_ids)
 
         # Upload files.
-        for ((path, purpose), lane_ids) in files_to_upload.items():
+        for (path, purpose), lane_ids in files_to_upload.items():
             # print(path, purpose, len(lane_ids))
             self.upload_file(
                 path,
