@@ -18,9 +18,8 @@ From: rockylinux:8.6
 	set -e
 	dnf install -y python39
 	ln -s /usr/bin/python3 /usr/bin/python
-	ls /opt/stamlims_api/
-
 	python -m pip install /opt/stamlims_api/
+	python -m pip install Biopython
 	dnf install -y rsync
 
 	# install fastqc
