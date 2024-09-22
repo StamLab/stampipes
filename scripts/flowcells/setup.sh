@@ -14,14 +14,17 @@ set -o pipefail
 
 source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
 
-# Run in apptainer if necessary
-if command -v apptainer ; then
-  echo "Using apptainer"
-  export apx="apptainer exec --bind /net/seq/data2/sequencers,/net/seq/data2/flowcells,$STAMPIPES $STAMPIPES/containers/fastq/fastq.sif"
+CLUSTER_NAME=$(scontrol show config | awk '$1 == "ClusterName" {print $3}')
+if [[ "$CLUSTER_NAME" == "altius-gene" ]] ; then
+  module load apptainer/1.3.3
+  echo "# Using apptainer"
+  # Warning: if STAMPIPES contains spaces or glob chars this will likely break
+  export APX="apptainer exec --bind /net/seq/data2/sequencers,/net/seq/data2/flowcells,$STAMPIPES $STAMPIPES/containers/fastq/fastq.sif"
 else
-  echo "Not using apptainer"
-  export apx=
+  echo "# Not using apptainer"
+  export APX=
 fi
+
 
 #########
 # Options
@@ -206,7 +209,7 @@ source "$STAMPIPES/scripts/lims/api_functions.sh"
 )
 
 # Get and read the processing script
-$apx python3 "$STAMPIPES/scripts/lims/get_processing.py" -f "$flowcell" -o "$json"
+$APX python3 "$STAMPIPES/scripts/lims/get_processing.py" -f "$flowcell" -o "$json"
 run_type=$(     jq -r '.flowcell.run_type'          "$json" )
 analysis_dir=$( jq -r '.alignment_group.directory'  "$json" )
 mask=$(         jq -r '.alignment_group.bases_mask' "$json" )
@@ -254,7 +257,7 @@ fi
 
 if [ -z "$demux" ] ; then
   bcl_mask=$mask
-  mismatches=$($apx python3 $STAMPIPES/scripts/flowcells/max_mismatch.py --ignore_failed_lanes --allow_collisions)
+  mismatches=$($APX python3 $STAMPIPES/scripts/flowcells/max_mismatch.py --ignore_failed_lanes --allow_collisions)
   if [ "$has_umi" == "true" ] ; then
     echo "---WARNING---"
     echo "Flowcell contains UMI samples, but -d param was not specified"
@@ -265,7 +268,7 @@ if [ -z "$demux" ] ; then
 else # Set some options for manual demultiplexing
   bcl_mask=$(tr Nn Ii <<< $mask)
   mismatches="0,0"
-  dmx_mismatches=$($apx python3 $STAMPIPES/scripts/flowcells/max_mismatch.py --ignore_failed_lanes | cut -c1 )
+  dmx_mismatches=$($APX python3 $STAMPIPES/scripts/flowcells/max_mismatch.py --ignore_failed_lanes | cut -c1 )
 fi
 
 # Long command definitions
@@ -350,7 +353,7 @@ _NOVA_SUBMIT_CMD_
 read -d '' novaseq_link_command  <<'_NOVA_LINK_CMD_'
 for fq_dir in fastq-withmask-* ; do
   [[ -d $fq_dir ]] || continue
-  $apx python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i "$fq_dir" -o Demultiplexed -p processing.json
+  $APX python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i "$fq_dir" -o Demultiplexed -p processing.json
 done
 _NOVA_LINK_CMD_
 set -e
@@ -373,7 +376,7 @@ case $run_type in
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $apx python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
+    $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
     #unaligned_command=$novaseq_bcl_command
     submit_bcl2fastq_cmd=$novaseq_submit_command
@@ -388,7 +391,7 @@ case $run_type in
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $apx python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
+    $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
     #unaligned_command=$novaseq_bcl_command
     submit_bcl2fastq_cmd=$novaseq_submit_command
@@ -403,7 +406,7 @@ case $run_type in
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $apx python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
+    $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
     #unaligned_command=$novaseq_bcl_command
     submit_bcl2fastq_cmd=$novaseq_submit_command
@@ -418,7 +421,7 @@ case $run_type in
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $apx python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
+    $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
     #unaligned_command=$novaseq_bcl_command
     submit_bcl2fastq_cmd=$novaseq_submit_command
@@ -433,7 +436,7 @@ case $run_type in
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $apx python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
+    $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
     #unaligned_command=$novaseq_bcl_command
     submit_bcl2fastq_cmd=$novaseq_submit_command
@@ -448,7 +451,7 @@ case $run_type in
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $apx python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
+    $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
     #unaligned_command=$novaseq_bcl_command
     submit_bcl2fastq_cmd=$novaseq_submit_command
@@ -464,7 +467,7 @@ case $run_type in
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $apx python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
+    $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
     unaligned_command=$novaseq_bcl_command
 
@@ -473,7 +476,7 @@ case $run_type in
 
     echo "Regular NextSeq 500 run detected"
     parallel_env="-pe threads 6"
-    link_command="$apx python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
+    link_command="$APX python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--nextseq"
@@ -485,7 +488,7 @@ case $run_type in
 "HiSeq 4000")
     echo "Hiseq 4000 run detected"
     parallel_env="-pe threads 6"
-    link_command="$apx python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o ."
+    link_command="$APX python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o ."
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--hiseq4k"
@@ -498,7 +501,7 @@ case $run_type in
     # Identical to nextseq processing
     echo "High-output MiniSeq run detected for DNase"
     parallel_env="-pe threads 6"
-    link_command="$apx python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
+    link_command="$APX python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--miniseq"
@@ -511,7 +514,7 @@ case $run_type in
     # Identical to nextseq processing
     echo "Mid-output MiniSeq run detected for GUIDEseq"
     parallel_env="-pe threads 6"
-    link_command="$apx python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
+    link_command="$APX python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--miniseq"
@@ -533,7 +536,7 @@ _U_
     # Identical to nextseq processing
     echo "Mid-output MiniSeq run detected"
     parallel_env="-pe threads 6"
-    link_command="$apx python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
+    link_command="$APX python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--miniseq"
@@ -554,7 +557,7 @@ _U_
     # Identical to nextseq processing
     echo "High-output MiniSeq run detected"
     parallel_env="-pe threads 6"
-    link_command="$apx python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
+    link_command="$APX python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--miniseq"
@@ -641,7 +644,7 @@ module load bcl2fastq2/2.17.1.14
 source $STAMPIPES/scripts/lims/api_functions.sh
 
 # Register the file directory
-$apx python3 "$STAMPIPES/scripts/lims/upload_data.py" \
+$APX python3 "$STAMPIPES/scripts/lims/upload_data.py" \
   --attach_directory "$analysis_dir" \
   --attach_file_contenttype SequencingData.flowcellrun \
   --attach_file_purpose flowcell-directory \
@@ -710,7 +713,7 @@ module load bcl2fastq2/2.20.0.422
 source $STAMPIPES/scripts/lims/api_functions.sh
 
 # Register the file directory
-$apx python3 "$STAMPIPES/scripts/lims/upload_data.py" \
+$APX python3 "$STAMPIPES/scripts/lims/upload_data.py" \
   --attach_directory "$analysis_dir" \
   --attach_file_contenttype SequencingData.flowcellrun \
   --attach_file_purpose flowcell-directory \
@@ -727,13 +730,13 @@ lims_patch "flowcell_run/$flowcell_id/" "status=https://lims.stamlab.org/api/flo
 lims_patch "flowcell_run/$flowcell_id/" "folder_name=${PWD##*/}"
 
 # Submit a barcode job for each mask
-for bcmask in $($apx python $STAMPIPES/scripts/flowcells/barcode_masks.py | xargs) ; do
+for bcmask in $($APX python $STAMPIPES/scripts/flowcells/barcode_masks.py | xargs) ; do
     export bcmask
     bcjobid=\$(sbatch --export=ALL -J "bc-$flowcell" -o "bc-$flowcell.o%A" -e "bc-$flowcell.e%A" --partition=$queue --cpus-per-task=10 --ntasks=1 --mem-per-cpu=6400 --parsable --oversubscribe --mail-type=FAIL --mail-user=sequencing@altius.org <<'__BARCODES__'
 #!/bin/bash
 bcl_barcode_count --mask=\$bcmask $bc_flag > barcodes.\$bcmask.json
-$apx python3 $STAMPIPES/scripts/lims/upload_data.py --barcode_report barcodes.\$bcmask.json
-bctest=\$($apx python $STAMPIPES/scripts/flowcells/barcode_check.py --barcodes barcodes.\$bcmask.json --processing processing.json --bcmask \$bcmask)
+$APX python3 $STAMPIPES/scripts/lims/upload_data.py --barcode_report barcodes.\$bcmask.json
+bctest=\$($APX python $STAMPIPES/scripts/flowcells/barcode_check.py --barcodes barcodes.\$bcmask.json --processing processing.json --bcmask \$bcmask)
 if [ \$bctest = "FALSE" ];
 then
     exit 1
@@ -780,7 +783,7 @@ for i in "\${inputfiles[@]}" ; do
    jobid=\$(sbatch --export=ALL -J dmx\$(basename "\$i") -o .dmx\$(basename "\$i").o%A -e .dmx\$(basename "\$i").e%A --partition $queue --ntasks=1 --cpus-per-task=1 --mem-per-cpu=4000 --parsable --oversubscribe <<__DEMUX__
 #!/bin/bash
     source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
-    $apx python3 $STAMPIPES/scripts/flowcells/demux_fastq.py   \
+    $APX python3 $STAMPIPES/scripts/flowcells/demux_fastq.py   \
       \$suffix                     \
       --processing "$json"             \
       --outdir "$copy_from_dir"        \
@@ -858,7 +861,7 @@ cd "$analysis_dir"
 rm -f fastqc.bash collate.bash run_alignments.bash run_aggregations.bash
 
 # Create fastqc scripts
-$apx python3 "$STAMPIPES/scripts/apilaneprocess.py" \
+$APX python3 "$STAMPIPES/scripts/apilaneprocess.py" \
   --script_template "$STAMPIPES/processes/fastq/fastqc.bash" \
   --qsub-prefix .fq \
   --queue $queue \
@@ -867,7 +870,7 @@ $apx python3 "$STAMPIPES/scripts/apilaneprocess.py" \
   --outfile fastqc.bash
 
 # Create collation scripts
-$apx python3 "$STAMPIPES/scripts/apilaneprocess.py" \
+$APX python3 "$STAMPIPES/scripts/apilaneprocess.py" \
   --script_template "$STAMPIPES/processes/fastq/collate_fastq.bash" \
   --qsub-prefix .collatefq \
   --queue $queue \
@@ -875,7 +878,7 @@ $apx python3 "$STAMPIPES/scripts/apilaneprocess.py" \
   --flowcell_label "$flowcell" \
   --outfile collate.bash
 
-$apx bash collate.bash
+bash collate.bash
 
 # Wait for collation jobs to finish
 while ( squeue -o "%j" | grep -q '^.collatefq*$flowcell') ; do
@@ -883,16 +886,16 @@ while ( squeue -o "%j" | grep -q '^.collatefq*$flowcell') ; do
 done
 
 # Run fastQC
-$apx bash fastqc.bash
+bash fastqc.bash
 
 # Set up of flowcell alignments
-$apx python3 "$STAMPIPES/scripts/alignprocess.py" \
+$APX python3 "$STAMPIPES/scripts/alignprocess.py" \
   --flowcell "$flowcell"                     \
   --auto_aggregate                           \
   --qsub-queue $SLOW_QUEUE                   \
   --outfile run_alignments.bash
 
-$apx python3 "$STAMPIPES/scripts/poolprocess.py" --flowcell "$flowcell" --outfile run_pools.bash
+$APX python3 "$STAMPIPES/scripts/poolprocess.py" --flowcell "$flowcell" --outfile run_pools.bash
 
 # Set up of flowcell aggregations
 curl -X POST "$LIMS_API_URL/flowcell_run/$flowcell_id/autoaggregate/" -H "Authorization: Token \$LIMS_API_TOKEN"

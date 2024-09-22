@@ -1,5 +1,5 @@
 # Dependencies
-source $MODULELOAD
+[[ -s "$MODULELOAD" ]] && source "$MODULELOAD"
 module load jdk/1.8.0_92
 module load picard/2.8.1
 module load fastqc/0.11.5
@@ -13,6 +13,16 @@ export TOP_UMIS=${SAMPLE_NAME}.topumis.txt.gz
 
 cd $FASTQ_DIR
 
+CLUSTER_NAME=$(scontrol show config | awk '$1 == "ClusterName" {print $3}')
+if [[ "$CLUSTER_NAME" == "altius-gene" ]] ; then
+  module load apptainer/1.3.3
+  echo "# Using apptainer"
+  export APX="apptainer exec --bind /net/seq/data2/sequencers,/net/seq/data2/flowcells,$STAMPIPES $STAMPIPES/containers/fastq/fastq.sif"
+else
+  echo "# Not using apptainer"
+  export APX=
+fi
+
 if [ ! -e "$R1_FASTQC" -o ! -e "$R2_FASTQC" ]; then
 
   set -x -e -o pipefail
@@ -24,9 +34,9 @@ if [ ! -e "$R1_FASTQC" -o ! -e "$R2_FASTQC" ]; then
   date
 
   cd $FASTQ_DIR
-  make -f $STAMPIPES/makefiles/fastqc.mk FASTQ_FILE=$R1_FASTQ FASTQC_FILE=$R1_FASTQC
+  $APX make -f $STAMPIPES/makefiles/fastqc.mk FASTQ_FILE=$R1_FASTQ FASTQC_FILE=$R1_FASTQC
   if [ "$PAIRED" = "True" ]; then
-      make -f $STAMPIPES/makefiles/fastqc.mk FASTQ_FILE=$R2_FASTQ FASTQC_FILE=$R2_FASTQC
+      $APX make -f $STAMPIPES/makefiles/fastqc.mk FASTQ_FILE=$R2_FASTQ FASTQC_FILE=$R2_FASTQC
   fi
 
   if [ "$UMI" = "True" ]; then
@@ -35,10 +45,10 @@ if [ ! -e "$R1_FASTQC" -o ! -e "$R2_FASTQC" ]; then
   fi
 
   if [ "$PAIRED" = "True" ]; then
-      python3 ${STAMPIPES}/scripts/lims/upload_data.py -f ${FLOWCELL} --flowcell_lane_id=${FLOWCELL_LANE_ID} \
+      $APX python3 ${STAMPIPES}/scripts/lims/upload_data.py -f ${FLOWCELL} --flowcell_lane_id=${FLOWCELL_LANE_ID} \
 	  --fastqcfile $R1_FASTQC --fastqcfile $R2_FASTQC
   else
-      python3 ${STAMPIPES}/scripts/lims/upload_data.py -f ${FLOWCELL} --flowcell_lane_id=${FLOWCELL_LANE_ID} \
+      $APX python3 ${STAMPIPES}/scripts/lims/upload_data.py -f ${FLOWCELL} --flowcell_lane_id=${FLOWCELL_LANE_ID} \
 	  --fastqcfile $R1_FASTQC
   fi
 
