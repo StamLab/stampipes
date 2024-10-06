@@ -298,7 +298,7 @@ fi
 set +e
 read -d '' regular_bcl_command  << _REG_BCL_CMD_
     PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
-    bcl2fastq \\\\
+    \$APX bcl2fastq \\\\
       --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
       --use-bases-mask "$bcl_mask" \\\\
       --output-dir "$fastq_dir" \\\\
@@ -313,7 +313,7 @@ read -d '' novaseq_bcl_command  << _NOVA_BCL_CMD_
     for samplesheet in SampleSheet.withmask*csv ; do
       bcl_mask=\$(sed 's/.*withmask\\.//;s/\\.csv//' <<< \$samplesheet)
       fastq_dir=\$(sed 's/,/-/g' <<< "fastq-withmask-\$bcl_mask")
-      bcl2fastq \\\\
+      \$APX bcl2fastq \\\\
         --input-dir          "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
         --output-dir         "${illumina_dir}/\$fastq_dir"                \\\\
         --use-bases-mask     "\$bcl_mask"                                 \\\\
@@ -348,7 +348,7 @@ for samplesheet in SampleSheet.withmask*csv ; do
       set -x -e -o pipefail
       cd "${illumina_dir}"
       PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
-      bcl2fastq \\\\
+      \$APX bcl2fastq \\\\
         --input-dir          "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
         --output-dir         "${illumina_dir}/\\\$fastq_dir"              \\\\
         --use-bases-mask     "\\\$bcl_mask"                               \\\\
@@ -544,7 +544,7 @@ case $run_type in
     bcl_tasks=1
     set +e
     read -d '' unaligned_command  << _U_
-    bcl2fastq \\\\
+    \$APX bcl2fastq \\\\
       --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
       --output-dir "$fastq_dir" \\\\
       --create-fastq-for-index-reads
@@ -565,7 +565,7 @@ _U_
     bcl_tasks=1
     set +e
     read -d '' unaligned_command  << _U_
-    bcl2fastq \\\\
+    \$APX bcl2fastq \\\\
       --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
       --output-dir "$fastq_dir" \\\\
       --no-lane-splitting
@@ -588,7 +588,7 @@ _U_
     bcl_tasks=1
     set +e
     read -d '' unaligned_command  << _U_
-    bcl2fastq \\\\
+    \$APX bcl2fastq \\\\
       --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
       --output-dir "$fastq_dir" \\\\
       --no-lane-splitting
@@ -733,13 +733,14 @@ cat > run_bcl2fastq.sh <<__BCL2FASTQ__
 
 [[ -s "$MODULELOAD" ]] && source "$MODULELOAD"
 module load bcl2fastq2/2.20.0.422
-\$LOAD_APPTAINER
 [[ -s "$PYTHON3_ACTIVATE" ]] && source "$PYTHON3_ACTIVATE"
 source $STAMPIPES/scripts/lims/api_functions.sh
 
 $(declare -f on_new_cluster)
 $(declare -f set_cluster_vars)
 set_cluster_vars
+
+\$LOAD_APPTAINER
 
 # Register the file directory
 \$APX python3 "$STAMPIPES/scripts/lims/upload_data.py" \
