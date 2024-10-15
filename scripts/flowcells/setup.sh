@@ -887,15 +887,19 @@ if [[ -n \$copy_jobid ]]; then
 fi
 
 # Collate
-sbatch --export=ALL -J "collate-$flowcell" \$copy_dependency -o "collate-$flowcell.o%A" -e "collate-$flowcell.e%A" --partition=$queue --cpus-per-task=1 --ntasks=1 --mem-per-cpu=1000 --parsable --oversubscribe <<'__COLLATE__'
+sbatch --export=ALL -J "collate-$flowcell" \$copy_dependency -o "collate-$flowcell.o%A" -e "collate-$flowcell.e%A" --partition=$queue --cpus-per-task=1 --ntasks=1 --mem-per-cpu=4000 --parsable --oversubscribe <<'__COLLATE__'
 #!/bin/bash
 source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
+
+$(declare -f on_new_cluster)
+$(declare -f set_cluster_vars)
+set_cluster_vars
 
 \$LOAD_APPTAINER
 
 cd "$analysis_dir"
 # Remove existing scripts if they exist (to avoid appending)
-rm -f fastqc.bash collate.bash run_alignments.bash run_aggregations.bash
+rm -f fastqc.bash collate.bash run_alignments.bash run_aggregations.bash run_pools.sh
 
 # Create fastqc scripts
 \$APX python3 "$STAMPIPES/scripts/apilaneprocess.py" \
@@ -941,8 +945,8 @@ bash fastqc.bash
 curl -X POST "$LIMS_API_URL/flowcell_run/$flowcell_id/autoaggregate/" -H "Authorization: Token \$LIMS_API_TOKEN"
 
 if on_new_cluster ; then
-  ssh "$ALIGN_NODE" bash -c "cd \$PWD && bash run_alignments.bash"
-  ssh "$ALIGN_NODE" bash -c "cd \$PWD && bash run_pools.bash"
+  ssh "$ALIGN_NODE" bash --login "\$PWD/run_alignments.bash"
+  ssh "$ALIGN_NODE" bash --login "\$PWD/run_pools.bash"
 else
   # Run alignments
   bash run_alignments.bash
