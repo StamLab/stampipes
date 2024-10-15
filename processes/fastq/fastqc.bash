@@ -1,8 +1,10 @@
 # Dependencies
 [[ -s "$MODULELOAD" ]] && source "$MODULELOAD"
+{
 module load jdk/1.8.0_92
 module load picard/2.8.1
 module load fastqc/0.11.5
+} || true # ignore module load failures
 
 export FASTQ_NAME=${FLOWCELL}_${SAMPLE_NAME}
 export R1_FASTQ=${FASTQ_NAME}_R1.fastq.gz
@@ -52,7 +54,7 @@ if [ ! -e "$R1_FASTQC" -o ! -e "$R2_FASTQC" ]; then
 	  --fastqcfile $R1_FASTQC
   fi
 
-  bash $STAMPIPES/scripts/fastq/attachfiles.bash
+  $APX bash $STAMPIPES/scripts/fastq/attachfiles.bash
 
   echo "FINISH: "
   date
