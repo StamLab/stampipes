@@ -6,11 +6,9 @@ import json
 import logging
 import math
 import os
-import pathlib
-import pprint
 import re
-
 from collections import defaultdict
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -33,13 +31,14 @@ def parse_cellreads(filename):
     with open(filename) as f:
         data = []
         for row in csv.DictReader(f, delimiter="\t"):
-            for (k, v) in row.items():
+            for k, v in row.items():
                 try:
                     row[k] = int(v)
-                except:
+                except Exception:
                     pass
             data.append(row)
         return data
+
 
 def parse_summary_stats(filename):
     with open(filename) as f:
@@ -61,6 +60,7 @@ def parse_summary_stats(filename):
             data[key] = val
     return data
 
+
 def parse_barcode_stats(filename):
     with open(filename) as f:
         data = {}
@@ -70,11 +70,15 @@ def parse_barcode_stats(filename):
             data[key] = val
     return data
 
+
 REVCOM = {"A": "T", "T": "A", "C": "G", "G": "C"}
+
+
 def revcom(bc):
     if bc is None:
         return None
     return "".join(REVCOM[x] for x in reversed(bc))
+
 
 def summarize_by_library(pool_info, stats):
     """
@@ -85,21 +89,24 @@ def summarize_by_library(pool_info, stats):
     For example, a library with barcode2 = "TTTAAGCG" will contain all cells
     that end with "_CGCTTAAA" (the reverse complement)
     """
+
     def build_barcode_to_library_lookup(pool_info, stats):
         barcode_to_library = {}
         for lib in pool_info["libraries"]:
-            #bc = revcom(lib["barcode2"])
+            # bc = revcom(lib["barcode2"])
             # Some old backward-compatibility
             # Newer stuff is at the top of the list
             if "sample_barcode" in lib:
                 bc = lib["sample_barcode"]
             elif "barcode2" in lib:
                 bc = revcom(lib["sample_barcode"])
-            elif "additional_information" in lib and "barcode2" in lib["additional_information"]:
+            elif (
+                "additional_information" in lib
+                and "barcode2" in lib["additional_information"]
+            ):
                 bc = revcom(lib["additional_information"]["sample_barcode"])
             barcode_to_library[bc] = lib["LN#"]
         return barcode_to_library
-
 
     # Stub out keys
     data = {
@@ -122,26 +129,31 @@ def summarize_by_library(pool_info, stats):
         (_, _1, bc) = total_bc.split("_")
         if bc not in libraries:
             libraries[bc] = defaultdict(int)
-        for (k, v) in cell.items():
+        for k, v in cell.items():
             if k == "CB":
                 continue
             libraries[bc][k] += int(v)
     # Convert back to strings (ew)
     for bc in libraries:
-        for (k, v) in libraries[bc].items():
+        for k, v in libraries[bc].items():
             libraries[bc][k] = str(v)
 
     pool_set = set(lib["library_pool"] for lib in pool_info["libraries"])
     assert len(pool_set) == 1, "Should have exactly 1 pool, instead: %s" % pool_set
     data["pool"] = pool_set.pop()
-    flowcell_set = set(lib["additional_information"]["flowcell"] for lib in pool_info["libraries"])
-    assert len(flowcell_set) == 1, "Pool should have exactly 1 flowcell, instead %s" % flowcell_set
+    flowcell_set = set(
+        lib["additional_information"]["flowcell"] for lib in pool_info["libraries"]
+    )
+    assert len(flowcell_set) == 1, (
+        "Pool should have exactly 1 flowcell, instead %s" % flowcell_set
+    )
     data["flowcell_label"] = flowcell_set.pop()[2:]
 
     data["barcode_mapping"] = bc_to_library
     data["libraries"] = libraries
 
     return data
+
 
 def summarize_by_sample(pool_info, stats):
     """
@@ -152,13 +164,13 @@ def summarize_by_sample(pool_info, stats):
     For example, a library with barcode2 = "TTTAAGCG" will contain all cells
     that end with "_CGCTTAAA" (the reverse complement)
     """
+
     def build_barcode_to_sample_lookup(pool_info, stats):
         barcode_to_sample = {}
         for lib in pool_info["libraries"]:
             bc = revcom(lib["barcode2"])
             barcode_to_sample[bc] = lib["sample"]
         return barcode_to_sample
-
 
     # Stub out keys
     data = {
@@ -181,26 +193,31 @@ def summarize_by_sample(pool_info, stats):
         (_, _1, bc) = total_bc.split("_")
         if bc not in samples:
             samples[bc] = defaultdict(int)
-        for (k, v) in cell.items():
+        for k, v in cell.items():
             if k == "CB":
                 continue
             samples[bc][k] += int(v)
     # Convert back to strings (ew)
     for bc in samples:
-        for (k, v) in samples[bc].items():
+        for k, v in samples[bc].items():
             samples[bc][k] = str(v)
 
     pool_set = set(lib["library_pool"] for lib in pool_info["libraries"])
     assert len(pool_set) == 1, "Should have exactly 1 pool, instead: %s" % pool_set
     data["pool"] = pool_set.pop()
-    flowcell_set = set(lib["additional_information"]["flowcell"] for lib in pool_info["libraries"])
-    assert len(flowcell_set) == 1, "Pool should have exactly 1 flowcell, instead %s" % flowcell_set
+    flowcell_set = set(
+        lib["additional_information"]["flowcell"] for lib in pool_info["libraries"]
+    )
+    assert len(flowcell_set) == 1, (
+        "Pool should have exactly 1 flowcell, instead %s" % flowcell_set
+    )
     data["flowcell_label"] = flowcell_set.pop()[2:]
 
     data["barcode_mapping"] = bc_to_sample
     data["samples"] = samples
 
     return data
+
 
 def main():
     opts = parse_args()
@@ -213,9 +230,12 @@ def main():
 
     data = summarize_by_library(cfg, samples)
     data["summary_stats"] = parse_summary_stats(os.path.join(gene_dir, "Summary.csv"))
-    data["barcode_stats"] = parse_barcode_stats(os.path.join(opts.solo_dir, "Barcodes.stats"))
+    data["barcode_stats"] = parse_barcode_stats(
+        os.path.join(opts.solo_dir, "Barcodes.stats")
+    )
 
     print(json.dumps(data))
+
 
 if __name__ == "__main__":
     main()

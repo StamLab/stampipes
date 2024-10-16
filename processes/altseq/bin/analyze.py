@@ -4,7 +4,7 @@ import argparse
 import csv
 import os
 import pathlib
-import pprint
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -25,9 +25,11 @@ def parse_barcode_config(filename):
             cfg[barcode] = name
     return cfg
 
+
 def parse_cellreads(filename):
     with open(filename) as f:
         return [*csv.DictReader(f, delimiter="\t")]
+
 
 def write_sample(output_directory, sample):
     if not sample.get("name", None):
@@ -35,16 +37,20 @@ def write_sample(output_directory, sample):
         return
     output = os.path.join(output_directory, ("%s.stats.txt" % sample["name"]))
     output_keys = [
-        "cbMatch", "cbPerfect",
-        "exonic", "intronic",
+        "cbMatch",
+        "cbPerfect",
+        "exonic",
+        "intronic",
         "mito",
-        "genomeU", "genomeM",
-        "featureU", "featureM",
+        "genomeU",
+        "genomeM",
+        "featureU",
+        "featureM",
         "nGenesUnique",
         "exonicAS",
         "intronicAS",
     ]
-    with open(output, 'w') as f:
+    with open(output, "w") as f:
         for key in output_keys:
             if key in sample:
                 f.write("%s\t%s\n" % (key, sample[key]))
@@ -55,11 +61,12 @@ def main():
     cfg = parse_barcode_config(opts.barcode_config_file)
     samples = parse_cellreads(opts.cellreads)
     for sample in samples:
-        sample['name'] = cfg.get(sample['CB'], None)
+        sample["name"] = cfg.get(sample["CB"], None)
 
     pathlib.Path(opts.output_directory).mkdir(parents=True, exist_ok=True)
     for sample in samples:
         write_sample(opts.output_directory, sample)
+
 
 if __name__ == "__main__":
     main()
