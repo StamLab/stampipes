@@ -1,0 +1,46 @@
+Bootstrap: docker
+From: rockylinux:8.6
+
+%arguments
+	FASTQC_VERSION=v0.11.5
+
+%help
+	This container contains the necessary software to run the first stage of
+	the pipeline, beginning from retriving metadata from LIMS, running
+	bcl2fastq and demultiplexing, collating fastq files, running FastQC, and
+	registering output with LIMS.
+
+%files
+	./bcl2fastq /usr/local/bin/bcl2fastq
+	../../scripts/lims/stamlims_api /opt/
+
+%post
+	set -e
+	dnf install -y python39
+	ln -s /usr/bin/python3 /usr/bin/python
+	python -m pip install /opt/stamlims_api/
+	python -m pip install Biopython
+	dnf install -y rsync
+
+	# install fastqc
+	# https://github.com/s-andrews/FastQC/
+	(
+		dnf install -y unzip perl java
+		cd /opt 
+		curl https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_{{ FASTQC_VERSION }}.zip --output fastqc.zip
+		unzip fastqc.zip
+		rm fastqc.zip
+		chmod +x FastQC/fastqc
+		ln -s /opt/FastQC/fastqc /usr/local/bin/fastqc
+	)
+
+
+%test
+	set -e
+	bcl2fastq --version
+	rsync --version
+	fastqc --version
+	gzip --version
+	python3 --version
+
+# vim: noexpandtab ts=4 sts=4 sw=4

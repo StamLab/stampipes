@@ -4,6 +4,16 @@
 # Ensure that script failures have the script quit before it deletes files
 set -e
 
+CLUSTER_NAME=$(scontrol show config | awk '$1 == "ClusterName" {print $3}')
+if [[ "$CLUSTER_NAME" == "altius-gene" ]] ; then
+  module load apptainer/1.3.3
+  echo "# Using apptainer"
+  export APX="apptainer exec --bind /net/seq/data2/sequencers,/net/seq/data2/flowcells,$STAMPIPES $STAMPIPES/containers/fastq/fastq.sif"
+else
+  echo "# Not using apptainer"
+  export APX=
+fi
+
 cd $FASTQ_DIR
 
 FASTQ_NAME=${FLOWCELL}_${SAMPLE_NAME}
@@ -28,10 +38,10 @@ R2_FILE=${FASTQ_NAME}_R2.fastq.gz
 function upload {
   if [[ "$SAMPLE_NAME" == LP* ]] ; then
     # Altcode sample, use dedicated script
-    python3 "$STAMPIPES/scripts/altcode/upload_fastq.py" --lane "$FLOWCELL_LANE_ID" --r1 "$R1_FILE" --r2 "$R2_FILE"
+    $APX python3 "$STAMPIPES/scripts/altcode/upload_fastq.py" --lane "$FLOWCELL_LANE_ID" --r1 "$R1_FILE" --r2 "$R2_FILE"
   else
     # Regular sample, upload old-style
-	  UPLOAD_SCRIPT="python3 $STAMPIPES/scripts/lims/upload_data.py --attach_file_contenttype SequencingData.flowcelllane --attach_file_objectid ${FLOWCELL_LANE_ID} --attach_file_type=gzipped-fastq"
+	  UPLOAD_SCRIPT="$APX python3 $STAMPIPES/scripts/lims/upload_data.py --attach_file_contenttype SequencingData.flowcelllane --attach_file_objectid ${FLOWCELL_LANE_ID} --attach_file_type=gzipped-fastq"
 	  $UPLOAD_SCRIPT --attach_file_purpose r1-fastq --attach_file "${R1_FILE}"
 
 	  if [ -e "$R2_FILE" ]; then
