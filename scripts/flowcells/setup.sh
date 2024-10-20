@@ -922,7 +922,7 @@ rm -f fastqc.bash collate.bash run_alignments.bash run_aggregations.bash run_poo
 bash collate.bash
 
 # Wait for collation jobs to finish
-while ( squeue -o "%j" | grep -q '^.collatefq*$flowcell') ; do
+while ( squeue -o "%j" | grep -q '^.collatefq.*$flowcell') ; do
    sleep 60
 done
 
