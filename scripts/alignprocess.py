@@ -390,6 +390,12 @@ class ProcessSetUp(object):
         lane = processing_info["libraries"][0]
         alignment = [a for a in lane["alignments"] if a["id"] == align_id][0]
 
+        # Skip processing if the lane is in a library pool
+        # These lanes are handled by poolprocess.py
+        if lane.get("library_pool"):
+            logging.info("Alignment %d belongs to a library pool, skipping", align_id)
+            return
+
         if "process_template" not in alignment:
             logging.error("Alignment %d has no process template", align_id)
             return False
