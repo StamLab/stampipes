@@ -2,11 +2,10 @@
 # shellcheck disable=SC1090
 # shellcheck disable=SC2162
 
-DEFAULT_QUEUE="${DEFAULT_QUEUE:-hpcz-test}"  # hpcz-2 on old cluster
-SLOW_QUEUE="${SLOW_QUEUE:-hpcz-test}"        # used to be queue0
+DEFAULT_QUEUE="${DEFAULT_QUEUE:-hpcz-test}" # hpcz-2 on old cluster
+SLOW_QUEUE="${SLOW_QUEUE:-hpcz-test}"       # used to be queue0
 
 ALIGN_NODE="${ALIGN_NODE:-dev2.altiusinstitute.org}" # Which node to run alignments on, curerntly should be on "old cluster"
-OLD_SLOW_QUEUE=${OLD_SLOW_QUEUE:-queue0}
 
 set -o errexit
 set -o pipefail
@@ -26,19 +25,29 @@ on_new_cluster () {
   [[ "$clustername" == "altius-gene" ]]
 }
 
-set_cluster_vars () {
-  if on_new_cluster ; then
+set_cluster_vars() {
+  # Sets the following vars:
+  # ON_NEW_CLUSTER - used for quick detection of what cluster we're on
+  # APX - a string that will run a command in apptainer if available, and run withou otherwise
+  # LOAD_APPTAINER - string to load apptainer moduler
+  # COMPUTE_QUEUE - the partition to run the resource-intensive jobs on
+  # LOGISTICS_QUEUE - the partition to run non-cpu-intensive jobs on  (file copy; "supervisor" jobs, etc)
+  if on_new_cluster; then
     echo "# Using apptainer"
     module load apptainer/1.3.3
     export ON_NEW_CLUSTER=1
     # Warning: if STAMPIPES contains spaces or glob chars this will likely break
     export APX="apptainer exec --bind /net/seq/data2/sequencers,/net/seq/data2/flowcells,$STAMPIPES $STAMPIPES/containers/fastq/fastq.sif"
     export LOAD_APPTAINER="module load apptainer/1.3.3"
+    export COMPUTE_QUEUE=hpcz-test
+    export LOGISTICS_QUEUE=hpcz-test
   else
     echo "# Not using apptainer"
     unset ON_NEW_CLUSTER
     export APX=
     export LOAD_APPTAINER=
+    export COMPUTE_QUEUE=hpcz-2
+    export LOGISTICS_QUEUE=queue0
   fi
 }
 # Immediately export our variables
@@ -327,7 +336,6 @@ _NOVA_BCL_CMD_
 
 # TODO: Remove hardcoded queue here!
 # The issue that that 'queue' isn't set until later in the script, but is needed for NOVA_SUBMIT_CMD
-queue="$DEFAULT_QUEUE"
 
 # This is a variant where we submit one job for each lane
 read -d '' novaseq_submit_command <<_NOVA_SUBMIT_CMD_
@@ -343,7 +351,7 @@ for samplesheet in SampleSheet.withmask*csv ; do
     bcl_mask=\$(sed 's/.*withmask\\.//;s/\\.csv//' <<< \$samplesheet)
     fastq_dir=\$(sed 's/,/-/g' <<< "fastq-withmask-\$bcl_mask-lane-00\$lane")
     jobname=u-$flowcell-\$bcl_mask-L00\$lane
-    bcl_jobid=\$(sbatch --export=ALL -J "\$jobname" -o "\$jobname.o%A" -e "\$jobname.e%A" --partition=$queue --ntasks=1 --cpus-per-task=40 --mem-per-cpu=8000 --parsable --oversubscribe <<__FASTQ__
+    bcl_jobid=\$(sbatch --export=ALL -J "\$jobname" -o "\$jobname.o%A" -e "\$jobname.e%A" --partition=\$COMPUTE_QUEUE --ntasks=1 --cpus-per-task=40 --mem-per-cpu=8000 --parsable --oversubscribe <<__FASTQ__
 #!/bin/bash
       set -x -e -o pipefail
       cd "${illumina_dir}"
@@ -394,7 +402,6 @@ case $run_type in
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
-    queue="$DEFAULT_QUEUE"
     $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
     #unaligned_command=$novaseq_bcl_command
@@ -409,7 +416,6 @@ case $run_type in
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
-    queue="$DEFAULT_QUEUE"
     $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
     #unaligned_command=$novaseq_bcl_command
@@ -424,7 +430,6 @@ case $run_type in
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
-    queue="$DEFAULT_QUEUE"
     $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
     #unaligned_command=$novaseq_bcl_command
@@ -439,7 +444,6 @@ case $run_type in
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
-    queue="$DEFAULT_QUEUE"
     $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
     #unaligned_command=$novaseq_bcl_command
@@ -454,7 +458,6 @@ case $run_type in
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
-    queue="$DEFAULT_QUEUE"
     $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
     #unaligned_command=$novaseq_bcl_command
@@ -469,7 +472,6 @@ case $run_type in
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
-    queue="$DEFAULT_QUEUE"
     $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
     #unaligned_command=$novaseq_bcl_command
@@ -485,7 +487,6 @@ case $run_type in
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--novaseq"
-    queue="$DEFAULT_QUEUE"
     $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
     bcl_tasks=1
     unaligned_command=$novaseq_bcl_command
@@ -499,7 +500,6 @@ case $run_type in
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--nextseq"
-    queue="$SLOW_QUEUE"
     make_nextseq_samplesheet > SampleSheet.csv
     bcl_tasks=1
     unaligned_command=$regular_bcl_command
@@ -511,7 +511,6 @@ case $run_type in
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--hiseq4k"
-    queue="$SLOW_QUEUE"
     make_nextseq_samplesheet > SampleSheet.csv
     bcl_tasks=1-8
     unaligned_command=$regular_bcl_command
@@ -524,7 +523,6 @@ case $run_type in
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--miniseq"
-    queue="$SLOW_QUEUE"
     make_nextseq_samplesheet > SampleSheet.csv
     bcl_tasks=1
     unaligned_command=$regular_bcl_command
@@ -537,7 +535,6 @@ case $run_type in
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--miniseq"
-    queue="$SLOW_QUEUE"
     minidemux="True"
     # placeholder
     cp /home/dchee7/projects/guide-seq/data/samplesheets/SampleSheet.csv SampleSheet.csv
@@ -559,7 +556,6 @@ _U_
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--miniseq"
-    queue="$SLOW_QUEUE"
     minidemux="True"
     make_miniseq_samplesheet > SampleSheet.csv
     bcl_tasks=1
@@ -580,7 +576,6 @@ _U_
     samplesheet="SampleSheet.csv"
     fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
     bc_flag="--miniseq"
-    queue="$SLOW_QUEUE"
     minidemux="True"
     # placeholder
     cat /net/fileserv0/projects/vol2/dchee7/datastore/talens/sample_sheets/SampleSheet.csv > SampleSheet.csv
@@ -636,7 +631,7 @@ copy_from_dir="$fastq_dir"
 if [ -n "$demux" ] ; then
   copy_from_dir="$(pwd)/Demultiplexed/"
   # obsolete now?
-  demux_cmd="$STAMPIPES/scripts/flowcells/demux_flowcell.sh -i $fastq_dir -o $copy_from_dir -p $json -q $queue -m $dmx_mismatches"
+  demux_cmd="$STAMPIPES/scripts/flowcells/demux_flowcell.sh -i $fastq_dir -o $copy_from_dir -p $json -q \$LOGISTICS_QUEUE -m $dmx_mismatches"
   link_command="#Demuxing happened, no linking to do"
 elif [[ "$bc_flag" == "--novaseq" ]] ; then
   copy_from_dir="$(pwd)/Demultiplexed/"
@@ -685,7 +680,7 @@ lims_patch "flowcell_run/$flowcell_id/" "status=https://lims.stamlab.org/api/flo
 lims_patch "flowcell_run/$flowcell_id/" "folder_name=${PWD##*/}"
 
 # bcl2fastq
-bcl_jobid=\$(sbatch --export=ALL -J "u-$flowcell" -o "u-$flowcell.o%A" -e "u-$flowcell.e%A" \$dependencies_barcodes --partition=$queue --ntasks=1 --cpus-per-task=20 --mem-per-cpu=8000 --parsable --oversubscribe <<'__FASTQ__'
+bcl_jobid=\$(sbatch --export=ALL -J "u-$flowcell" -o "u-$flowcell.o%A" -e "u-$flowcell.e%A" \$dependencies_barcodes --partition=\$COMPUTE_QUEUE --ntasks=1 --cpus-per-task=20 --mem-per-cpu=8000 --parsable --oversubscribe <<'__FASTQ__'
 #!/bin/bash
 
 set -x -e -o pipefail
@@ -706,13 +701,13 @@ __BCL2FASTQ__
 
 else # If not miniseq
 
-# Default (slow) bcl2fastq cmd
-if [[ -z "$submit_bcl2fastq_cmd" ]] ; then
-  # If we haven't created the submit command yet, wrap up the unaligned_command
-  # This is the "old" way of submitting one job that does the whole flowcell
-  submit_bcl2fastq_cmd=<<__SUBMIT_BCL2FASTQ_CMD__
+  # Default (slow) bcl2fastq cmd
+  if [[ -z "$submit_bcl2fastq_cmd" ]]; then
+    # If we haven't created the submit command yet, wrap up the unaligned_command
+    # This is the "old" way of submitting one job that does the whole flowcell
+    submit_bcl2fastq_cmd= <<__SUBMIT_BCL2FASTQ_CMD__
 # bcl2fastq
-bcl_jobid=\$(sbatch --export=ALL -J "u-$flowcell" -o "u-$flowcell.o%A" -e "u-$flowcell.e%A"  --partition=$queue --ntasks=1 --cpus-per-task=20 --mem-per-cpu=8000 --parsable --oversubscribe <<'__FASTQ__'
+bcl_jobid=\$(sbatch --export=ALL -J "u-$flowcell" -o "u-$flowcell.o%A" -e "u-$flowcell.e%A"  --partition=\$COMPUTE_QUEUE --ntasks=1 --cpus-per-task=20 --mem-per-cpu=8000 --parsable --oversubscribe <<'__FASTQ__'
 #!/bin/bash
 set -x -e -o pipefail
 cd "$illumina_dir"
@@ -762,7 +757,7 @@ lims_patch "flowcell_run/$flowcell_id/" "folder_name=${PWD##*/}"
 # Submit a barcode job for each mask
 for bcmask in $($APX python $STAMPIPES/scripts/flowcells/barcode_masks.py | xargs) ; do
     export bcmask
-    bcjobid=\$(sbatch --export=ALL -J "bc-$flowcell" -o "bc-$flowcell.o%A" -e "bc-$flowcell.e%A" --partition=$queue --cpus-per-task=10 --ntasks=1 --mem-per-cpu=6400 --parsable --oversubscribe --mail-type=FAIL --mail-user=sequencing@altius.org <<'__BARCODES__'
+    bcjobid=\$(sbatch --export=ALL -J "bc-$flowcell" -o "bc-$flowcell.o%A" -e "bc-$flowcell.e%A" --partition=\$COMPUTE_QUEUE --cpus-per-task=10 --ntasks=1 --mem-per-cpu=6400 --parsable --oversubscribe --mail-type=FAIL --mail-user=sequencing@altius.org <<'__BARCODES__'
 #!/bin/bash
 bcl_barcode_count --mask=\$bcmask $bc_flag > barcodes.\$bcmask.json
 \$APX python3 $STAMPIPES/scripts/lims/upload_data.py --barcode_report barcodes.\$bcmask.json
@@ -779,14 +774,14 @@ done
 
 $submit_bcl2fastq_cmd
 
-sbatch --export=ALL -J queuedemux-$flowcell -o "queuedemux-$flowcell.o%A" -e "queuedemux-$flowcell.e%A" \$bcl_dependency --partition $queue --ntasks=1 --cpus-per-task=1 --mem-per-cpu=1000 --parsable --oversubscribe <<__PART2__
+sbatch --export=ALL -J queuedemux-$flowcell -o "queuedemux-$flowcell.o%A" -e "queuedemux-$flowcell.e%A" \$bcl_dependency --partition=\$COMPUTE_QUEUE --ntasks=1 --cpus-per-task=1 --mem-per-cpu=1000 --parsable --oversubscribe <<__PART2__
 #!/bin/bash
 bash run_bcl2fastq_2.sh
 __PART2__
 
 __BCL2FASTQ__
 
-cat > run_bcl2fastq_2.sh <<__BCL2FASTQ2__
+  cat >run_bcl2fastq_2.sh <<__BCL2FASTQ2__
 # !/bin/bash
 source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
 [[ -s "$MODULELOAD" ]] && source "$MODULELOAD"
@@ -814,7 +809,7 @@ for i in "\${inputfiles[@]}" ; do
       suffix="--suffix \$(sed 's/.*_L00[0-9]\(_R[12]_.*\).fastq.gz/\1/' <(basename "\$i" ))"
    fi
 
-   jobid=\$(sbatch --export=ALL -J dmx\$(basename "\$i") -o .dmx\$(basename "\$i").o%A -e .dmx\$(basename "\$i").e%A --partition $queue --ntasks=1 --cpus-per-task=1 --mem-per-cpu=4000 --parsable --oversubscribe <<__DEMUX__
+   jobid=\$(sbatch --export=ALL -J dmx\$(basename "\$i") -o .dmx\$(basename "\$i").o%A -e .dmx\$(basename "\$i").e%A --partition=\$COMPUTE_QUEUE --ntasks=1 --cpus-per-task=1 --mem-per-cpu=4000 --parsable --oversubscribe <<__DEMUX__
 #!/bin/bash
     source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
     \$LOAD_APPTAINER
@@ -837,7 +832,7 @@ if [[ -n \$DEMUX_JOBIDS ]]; then
 fi
 
 # copy files and prep collation/fastqc
-copy_jobid=\$(sbatch --export=ALL -J "c-$flowcell" \$dmx_dependency -o "c-$flowcell.o%A" -e "c-$flowcell.e%A" --partition=$queue --cpus-per-task=1 --ntasks=1 --mem-per-cpu=1000 --parsable --oversubscribe <<'__COPY__'
+copy_jobid=\$(sbatch --export=ALL -J "c-$flowcell" \$dmx_dependency -o "c-$flowcell.o%A" -e "c-$flowcell.e%A" --partition=\$COMPUTE_QUEUE --cpus-per-task=1 --ntasks=1 --mem-per-cpu=1000 --parsable --oversubscribe <<'__COPY__'
 #!/bin/bash
 source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
 $link_command
@@ -887,7 +882,7 @@ if [[ -n \$copy_jobid ]]; then
 fi
 
 # Collate
-sbatch --export=ALL -J "collate-$flowcell" \$copy_dependency -o "collate-$flowcell.o%A" -e "collate-$flowcell.e%A" --partition=$queue --cpus-per-task=1 --ntasks=1 --mem-per-cpu=4000 --parsable --oversubscribe <<'__COLLATE__'
+sbatch --export=ALL -J "collate-$flowcell" \$copy_dependency -o "collate-$flowcell.o%A" -e "collate-$flowcell.e%A" --partition=\$LOGISTICS_QUEUE --cpus-per-task=1 --ntasks=1 --mem-per-cpu=4000 --parsable --oversubscribe <<'__COLLATE__'
 #!/bin/bash
 source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
 
@@ -905,7 +900,7 @@ rm -f fastqc.bash collate.bash run_alignments.bash run_aggregations.bash run_poo
 \$APX python3 "$STAMPIPES/scripts/apilaneprocess.py" \
   --script_template "$STAMPIPES/processes/fastq/fastqc.bash" \
   --qsub-prefix .fq \
-  --queue "$queue" \
+  --queue "\$COMPUTE_QUEUE" \
   --sample-script-basename fastqc.bash \
   --flowcell_label "$flowcell" \
   --outfile fastqc.bash
@@ -914,7 +909,7 @@ rm -f fastqc.bash collate.bash run_alignments.bash run_aggregations.bash run_poo
 \$APX python3 "$STAMPIPES/scripts/apilaneprocess.py" \
   --script_template "$STAMPIPES/processes/fastq/collate_fastq.bash" \
   --qsub-prefix .collatefq \
-  --queue "$queue" \
+  --queue "\$COMPUTE_QUEUE" \
   --sample-script-basename "collate.bash" \
   --flowcell_label "$flowcell" \
   --outfile collate.bash
@@ -933,12 +928,12 @@ bash fastqc.bash
 \$APX python3 "$STAMPIPES/scripts/alignprocess.py" \
   --flowcell "$flowcell"                          \
   --auto_aggregate                                \
-  --qsub-queue "$OLD_SLOW_QUEUE"                  \
+  --qsub-queue "\$LOGISTICS_QUEUE"                  \
   --outfile run_alignments.bash
 
 \$APX python3 "$STAMPIPES/scripts/poolprocess.py" \
   --flowcell "$flowcell"                         \
-  --qsub-queue "$OLD_SLOW_QUEUE"                 \
+  --qsub-queue "\$LOGISTICS_QUEUE"                 \
   --outfile run_pools.bash
 
 # Set up of flowcell aggregations
