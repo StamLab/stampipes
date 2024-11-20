@@ -454,7 +454,7 @@ class ProcessSetUp(object):
             )
             lane = None
         else:
-            lane = self.api.single_result(url=included["lane"])
+            lane = self.api_single_result(url=included["lane"])
 
         if not lane:
             logging.critical(
