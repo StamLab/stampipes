@@ -858,7 +858,7 @@ rsync -avP "$illumina_dir"/SampleSheet*.csv "$analysis_dir/"
         samp_number=\$(sed 's/.*DS\([0-9]*\).*/\1/' <<< "\$dir")
         [[ -n "\$samp_number" ]]
         destination=\$(jq -c -r ".libraries[] | select(.sample == \$samp_number) | .project_share_directory" ../processing.json)
-        if [[ -z "\$destination" ]] ; then
+        if [[ -z "\$destination" ]] || [[ "null" == "\$destination" ]] ; then
             destination=$analysis_dir
         elif [[ ! -d "\$destination" ]] ; then
             echo "Destination \$destination does not exist! Please create it." >&2
