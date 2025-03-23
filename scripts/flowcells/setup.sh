@@ -540,7 +540,7 @@ case $run_type in
     queue="$SLOW_QUEUE"
     minidemux="True"
     # placeholder
-    cp /home/dchee7/projects/guide-seq/data/samplesheets/SampleSheet.csv SampleSheet.csv
+    cp "$STAMPIPES/data/flowcells/miniseq/example_SampleSheet.csv" SampleSheet.csv
     bcl_tasks=1
     set +e
     read -d '' unaligned_command  << _U_
@@ -583,7 +583,7 @@ _U_
     queue="$SLOW_QUEUE"
     minidemux="True"
     # placeholder
-    cat /net/fileserv0/projects/vol2/dchee7/datastore/talens/sample_sheets/SampleSheet.csv > SampleSheet.csv
+    cp "$STAMPIPES/data/flowcells/miniseq/example_SampleSheet.csv" SampleSheet.csv
     #make_nextseq_samplesheet > SampleSheet.csv
     bcl_tasks=1
     set +e
