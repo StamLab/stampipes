@@ -992,7 +992,7 @@ class UploadLIMS(object):
             self.flowcelllane_contenttype = self.get_flowcelllane_contenttype()
 
         m = re.search(
-            r"(?P<samplename>[^/]+)_(?P<barcode>[AGTC-]+|NoIndex)_L00(?P<lane>[0-9])_(?P<read>R[12])",
+            r"(?P<samplename>[^/]+)_(?P<barcode>[AGTC-]+|NoIndex)_L00(?P<lane>[0-9])_(?P<read>R\d)",
             filename,
         )
 
