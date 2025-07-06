@@ -169,22 +169,15 @@ def main():
     data = json.loads(open(poptions.processing_file, "r").read())
 
     for lane in data["libraries"]:
-        create_links(
-            lane,
-            "R1",
-            input_dir,
-            poptions.output_dir,
-            poptions.dry_run,
-            merge_across_lanes=poptions.merge_across_lanes,
-        )
-        create_links(
-            lane,
-            "R2",
-            input_dir,
-            poptions.output_dir,
-            poptions.dry_run,
-            merge_across_lanes=poptions.merge_across_lanes,
-        )
+        for read in ["R1", "R2", "R3", "R4"]:
+            create_links(
+                lane,
+                read,
+                input_dir,
+                poptions.output_dir,
+                poptions.dry_run,
+                merge_across_lanes=poptions.merge_across_lanes,
+            )
 
     undet_lane = {
         "alignments": [{"sample_name": "lane1_Undetermined_L001"}],
