@@ -60,7 +60,7 @@ if [ "$UMI" = "True" ]; then
 fi
 
 # Build upload command dynamically based on which FastQC files exist
-UPLOAD_CMD="$APX python3 ${STAMPIPES}/scripts/lims/upload_data_withr3.py -f ${FLOWCELL} --flowcell_lane_id=${FLOWCELL_LANE_ID}"
+UPLOAD_CMD="$APX python3 ${STAMPIPES}/scripts/lims/upload_data.py -f ${FLOWCELL} --flowcell_lane_id=${FLOWCELL_LANE_ID}"
 if [ -e "$R1_FASTQC" ]; then
   UPLOAD_CMD="$UPLOAD_CMD --fastqcfile $R1_FASTQC"
 fi
@@ -77,8 +77,8 @@ eval $UPLOAD_CMD
 
 #$APX bash $STAMPIPES/scripts/fastq/attachfiles.bash
 # Inline contents of the script so I can add R3 and R4:
-UPLOAD_SCRIPT=$STAMPIPES/scripts/lims/upload_data_withr3.py
-ATTACH_LANE="python3 $UPLOAD_SCRIPT --attach_file_contenttype SequencingData.flowcelllane --attach_file_object ${FLOWCELL_LANE_ID}"
+UPLOAD_SCRIPT=$STAMPIPES/scripts/lims/upload_data.py
+ATTACH_LANE="$APX python3 $UPLOAD_SCRIPT --attach_file_contenttype SequencingData.flowcelllane --attach_file_object ${FLOWCELL_LANE_ID}"
 $ATTACH_LANE --attach_directory ${FASTQ_DIR} --attach_file_purpose fastq-directory
 if [ -e "$R1_FASTQC" ]; then
   $ATTACH_LANE --attach_file ${R1_FASTQC} --attach_file_type zip --attach_file_purpose fastqc-results-zip
