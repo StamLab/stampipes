@@ -936,21 +936,22 @@ bash fastqc.bash
   --qsub-queue "$OLD_SLOW_QUEUE"                  \
   --outfile run_alignments.bash
 
-\$APX python3 "$STAMPIPES/scripts/poolprocess.py" \
-  --flowcell "$flowcell"                         \
-  --qsub-queue "$OLD_SLOW_QUEUE"                 \
-  --outfile run_pools.bash
+# Pool processing is disabled - subsumed by megamap pipeline
+# \$APX python3 "$STAMPIPES/scripts/poolprocess.py" \
+#   --flowcell "$flowcell"                         \
+#   --qsub-queue "$OLD_SLOW_QUEUE"                 \
+#   --outfile run_pools.bash
 
 # Set up of flowcell aggregations
 curl -X POST "$LIMS_API_URL/flowcell_run/$flowcell_id/autoaggregate/" -H "Authorization: Token \$LIMS_API_TOKEN"
 
 if on_new_cluster ; then
   ssh "$ALIGN_NODE" bash --login "\$PWD/run_alignments.bash"
-  ssh "$ALIGN_NODE" bash --login "\$PWD/run_pools.bash"
+  # ssh "$ALIGN_NODE" bash --login "\$PWD/run_pools.bash"
 else
   # Run alignments
   bash run_alignments.bash
-  bash run_pools.bash
+  # bash run_pools.bash
 fi
 
 __COLLATE__
