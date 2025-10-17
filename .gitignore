@@ -32,3 +32,7 @@ environments/
 work
 genome_build
 tmp
+
+*.sif
+containers/module_files/*
+programs/*
