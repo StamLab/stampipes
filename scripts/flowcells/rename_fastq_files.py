@@ -82,7 +82,7 @@ def rename_files(
     merge_across_lanes=False,
 ):
     """
-    Rename (move) fastq files from bcl-convert output into canonical sample names.
+    Rename (move) fastq files from bcl2fastq output into canonical sample names.
     If dry_run is passed, will print the planned renames instead of performing them.
     """
 

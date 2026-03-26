@@ -687,7 +687,7 @@ while [ ! -e "$illumina_dir/CopyComplete.txt" ] ; do sleep 60 ; done
 lims_patch "flowcell_run/$flowcell_id/" "status=https://lims.stamlab.org/api/flowcell_run_status/3/"
 lims_patch "flowcell_run/$flowcell_id/" "folder_name=${PWD##*/}"
 
-# Create output subdirectory with restricted permissions before bcl-convert writes to it
+# Create output subdirectory with restricted permissions before bcl2fastq writes to it
 mkdir -p "$analysis_dir/bcl_output"
 chmod 700 "$analysis_dir/bcl_output"
 
@@ -766,7 +766,7 @@ while [ ! -e "$illumina_dir/CopyComplete.txt" ] ; do sleep 60 ; done
 lims_patch "flowcell_run/$flowcell_id/" "status=https://lims.stamlab.org/api/flowcell_run_status/3/"
 lims_patch "flowcell_run/$flowcell_id/" "folder_name=${PWD##*/}"
 
-# Create output subdirectory with restricted permissions before bcl-convert writes to it
+# Create output subdirectory with restricted permissions before bcl2fastq writes to it
 mkdir -p "$analysis_dir/bcl_output"
 chmod 700 "$analysis_dir/bcl_output"
 
