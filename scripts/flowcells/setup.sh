@@ -632,7 +632,6 @@ _U_
     ;;
 esac
 
-copy_from_dir="$fastq_dir"
 if [ -n "$demux" ] ; then
   copy_from_dir="$(pwd)/Demultiplexed/"
   # obsolete now?
@@ -702,8 +701,8 @@ $unaligned_command
 
 # if the run is for GUIDEseq, swap the indexes
 if cat processing.json | grep -q "MiniSeq Mid Output Kit GUIDEseq"; then
-    zcat fastq/Undetermined_S0_L001_I2_001.fastq.gz | awk '{if(NR % 4 == 2) {x=(substr(\$0,9,16)); y=(substr(\$0,0,8)); print x y; } else print; }' > fastq/Undetermined_S0_L001_I2_001.rev.fastq
-    gzip fastq/Undetermined_S0_L001_I2_001.rev.fastq
+    zcat "$analysis_dir/bcl_output/fastq/Undetermined_S0_L001_I2_001.fastq.gz" | awk '{if(NR % 4 == 2) {x=(substr(\$0,9,16)); y=(substr(\$0,0,8)); print x y; } else print; }' > "$analysis_dir/bcl_output/fastq/Undetermined_S0_L001_I2_001.rev.fastq"
+    gzip "$analysis_dir/bcl_output/fastq/Undetermined_S0_L001_I2_001.rev.fastq"
 fi
 
 __FASTQ__
