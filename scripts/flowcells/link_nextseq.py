@@ -142,11 +142,9 @@ def create_links(
         output_name = "%s_%s_%03d.fastq.gz" % (sample_name, read, idx)
         output_file = os.path.join(output_dir, output_name)
 
-        rel_path = os.path.relpath(input_file, output_dir)
-
-        logging.info("Linking %s => %s", rel_path, output_file)
+        logging.info("Moving %s => %s", input_file, output_file)
         if not dry_run and not os.path.exists(output_file):
-            os.symlink(rel_path, output_file)
+            os.rename(input_file, output_file)
 
 
 def main():
