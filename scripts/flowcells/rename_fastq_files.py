@@ -143,7 +143,7 @@ def rename_files(
         output_file = os.path.join(output_dir, output_name)
 
         logging.info("Moving %s => %s", input_file, output_file)
-        if not dry_run and not os.path.exists(output_file):
+        if not dry_run:
             os.rename(input_file, output_file)
 
 

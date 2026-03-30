@@ -850,6 +850,7 @@ fi
 copy_jobid=\$(sbatch --export=ALL -J "c-$flowcell" \$dmx_dependency -o "c-$flowcell.o%A" -e "c-$flowcell.e%A" --partition=$queue --cpus-per-task=1 --ntasks=1 --mem-per-cpu=1000 --parsable --oversubscribe <<'__COPY__'
 #!/bin/bash
 source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
+set -euo pipefail
 
 # Copy processing.json to analysis_dir and cd there so rename_fastq_files.py
 # resolves its -i and -o arguments correctly relative to analysis_dir
@@ -891,15 +892,16 @@ rsync -avP "$illumina_dir"/SampleSheet*.csv "$analysis_dir/"
         else
             # Internal: fast rename within the same filesystem
             mkdir -p "\$(dirname "\$destination")"
-            mv "\$dir" "\$destination"
+            mkdir -p "\$destination"
+            find "\$dir" -maxdepth 1 -mindepth 1 -exec mv -f '{}' "\$destination/" ';'
         fi
     done
     for dir in Project*/LibraryPool* ; do
         [[ -d \$dir ]] || continue
         destination=$analysis_dir
         destination=\$destination/\$dir
-        mkdir -p "\$(dirname "\$destination")"
-        mv "\$dir" "\$destination"
+        mkdir -p "\$destination"
+        find "\$dir" -maxdepth 1 -mindepth 1 -exec mv -f '{}' "\$destination/" ';'
     done
 )
 
