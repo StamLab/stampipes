@@ -142,8 +142,10 @@ def rename_files(
         output_name = "%s_%s_%03d.fastq.gz" % (sample_name, read, idx)
         output_file = os.path.join(output_dir, output_name)
 
-        logging.info("Moving %s => %s", input_file, output_file)
-        if not dry_run:
+        if dry_run:
+            logging.info("Dry run, skipping move: %s => %s", input_file, output_file)
+        else:
+            logging.info("Moving %s => %s", input_file, output_file)
             os.rename(input_file, output_file)
 
 
