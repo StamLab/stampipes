@@ -114,6 +114,26 @@ class BasesMask:
         return sum(1 for read in self.reads if any(piece[0] == "i" for piece in read))
 
     @property
+    def index_active_states(self) -> list[bool]:
+        """
+        Return active state for each physical index position.
+
+        A physical index slot is identified by containing any 'i' piece (including
+        zero-length ones left by adjust_for_barcode_lengths).  A slot is *active*
+        when it has at least one 'i' piece with length > 0, meaning bcl-convert
+        will actually demultiplex on it.
+
+        Returns a list ordered by physical read position, e.g. [True, False] means
+        Index1 is active and Index2 is masked.
+        """
+        states = []
+        for read in self.reads:
+            if any(piece[0] == "i" for piece in read):
+                active = any(piece[0] == "i" and piece[1] > 0 for piece in read)
+                states.append(active)
+        return states
+
+    @property
     def index_lengths(self) -> tuple[int, int]:
         """
         Return the lengths of index1 and index2.
@@ -160,7 +180,9 @@ class BasesMask:
                     # Barcode fills or exceeds the read
                     new_reads.append([("i", read_len)])
                 else:
-                    # Barcode is shorter, pad with 'n'
+                    # Barcode is shorter (or absent), pad with 'n'.
+                    # Keep ('i', 0) as a zero-length marker so callers can
+                    # distinguish a masked physical index slot from a non-index read.
                     new_reads.append([("i", bc_len), ("n", read_len - bc_len)])
             else:
                 new_reads.append(read)
@@ -250,16 +272,17 @@ def make_samplesheet_header(
     mismatch1 = mismatch_parts[0] if len(mismatch_parts) > 0 else "1"
     mismatch2 = mismatch_parts[1] if len(mismatch_parts) > 1 else mismatch1
 
-    # Build mismatch settings - only include Index2 if there are 2 index reads
-    num_indexes = mask.num_index_reads
-    if num_indexes >= 2:
-        mismatch_settings = (
-            f"BarcodeMismatchesIndex1,{mismatch1}\nBarcodeMismatchesIndex2,{mismatch2}"
-        )
-    elif num_indexes == 1:
-        mismatch_settings = f"BarcodeMismatchesIndex1,{mismatch1}"
-    else:
-        mismatch_settings = ""
+    # Emit BarcodeMismatchesIndexN only for physically active index reads.
+    # bcl-convert uses physical read numbering: Index1 = first index slot in
+    # RunInfo.xml, Index2 = second.  Emitting a mismatch setting for a slot
+    # whose OverrideCycles are all-N causes bcl-convert to error.
+    active = mask.index_active_states
+    mismatch_lines = []
+    if len(active) >= 1 and active[0]:
+        mismatch_lines.append(f"BarcodeMismatchesIndex1,{mismatch1}")
+    if len(active) >= 2 and active[1]:
+        mismatch_lines.append(f"BarcodeMismatchesIndex2,{mismatch2}")
+    mismatch_settings = "\n".join(mismatch_lines)
 
     template = textwrap.dedent("""\
     [Header]
