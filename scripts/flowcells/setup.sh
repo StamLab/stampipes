@@ -65,7 +65,7 @@ EOF
 }
 
 verbose=
-separate_demux_step=
+demux=
 nosleep=
 while getopts ":hvdxf:" opt ; do
     case $opt in
@@ -77,7 +77,7 @@ while getopts ":hvdxf:" opt ; do
         verbose=true
         ;;
     d)
-        separate_demux_step=true
+        demux=true
         ;;
     x)
         nosleep=true
@@ -110,10 +110,10 @@ fi
 
 # Generate sample sheets using make_samplesheets.py
 # This creates bcl-convert v2 format sample sheets with OverrideCycles
-# When $separate_demux_step is set, we skip samplesheet generation and use --no-sample-sheet
+# When $demux is set, we skip samplesheet generation and use --no-sample-sheet
 generate_samplesheets() {
   local extra_args=("$@")
-  if [ -n "$separate_demux_step" ] ; then
+  if [ -n "$demux" ] ; then
     echo "Demux mode: skipping samplesheet generation (will use --no-sample-sheet)"
     return
   fi
@@ -204,7 +204,7 @@ __BCL2FASTQ__
   exit 0
 fi
 
-if [ -z "$separate_demux_step" ] ; then
+if [ -z "$demux" ] ; then
   bcl_mask=$mask
   mismatches=$($APX python3 $STAMPIPES/scripts/flowcells/max_mismatch.py --ignore_failed_lanes --allow_collisions)
   if [ "$has_umi" == "true" ] ; then
@@ -226,19 +226,14 @@ fi
 # read -d '' always exits with status 1, so we ignore error
 # We split threads equally between processing and loading+writing.
 set +e
-# Build samplesheet argument - use --no-sample-sheet for demux mode
-if [ -n "$separate_demux_step" ] ; then
-  samplesheet_arg="--no-sample-sheet true"
-else
-  samplesheet_arg="--sample-sheet \"${illumina_dir}/SampleSheet.csv\""
-fi
-
+# NOTE: --sample-sheet is hardcoded here; running with -d (demux mode) on non-Novaseq
+# runs will fail because generate_samplesheets() skips creation and SampleSheet.csv won't exist.
 read -d '' regular_bcl_command  << _REG_BCL_CMD_
     module load bcl-convert/4.4.6
     bcl-convert \\\\
       --bcl-input-directory "${illumina_dir}" \\\\
       --output-directory "$fastq_dir" \\\\
-      $samplesheet_arg \\\\
+      --sample-sheet "${illumina_dir}/SampleSheet.csv" \\\\
       --fastq-gzip-compression-level 1 \\\\
       --bcl-num-conversion-threads     \\\$((SLURM_CPUS_PER_TASK / 2)) \\\\
       --bcl-num-compression-threads    \\\$((SLURM_CPUS_PER_TASK / 2)) \\\\
@@ -252,7 +247,7 @@ read -d '' novaseq_bcl_command  << _NOVA_BCL_CMD_
       fastq_dir=\$(sed 's/,/-/g' <<< "fastq-withmask-\$bcl_mask")
       bcl-convert \\\\
         --bcl-input-directory "${illumina_dir}" \\\\
-        --output-directory    "${illumina_dir}/\$fastq_dir" \\\\
+        --output-directory    "${analysis_dir}/bcl_output/\$fastq_dir" \\\\
         --sample-sheet        "${illumina_dir}/\$samplesheet" \\\\
         --fastq-gzip-compression-level 1 \\\\
         --bcl-num-conversion-threads     \\\$((SLURM_CPUS_PER_TASK / 2)) \\\\
@@ -286,7 +281,7 @@ for samplesheet in SampleSheet.withmask*csv ; do
       module load bcl-convert/4.4.6
       bcl-convert \\\\
         --bcl-input-directory "${illumina_dir}" \\\\
-        --output-directory    "${illumina_dir}/\\\$fastq_dir" \\\\
+        --output-directory    "${analysis_dir}/bcl_output/\\\$fastq_dir" \\\\
         --sample-sheet        "${illumina_dir}/\$samplesheet" \\\\
         --bcl-only-lane       "\\\$lane" \\\\
         --fastq-gzip-compression-level 1 \\\\
@@ -305,9 +300,9 @@ fi
 _NOVA_SUBMIT_CMD_
 
 read -d '' novaseq_link_command  <<'_NOVA_LINK_CMD_'
-for fq_dir in fastq-withmask-* ; do
+for fq_dir in bcl_output/fastq-withmask-* ; do
   [[ -d $fq_dir ]] || continue
-  $APX python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i "$fq_dir" -o Demultiplexed -p processing.json
+  $APX python3 $STAMPIPES/scripts/flowcells/rename_fastq_files.py -i "$fq_dir" -o Demultiplexed -p processing.json
 done
 _NOVA_LINK_CMD_
 set -e
@@ -327,7 +322,7 @@ case $run_type in
     parallel_env="-pe threads 6"
     link_command=$novaseq_link_command
     samplesheet="SampleSheet.csv"
-    fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
+    fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
     $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --mismatches "$mismatches" -p processing.json
@@ -341,7 +336,7 @@ case $run_type in
     parallel_env="-pe threads 6"
     link_command=$novaseq_link_command
     samplesheet="SampleSheet.csv"
-    fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
+    fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
     $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --mismatches "$mismatches" -p processing.json
@@ -355,7 +350,7 @@ case $run_type in
     parallel_env="-pe threads 6"
     link_command=$novaseq_link_command
     samplesheet="SampleSheet.csv"
-    fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
+    fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
     $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --mismatches "$mismatches" -p processing.json
@@ -369,7 +364,7 @@ case $run_type in
     parallel_env="-pe threads 6"
     link_command=$novaseq_link_command
     samplesheet="SampleSheet.csv"
-    fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
+    fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
     $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --mismatches "$mismatches" -p processing.json
@@ -383,7 +378,7 @@ case $run_type in
     parallel_env="-pe threads 6"
     link_command=$novaseq_link_command
     samplesheet="SampleSheet.csv"
-    fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
+    fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
     $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --mismatches "$mismatches" -p processing.json
@@ -397,7 +392,7 @@ case $run_type in
     parallel_env="-pe threads 6"
     link_command=$novaseq_link_command
     samplesheet="SampleSheet.csv"
-    fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
+    fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
     $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --mismatches "$mismatches" -p processing.json
@@ -412,7 +407,7 @@ case $run_type in
     parallel_env="-pe threads 6"
     link_command=$novaseq_link_command
     samplesheet="SampleSheet.csv"
-    fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
+    fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
     $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --mismatches "$mismatches" -p processing.json
@@ -424,9 +419,9 @@ case $run_type in
 
     echo "Regular NextSeq 500 run detected"
     parallel_env="-pe threads 6"
-    link_command="\$APX python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
+    link_command="\$APX python3 $STAMPIPES/scripts/flowcells/rename_fastq_files.py -i bcl_output/fastq -o Demultiplexed --merge-across-lanes"
     samplesheet="SampleSheet.csv"
-    fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
+    fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--nextseq"
     queue="$SLOW_QUEUE"
     generate_samplesheets
@@ -436,9 +431,9 @@ case $run_type in
 "HiSeq 4000")
     echo "Hiseq 4000 run detected"
     parallel_env="-pe threads 6"
-    link_command="\$APX python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o ."
+    link_command="\$APX python3 $STAMPIPES/scripts/flowcells/rename_fastq_files.py -i bcl_output/fastq -o Demultiplexed"
     samplesheet="SampleSheet.csv"
-    fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
+    fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--hiseq4k"
     queue="$SLOW_QUEUE"
     generate_samplesheets
@@ -449,9 +444,9 @@ case $run_type in
     # Identical to nextseq processing
     echo "High-output MiniSeq run detected for DNase"
     parallel_env="-pe threads 6"
-    link_command="\$APX python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
+    link_command="\$APX python3 $STAMPIPES/scripts/flowcells/rename_fastq_files.py -i bcl_output/fastq -o Demultiplexed --merge-across-lanes"
     samplesheet="SampleSheet.csv"
-    fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
+    fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--miniseq"
     queue="$SLOW_QUEUE"
     generate_samplesheets
@@ -462,9 +457,9 @@ case $run_type in
     # Identical to nextseq processing
     echo "Mid-output MiniSeq run detected for GUIDEseq"
     parallel_env="-pe threads 6"
-    link_command="\$APX python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
+    link_command="\$APX python3 $STAMPIPES/scripts/flowcells/rename_fastq_files.py -i bcl_output/fastq -o Demultiplexed --merge-across-lanes"
     samplesheet="SampleSheet.csv"
-    fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
+    fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--miniseq"
     queue="$SLOW_QUEUE"
     minidemux="True"
@@ -487,9 +482,9 @@ _U_
     # Identical to nextseq processing
     echo "Mid-output MiniSeq run detected"
     parallel_env="-pe threads 6"
-    link_command="\$APX python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
+    link_command="\$APX python3 $STAMPIPES/scripts/flowcells/rename_fastq_files.py -i bcl_output/fastq -o Demultiplexed --merge-across-lanes"
     samplesheet="SampleSheet.csv"
-    fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
+    fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--miniseq"
     queue="$SLOW_QUEUE"
     minidemux="True"
@@ -501,7 +496,7 @@ _U_
     bcl-convert \\\\
       --bcl-input-directory "${illumina_dir}" \\\\
       --output-directory "$fastq_dir" \\\\
-      $samplesheet_arg \\\\
+      --sample-sheet "${illumina_dir}/SampleSheet.csv" \\\\
       --no-lane-splitting true \\\\
       --fastq-gzip-compression-level 1
 _U_
@@ -511,9 +506,9 @@ _U_
     # Identical to nextseq processing
     echo "High-output MiniSeq run detected"
     parallel_env="-pe threads 6"
-    link_command="\$APX python3 $STAMPIPES/scripts/flowcells/link_nextseq.py -i fastq -o . --merge-across-lanes"
+    link_command="\$APX python3 $STAMPIPES/scripts/flowcells/rename_fastq_files.py -i bcl_output/fastq -o Demultiplexed --merge-across-lanes"
     samplesheet="SampleSheet.csv"
-    fastq_dir="$illumina_dir/fastq"  # Lack of trailing slash is important for rsync!
+    fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--miniseq"
     queue="$SLOW_QUEUE"
     minidemux="True"
@@ -546,14 +541,16 @@ _U_
     ;;
 esac
 
-copy_from_dir="$fastq_dir"
-if [ -n "$separate_demux_step" ] ; then
+if [ -n "$demux" ] ; then
   copy_from_dir="$(pwd)/Demultiplexed/"
   # obsolete now?
   demux_cmd="$STAMPIPES/scripts/flowcells/demux_flowcell.sh -i $fastq_dir -o $copy_from_dir -p $json -q $queue -m $dmx_mismatches"
   link_command="#Demuxing happened, no linking to do"
-elif [[ "$bc_flag" == "--novaseq" ]] ; then
-  copy_from_dir="$(pwd)/Demultiplexed/"
+else
+  # All paths write FASTQs directly to analysis_dir/bcl_output/; rename_fastq_files.py renames
+  # them into Demultiplexed/ as an intermediate before the copy step moves them
+  # to their final locations.
+  copy_from_dir="$analysis_dir/Demultiplexed/"
 fi
 
 flowcell_id=$( curl \
@@ -598,6 +595,10 @@ while [ ! -e "$illumina_dir/CopyComplete.txt" ] ; do sleep 60 ; done
 lims_patch "flowcell_run/$flowcell_id/" "status=https://lims.stamlab.org/api/flowcell_run_status/3/"
 lims_patch "flowcell_run/$flowcell_id/" "folder_name=${PWD##*/}"
 
+# Create output subdirectory with restricted permissions before bcl-convert writes to it
+mkdir -p "$analysis_dir/bcl_output"
+chmod 700 "$analysis_dir/bcl_output"
+
 # bcl-convert
 bcl_jobid=\$(sbatch --export=ALL -J "u-$flowcell" -o "u-$flowcell.o%A" -e "u-$flowcell.e%A" \$dependencies_barcodes --partition=$queue --ntasks=1 --cpus-per-task=20 --mem-per-cpu=8000 --parsable --oversubscribe <<'__FASTQ__'
 #!/bin/bash
@@ -609,8 +610,8 @@ $unaligned_command
 
 # if the run is for GUIDEseq, swap the indexes
 if cat processing.json | grep -q "MiniSeq Mid Output Kit GUIDEseq"; then
-    zcat fastq/Undetermined_S0_L001_I2_001.fastq.gz | awk '{if(NR % 4 == 2) {x=(substr(\$0,9,16)); y=(substr(\$0,0,8)); print x y; } else print; }' > fastq/Undetermined_S0_L001_I2_001.rev.fastq
-    gzip fastq/Undetermined_S0_L001_I2_001.rev.fastq
+    zcat "$analysis_dir/bcl_output/fastq/Undetermined_S0_L001_I2_001.fastq.gz" | awk '{if(NR % 4 == 2) {x=(substr(\$0,9,16)); y=(substr(\$0,0,8)); print x y; } else print; }' > "$analysis_dir/bcl_output/fastq/Undetermined_S0_L001_I2_001.rev.fastq"
+    gzip "$analysis_dir/bcl_output/fastq/Undetermined_S0_L001_I2_001.rev.fastq"
 fi
 
 __FASTQ__
@@ -673,6 +674,10 @@ while [ ! -e "$illumina_dir/CopyComplete.txt" ] ; do sleep 60 ; done
 lims_patch "flowcell_run/$flowcell_id/" "status=https://lims.stamlab.org/api/flowcell_run_status/3/"
 lims_patch "flowcell_run/$flowcell_id/" "folder_name=${PWD##*/}"
 
+# Create output subdirectory with restricted permissions before bcl-convert writes to it
+mkdir -p "$analysis_dir/bcl_output"
+chmod 700 "$analysis_dir/bcl_output"
+
 # Submit a barcode job for each mask
 for bcmask in $($APX python $STAMPIPES/scripts/flowcells/barcode_masks.py | xargs) ; do
     export bcmask
@@ -711,7 +716,7 @@ $(declare -f on_new_cluster)
 $(declare -f set_cluster_vars)
 set_cluster_vars
 
-if [[ -n "$separate_demux_step" ]] ; then
+if [[ -n "$demux" ]] ; then
 # demultiplex
 if [ -d "$fastq_dir.L001" ] ; then
   inputfiles=(\$(find $fastq_dir.L00[1-9] -name "*Undetermined_*fastq.gz" -size +0 ))
@@ -754,17 +759,23 @@ fi
 copy_jobid=\$(sbatch --export=ALL -J "c-$flowcell" \$dmx_dependency -o "c-$flowcell.o%A" -e "c-$flowcell.e%A" --partition=$queue --cpus-per-task=1 --ntasks=1 --mem-per-cpu=1000 --parsable --oversubscribe <<'__COPY__'
 #!/bin/bash
 source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
+set -euo pipefail
+
+# Copy processing.json to analysis_dir and cd there so rename_fastq_files.py
+# resolves its -i and -o arguments correctly relative to analysis_dir
+cp "$illumina_dir/processing.json" "$analysis_dir/"
+cd "$analysis_dir"
 $link_command
 
-# copy files
-mkdir -p "$analysis_dir"
+# Copy small metadata files from the illumina run dir
 rsync -avP "$illumina_dir/InterOp" "$analysis_dir/"
 rsync -avP "$illumina_dir/RunInfo.xml" "$analysis_dir/"
 rsync -avP "$illumina_dir"/SampleSheet*.csv "$analysis_dir/"
 
 
-# Copy each sample by itself, checking to see if we have a project_share_directory set
-# This is very important to keep customer data separate from internal data.
+# Move each sample into its final location. Samples with a project_share_directory
+# are rsynced to a potentially different filesystem; internal samples are renamed
+# (O(1) on the same filesystem, no data movement).
 (
     cd "$copy_from_dir"
     for dir in Project*/Sample* ; do
@@ -774,22 +785,32 @@ rsync -avP "$illumina_dir"/SampleSheet*.csv "$analysis_dir/"
         destination=\$(jq -c -r ".libraries[] | select(.sample == \$samp_number) | .project_share_directory" ../processing.json)
         if [[ -z "\$destination" ]] || [[ "null" == "\$destination" ]] ; then
             destination=$analysis_dir
+            use_rsync=
         elif [[ ! -d "\$destination" ]] ; then
             echo "Destination \$destination does not exist! Please create it." >&2
             exit 1
         else
             destination=\$destination/fastq
+            use_rsync=1
         fi
         destination=\$destination/\$dir
-        mkdir -p "\$destination"
-        rsync -aL "\$dir/" "\$destination/"
+        if [[ -n "\$use_rsync" ]] ; then
+            # External share: copy to a (potentially different) filesystem path
+            mkdir -p "\$destination"
+            rsync -a "\$dir/" "\$destination/"
+        else
+            # Internal: fast rename within the same filesystem
+            mkdir -p "\$(dirname "\$destination")"
+            mkdir -p "\$destination"
+            find "\$dir" -maxdepth 1 -mindepth 1 -exec mv -f '{}' "\$destination/" ';'
+        fi
     done
     for dir in Project*/LibraryPool* ; do
         [[ -d \$dir ]] || continue
         destination=$analysis_dir
         destination=\$destination/\$dir
         mkdir -p "\$destination"
-        rsync -aL "\$dir/" "\$destination/"
+        find "\$dir" -maxdepth 1 -mindepth 1 -exec mv -f '{}' "\$destination/" ';'
     done
 )
 

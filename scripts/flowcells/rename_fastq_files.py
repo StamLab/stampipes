@@ -62,7 +62,7 @@ def parser_setup():
         "--dry-run",
         dest="dry_run",
         action="store_true",
-        help="Only print out planned symlinks.",
+        help="Only print out planned renames without performing them.",
     )
 
     parser.set_defaults(**SCRIPT_OPTIONS)
@@ -71,7 +71,7 @@ def parser_setup():
     return parser
 
 
-def create_links(
+def rename_files(
     lane,
     read,
     input_basedir,
@@ -82,8 +82,8 @@ def create_links(
     merge_across_lanes=False,
 ):
     """
-    Create the links between the input directories and output dir
-    If dry_run is passed, will print them instead of creating them
+    Rename (move) fastq files from bcl2fastq output into canonical sample names.
+    If dry_run is passed, will print the planned renames instead of performing them.
     """
 
     short_name = lane["samplesheet_name"]
@@ -142,11 +142,11 @@ def create_links(
         output_name = "%s_%s_%03d.fastq.gz" % (sample_name, read, idx)
         output_file = os.path.join(output_dir, output_name)
 
-        rel_path = os.path.relpath(input_file, output_dir)
-
-        logging.info("Linking %s => %s", rel_path, output_file)
-        if not dry_run and not os.path.exists(output_file):
-            os.symlink(rel_path, output_file)
+        if dry_run:
+            logging.info("Dry run, skipping move: %s => %s", input_file, output_file)
+        else:
+            logging.info("Moving %s => %s", input_file, output_file)
+            os.rename(input_file, output_file)
 
 
 def main():
@@ -170,7 +170,7 @@ def main():
 
     for lane in data["libraries"]:
         for read in ["R1", "R2", "R3", "R4"]:
-            create_links(
+            rename_files(
                 lane,
                 read,
                 input_dir,
@@ -184,7 +184,7 @@ def main():
         "samplesheet_name": "Undetermined",
     }
     for read in ["R1", "R2"]:
-        create_links(
+        rename_files(
             undet_lane,
             read,
             input_dir,
@@ -216,7 +216,7 @@ def main():
                 "project": "Lab",
             }
             for read in ["R1", "R2"]:
-                create_links(
+                rename_files(
                     lane,
                     read,
                     input_dir,
