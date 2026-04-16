@@ -234,7 +234,7 @@ read -d '' regular_bcl_command  << _REG_BCL_CMD_
       --bcl-input-directory "${illumina_dir}" \\\\
       --output-directory "$fastq_dir" \\\\
       --sample-sheet "${illumina_dir}/SampleSheet.csv" \\\\
-      --fastq-gzip-compression-level 1 \\\\
+      --fastq-gzip-compression-level 4 \\\\
       --bcl-num-conversion-threads     \\\$((SLURM_CPUS_PER_TASK / 2)) \\\\
       --bcl-num-compression-threads    \\\$((SLURM_CPUS_PER_TASK / 2)) \\\\
       --bcl-num-decompression-threads  \\\$((SLURM_CPUS_PER_TASK / 2))
@@ -249,7 +249,7 @@ read -d '' novaseq_bcl_command  << _NOVA_BCL_CMD_
         --bcl-input-directory "${illumina_dir}" \\\\
         --output-directory    "${analysis_dir}/bcl_output/\$fastq_dir" \\\\
         --sample-sheet        "${illumina_dir}/\$samplesheet" \\\\
-        --fastq-gzip-compression-level 1 \\\\
+        --fastq-gzip-compression-level 4 \\\\
         --bcl-num-conversion-threads     \\\$((SLURM_CPUS_PER_TASK / 2)) \\\\
         --bcl-num-compression-threads    \\\$((SLURM_CPUS_PER_TASK / 2)) \\\\
         --bcl-num-decompression-threads  \\\$((SLURM_CPUS_PER_TASK / 2))
@@ -284,7 +284,7 @@ for samplesheet in SampleSheet.withmask*csv ; do
         --output-directory    "${analysis_dir}/bcl_output/\\\$fastq_dir" \\\\
         --sample-sheet        "${illumina_dir}/\$samplesheet" \\\\
         --bcl-only-lane       "\\\$lane" \\\\
-        --fastq-gzip-compression-level 1 \\\\
+        --fastq-gzip-compression-level 4 \\\\
         --bcl-num-conversion-threads     \\\\\$((SLURM_CPUS_PER_TASK / 2)) \\\\
         --bcl-num-compression-threads    \\\\\$((SLURM_CPUS_PER_TASK / 2)) \\\\
         --bcl-num-decompression-threads  \\\\\$((SLURM_CPUS_PER_TASK / 2))
@@ -474,7 +474,7 @@ case $run_type in
       --output-directory "$fastq_dir" \\\\
       --sample-sheet "${illumina_dir}/SampleSheet.csv" \\\\
       --create-fastq-for-index-reads true \\\\
-      --fastq-gzip-compression-level 1
+      --fastq-gzip-compression-level 4
 _U_
     set -e
     ;;
@@ -498,7 +498,7 @@ _U_
       --output-directory "$fastq_dir" \\\\
       --sample-sheet "${illumina_dir}/SampleSheet.csv" \\\\
       --no-lane-splitting true \\\\
-      --fastq-gzip-compression-level 1
+      --fastq-gzip-compression-level 4
 _U_
     set -e
     ;;
@@ -524,7 +524,7 @@ _U_
       --output-directory "$fastq_dir" \\\\
       --sample-sheet "${illumina_dir}/SampleSheet.csv" \\\\
       --no-lane-splitting true \\\\
-      --fastq-gzip-compression-level 1
+      --fastq-gzip-compression-level 4
 _U_
     set -e
     ;;
