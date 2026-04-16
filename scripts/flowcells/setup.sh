@@ -325,7 +325,7 @@ case $run_type in
     fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --mismatches "$mismatches" -p processing.json
+    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --reverse_barcode2 --mismatches "$mismatches" -p processing.json
     bcl_tasks=1
     submit_bcl2fastq_cmd=$novaseq_submit_command
 ;;
@@ -339,7 +339,7 @@ case $run_type in
     fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --mismatches "$mismatches" -p processing.json
+    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --reverse_barcode2 --mismatches "$mismatches" -p processing.json
     bcl_tasks=1
     submit_bcl2fastq_cmd=$novaseq_submit_command
 
@@ -353,7 +353,7 @@ case $run_type in
     fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --mismatches "$mismatches" -p processing.json
+    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --reverse_barcode2 --mismatches "$mismatches" -p processing.json
     bcl_tasks=1
     submit_bcl2fastq_cmd=$novaseq_submit_command
 
@@ -367,7 +367,7 @@ case $run_type in
     fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --mismatches "$mismatches" -p processing.json
+    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --reverse_barcode2 --mismatches "$mismatches" -p processing.json
     bcl_tasks=1
     submit_bcl2fastq_cmd=$novaseq_submit_command
 
@@ -381,7 +381,7 @@ case $run_type in
     fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --mismatches "$mismatches" -p processing.json
+    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --reverse_barcode2 --mismatches "$mismatches" -p processing.json
     bcl_tasks=1
     submit_bcl2fastq_cmd=$novaseq_submit_command
 
@@ -395,7 +395,7 @@ case $run_type in
     fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --mismatches "$mismatches" -p processing.json
+    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --reverse_barcode2 --mismatches "$mismatches" -p processing.json
     bcl_tasks=1
     submit_bcl2fastq_cmd=$novaseq_submit_command
 
@@ -410,7 +410,7 @@ case $run_type in
     fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --mismatches "$mismatches" -p processing.json
+    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --reverse_barcode2 --mismatches "$mismatches" -p processing.json
     bcl_tasks=1
     unaligned_command=$novaseq_bcl_command
 
