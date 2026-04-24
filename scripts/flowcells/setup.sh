@@ -105,103 +105,33 @@ if [ -z "$flowcell" ] ; then
 fi
 
 #######################
-# Samplesheet functions
+# Samplesheet generation
 #######################
 
-make_hiseq_samplesheet(){
-  echo "FCID,Lane,SampleID,SampleRef,Index,Description,Control,Recipe,Operator,SampleProject"
-
-  if [ -z "$demux" ] ; then
-    # ( X | tostring) syntax is for non-string fields
-    # Default values (if field is false or null) come after //
-    jq -r --arg flowcell "$flowcell" '
-    .libraries as $l
-    | $l
-    | map( select(.failed == false) )
-    | map( .lane as $num
-    | .barcode_index =
-    if (  $l | map(select( $num  == .lane )) | length == 1 ) then
-      "NoIndex"
-    else
-      .barcode_index
-      end )
-      | .[] | [
-      "FC" + $flowcell,
-      (.lane | tostring),
-      .samplesheet_name,
-      .alignments[0].genome_index // "contam",
-      .barcode_index              // "NoIndex",
-      .cell_type                  // "None"  ,
-      "N",
-      .assay                      // "N/A"   ,
-      "orders",
-      .project
-      ] | join(",") ' "$json"
-    else
-      for i in $(seq 8) ; do
-        echo "FC$flowcell,$i,none,none,GGGGGGGG-GGGGGGGG,none,N,none,none,none"
-      done
+# Generate sample sheets using make_samplesheets.py
+# This creates bcl-convert v2 format sample sheets with OverrideCycles
+# When $demux is set, we skip samplesheet generation and use --no-sample-sheet
+generate_samplesheets() {
+  local extra_args=("$@")
+  if [ -n "$demux" ] ; then
+    echo "Demux mode: skipping samplesheet generation (will use --no-sample-sheet)"
+    return
+  fi
+  # shellcheck disable=SC2086
+  $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" \
+    -p "$json" \
+    --mismatches "$mismatches" \
+    --filename "SampleSheet.withmask.{mask}.csv" \
+    "${extra_args[@]}"
+  # TODO: Don't like this....
+  # Create a symlink to the first samplesheet as SampleSheet.csv for simple cases
+  if [ ! -e SampleSheet.csv ] ; then
+    local first_sheet
+    first_sheet=$(ls SampleSheet.withmask.*.csv 2>/dev/null | head -n1)
+    if [ -n "$first_sheet" ] ; then
+      ln -sf "$first_sheet" SampleSheet.csv
     fi
-
-  }
-
-
-make_nextseq_samplesheet(){
-  name=Stamlab
-  date=$(date '+%m/%d/%Y')
-  cat <<__SHEET__
-[Header]
-Investigator Name,$name
-Project Name,$name
-Experiment Name,$name
-Date,$date
-Workflow,GenerateFASTQ
-
-[Settings]
-
-[Data]
-SampleID,SampleName,index,index2
-none,none,GGGGGGGG,GGGGGGGG
-__SHEET__
-
-if [ -z "$demux" ] ; then
-  # This bit of cryptic magic generates the samplesheet part.
-  jq -r '.libraries[] | select(.failed == false) | [.samplesheet_name,.samplesheet_name,.barcode_index,""] | join(",") ' "$json" \
-    | sed 's/\([ACTG]\+\)-\([ACTG]\+\),$/\1,\2/'  # Changes dual-index barcodes to proper format
-fi
-
-}
-
-# placeholder
-make_miniseq_samplesheet(){
-  name=Stamlab
-  date=$(date '+%m/%d/%Y')
-  cat <<__SHEET__
-[Header]
-Investigator Name,$name
-Project Name,$name
-Experiment Name,$name
-Date,$date
-Workflow,GenerateFASTQ
-
-[Settings]
-
-[Data]
-SampleID,SampleName,index,index2
-none,none,GGGGGGGG,GGGGGGGG
-__SHEET__
-
-if [ -z "$demux" ] ; then
-  # This bit of cryptic magic generates the samplesheet part.
-  jq -r '.libraries[] | select(.failed == false) | [.samplesheet_name,.samplesheet_name,.barcode_index,""] | join(",") ' "$json" \
-    | sed 's/\([ACTG]\+\)-\([ACTG]\+\),$/\1,\2/'  # Changes dual-index barcodes to proper format
-fi
-
-}
-
-# placeholder
-make_miniseq_guideseq_samplesheet(){
-sleep 10
+  fi
 }
 
 ########
@@ -296,32 +226,33 @@ fi
 # read -d '' always exits with status 1, so we ignore error
 # We split threads equally between processing and loading+writing.
 set +e
+# NOTE: --sample-sheet is hardcoded here; running with -d (demux mode) on non-Novaseq
+# runs will fail because generate_samplesheets() skips creation and SampleSheet.csv won't exist.
 read -d '' regular_bcl_command  << _REG_BCL_CMD_
-    PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
-    \$APX bcl2fastq \\\\
-      --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
-      --use-bases-mask "$bcl_mask" \\\\
-      --output-dir "$fastq_dir" \\\\
-      --barcode-mismatches "$mismatches" \\\\
-      --writing-threads        0                       \\\\
-      --loading-threads        \\\$SLURM_CPUS_PER_TASK \\\\
-      --processing-threads     \\\$SLURM_CPUS_PER_TASK
+    module load bcl-convert/4.4.6
+    bcl-convert \\\\
+      --bcl-input-directory "${illumina_dir}" \\\\
+      --output-directory "$fastq_dir" \\\\
+      --sample-sheet "${illumina_dir}/SampleSheet.csv" \\\\
+      --fastq-gzip-compression-level 4 \\\\
+      --bcl-num-conversion-threads     \\\$((SLURM_CPUS_PER_TASK / 2)) \\\\
+      --bcl-num-compression-threads    \\\$((SLURM_CPUS_PER_TASK / 2)) \\\\
+      --bcl-num-decompression-threads  \\\$((SLURM_CPUS_PER_TASK / 2))
 _REG_BCL_CMD_
 
 read -d '' novaseq_bcl_command  << _NOVA_BCL_CMD_
-    PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
+    module load bcl-convert/4.4.6
     for samplesheet in SampleSheet.withmask*csv ; do
       bcl_mask=\$(sed 's/.*withmask\\.//;s/\\.csv//' <<< \$samplesheet)
       fastq_dir=\$(sed 's/,/-/g' <<< "fastq-withmask-\$bcl_mask")
-      \$APX bcl2fastq \\\\
-        --input-dir          "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
-        --output-dir         "${analysis_dir}/bcl_output/\$fastq_dir"        \\\\
-        --use-bases-mask     "\$bcl_mask"                                 \\\\
-        --barcode-mismatches "$mismatches"                                \\\\
-        --sample-sheet       "${illumina_dir}/\$samplesheet"              \\\\
-        --writing-threads    0                                            \\\\
-        --loading-threads    \\\$SLURM_CPUS_PER_TASK                      \\\\
-        --processing-threads \\\$SLURM_CPUS_PER_TASK
+      bcl-convert \\\\
+        --bcl-input-directory "${illumina_dir}" \\\\
+        --output-directory    "${analysis_dir}/bcl_output/\$fastq_dir" \\\\
+        --sample-sheet        "${illumina_dir}/\$samplesheet" \\\\
+        --fastq-gzip-compression-level 4 \\\\
+        --bcl-num-conversion-threads     \\\$((SLURM_CPUS_PER_TASK / 2)) \\\\
+        --bcl-num-compression-threads    \\\$((SLURM_CPUS_PER_TASK / 2)) \\\\
+        --bcl-num-decompression-threads  \\\$((SLURM_CPUS_PER_TASK / 2))
     done
 _NOVA_BCL_CMD_
 
@@ -331,7 +262,7 @@ queue="$DEFAULT_QUEUE"
 
 # This is a variant where we submit one job for each lane
 read -d '' novaseq_submit_command <<_NOVA_SUBMIT_CMD_
-# Run bcl2fastq in parallel, for each samplesheet and lane
+# Run bcl-convert in parallel, for each samplesheet and lane
 PROCESSING=
 for samplesheet in SampleSheet.withmask*csv ; do
   for lane in {1..8} ; do
@@ -347,17 +278,16 @@ for samplesheet in SampleSheet.withmask*csv ; do
 #!/bin/bash
       set -x -e -o pipefail
       cd "${illumina_dir}"
-      PATH=/home/nelsonjs/src/bcl2fastq2/bin/:\$PATH
-      \$APX bcl2fastq \\\\
-        --input-dir          "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
-        --output-dir         "${analysis_dir}/bcl_output/\\\$fastq_dir"  \\\\
-        --use-bases-mask     "\\\$bcl_mask"                               \\\\
-        --tiles              "s_\\\$lane"                                 \\\\
-        --barcode-mismatches "$mismatches"                                \\\\
-        --sample-sheet       "${illumina_dir}/\$samplesheet"              \\\\
-        --writing-threads    0                                            \\\\
-        --loading-threads    \\\\\$SLURM_CPUS_PER_TASK                    \\\\
-        --processing-threads \\\\\$SLURM_CPUS_PER_TASK
+      module load bcl-convert/4.4.6
+      bcl-convert \\\\
+        --bcl-input-directory "${illumina_dir}" \\\\
+        --output-directory    "${analysis_dir}/bcl_output/\\\$fastq_dir" \\\\
+        --sample-sheet        "${illumina_dir}/\$samplesheet" \\\\
+        --bcl-only-lane       "\\\$lane" \\\\
+        --fastq-gzip-compression-level 4 \\\\
+        --bcl-num-conversion-threads     \\\\\$((SLURM_CPUS_PER_TASK / 2)) \\\\
+        --bcl-num-compression-threads    \\\\\$((SLURM_CPUS_PER_TASK / 2)) \\\\
+        --bcl-num-decompression-threads  \\\\\$((SLURM_CPUS_PER_TASK / 2))
 __FASTQ__
 )
     PROCESSING="\$PROCESSING,\$bcl_jobid"
@@ -395,9 +325,8 @@ case $run_type in
     fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
+    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --reverse_barcode2 --mismatches "$mismatches" -p processing.json
     bcl_tasks=1
-    #unaligned_command=$novaseq_bcl_command
     submit_bcl2fastq_cmd=$novaseq_submit_command
 ;;
 
@@ -410,9 +339,8 @@ case $run_type in
     fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
+    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --reverse_barcode2 --mismatches "$mismatches" -p processing.json
     bcl_tasks=1
-    #unaligned_command=$novaseq_bcl_command
     submit_bcl2fastq_cmd=$novaseq_submit_command
 
 ;;
@@ -425,9 +353,8 @@ case $run_type in
     fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
+    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --reverse_barcode2 --mismatches "$mismatches" -p processing.json
     bcl_tasks=1
-    #unaligned_command=$novaseq_bcl_command
     submit_bcl2fastq_cmd=$novaseq_submit_command
 
 ;;
@@ -440,9 +367,8 @@ case $run_type in
     fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
+    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --reverse_barcode2 --mismatches "$mismatches" -p processing.json
     bcl_tasks=1
-    #unaligned_command=$novaseq_bcl_command
     submit_bcl2fastq_cmd=$novaseq_submit_command
 
 ;;
@@ -455,9 +381,8 @@ case $run_type in
     fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
+    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --reverse_barcode2 --mismatches "$mismatches" -p processing.json
     bcl_tasks=1
-    #unaligned_command=$novaseq_bcl_command
     submit_bcl2fastq_cmd=$novaseq_submit_command
 
 ;;
@@ -470,9 +395,8 @@ case $run_type in
     fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
+    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --reverse_barcode2 --mismatches "$mismatches" -p processing.json
     bcl_tasks=1
-    #unaligned_command=$novaseq_bcl_command
     submit_bcl2fastq_cmd=$novaseq_submit_command
 
 ;;
@@ -486,7 +410,7 @@ case $run_type in
     fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--novaseq"
     queue="$DEFAULT_QUEUE"
-    $APX python "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 -p processing.json
+    $APX python3 "$STAMPIPES/scripts/flowcells/make_samplesheets.py" --reverse_barcode1 --reverse_barcode2 --mismatches "$mismatches" -p processing.json
     bcl_tasks=1
     unaligned_command=$novaseq_bcl_command
 
@@ -500,7 +424,7 @@ case $run_type in
     fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--nextseq"
     queue="$SLOW_QUEUE"
-    make_nextseq_samplesheet > SampleSheet.csv
+    generate_samplesheets
     bcl_tasks=1
     unaligned_command=$regular_bcl_command
     ;;
@@ -512,7 +436,7 @@ case $run_type in
     fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--hiseq4k"
     queue="$SLOW_QUEUE"
-    make_nextseq_samplesheet > SampleSheet.csv
+    generate_samplesheets
     bcl_tasks=1-8
     unaligned_command=$regular_bcl_command
   ;;
@@ -525,7 +449,7 @@ case $run_type in
     fastq_dir="$analysis_dir/bcl_output/fastq"  # Written directly to flowcells/bcl_output/, no rsync needed
     bc_flag="--miniseq"
     queue="$SLOW_QUEUE"
-    make_nextseq_samplesheet > SampleSheet.csv
+    generate_samplesheets
     bcl_tasks=1
     unaligned_command=$regular_bcl_command
     ;;
@@ -544,10 +468,13 @@ case $run_type in
     bcl_tasks=1
     set +e
     read -d '' unaligned_command  << _U_
-    \$APX bcl2fastq \\\\
-      --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
-      --output-dir "$fastq_dir" \\\\
-      --create-fastq-for-index-reads
+    module load bcl-convert/4.4.6
+    bcl-convert \\\\
+      --bcl-input-directory "${illumina_dir}" \\\\
+      --output-directory "$fastq_dir" \\\\
+      --sample-sheet "${illumina_dir}/SampleSheet.csv" \\\\
+      --create-fastq-for-index-reads true \\\\
+      --fastq-gzip-compression-level 4
 _U_
     set -e
     ;;
@@ -561,14 +488,17 @@ _U_
     bc_flag="--miniseq"
     queue="$SLOW_QUEUE"
     minidemux="True"
-    make_miniseq_samplesheet > SampleSheet.csv
+    generate_samplesheets
     bcl_tasks=1
     set +e
     read -d '' unaligned_command  << _U_
-    \$APX bcl2fastq \\\\
-      --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
-      --output-dir "$fastq_dir" \\\\
-      --no-lane-splitting
+    module load bcl-convert/4.4.6
+    bcl-convert \\\\
+      --bcl-input-directory "${illumina_dir}" \\\\
+      --output-directory "$fastq_dir" \\\\
+      --sample-sheet "${illumina_dir}/SampleSheet.csv" \\\\
+      --no-lane-splitting true \\\\
+      --fastq-gzip-compression-level 4
 _U_
     set -e
     ;;
@@ -588,10 +518,13 @@ _U_
     bcl_tasks=1
     set +e
     read -d '' unaligned_command  << _U_
-    \$APX bcl2fastq \\\\
-      --input-dir "${illumina_dir}/Data/Intensities/BaseCalls" \\\\
-      --output-dir "$fastq_dir" \\\\
-      --no-lane-splitting
+    module load bcl-convert/4.4.6
+    bcl-convert \\\\
+      --bcl-input-directory "${illumina_dir}" \\\\
+      --output-directory "$fastq_dir" \\\\
+      --sample-sheet "${illumina_dir}/SampleSheet.csv" \\\\
+      --no-lane-splitting true \\\\
+      --fastq-gzip-compression-level 4
 _U_
     set -e
     ;;
@@ -600,31 +533,7 @@ _U_
     echo "Regular HiSeq 2500 run detected"
     echo "HiSeq 2500 processing not supported on the new cluster! (Does not have old version of bcl2fastq)"
     exit 2
-    #parallel_env=""
-    #link_command='#no linking to do'
-    #samplesheet=$(pwd)/Data/Intensities/BaseCalls/SampleSheet.csv
-    #mkdir -p $(dirname "$samplesheet")
-    #make_hiseq_samplesheet > "$samplesheet"
-    #fastq_dir="$illumina_dir/Unaligned/"  # Trailing slash is important for rsync!
-    #bc_flag="--hiseq"
-    #bcl_tasks=1
-
-    #set +e
-    #read -d '' unaligned_command <<_U_
-    #if [ ! -e "$fastq_dir" ] ; then
-    #        configureBclToFastq.pl \\\\
-    #          --mismatches "$mismatches" \\\\
-    #          --output-dir "$fastq_dir" \\\\
-    #          --fastq-cluster-count 16000000 \\\\
-    #          --with-failed-reads --sample-sheet $samplesheet \\\\
-    #          --use-bases-mask "$bcl_mask"  \\\\
-    #          --input-dir "$illumina_dir/Data/Intensities/BaseCalls"
-    #fi
-
-    #cd "$fastq_dir"
-    #qmake -now no -cwd -q all.q -V -- -j "$NODES"
-#_U_
-    #set -e
+    # If you need the older code - check git history
     ;;
 *)
     echo "Unrecognized run type '$run_type'"
@@ -664,7 +573,7 @@ $(declare -f set_cluster_vars)
 set_cluster_vars
 
 [[ -s "$MODULELOAD" ]] && source "$MODULELOAD"
-module load bcl2fastq2/2.17.1.14
+module load bcl-convert/4.4.6
 \$LOAD_APPTAINER
 [[ -s "$PYTHON3_ACTIVATE" ]] && source "$PYTHON3_ACTIVATE"
 source $STAMPIPES/scripts/lims/api_functions.sh
@@ -686,11 +595,11 @@ while [ ! -e "$illumina_dir/CopyComplete.txt" ] ; do sleep 60 ; done
 lims_patch "flowcell_run/$flowcell_id/" "status=https://lims.stamlab.org/api/flowcell_run_status/3/"
 lims_patch "flowcell_run/$flowcell_id/" "folder_name=${PWD##*/}"
 
-# Create output subdirectory with restricted permissions before bcl2fastq writes to it
+# Create output subdirectory with restricted permissions before bcl-convert writes to it
 mkdir -p "$analysis_dir/bcl_output"
 chmod 700 "$analysis_dir/bcl_output"
 
-# bcl2fastq
+# bcl-convert
 bcl_jobid=\$(sbatch --export=ALL -J "u-$flowcell" -o "u-$flowcell.o%A" -e "u-$flowcell.e%A" \$dependencies_barcodes --partition=$queue --ntasks=1 --cpus-per-task=20 --mem-per-cpu=8000 --parsable --oversubscribe <<'__FASTQ__'
 #!/bin/bash
 
@@ -712,12 +621,12 @@ __BCL2FASTQ__
 
 else # If not miniseq
 
-# Default (slow) bcl2fastq cmd
+# Default (slow) bcl-convert cmd
 if [[ -z "$submit_bcl2fastq_cmd" ]] ; then
   # If we haven't created the submit command yet, wrap up the unaligned_command
   # This is the "old" way of submitting one job that does the whole flowcell
   submit_bcl2fastq_cmd=<<__SUBMIT_BCL2FASTQ_CMD__
-# bcl2fastq
+# bcl-convert
 bcl_jobid=\$(sbatch --export=ALL -J "u-$flowcell" -o "u-$flowcell.o%A" -e "u-$flowcell.e%A"  --partition=$queue --ntasks=1 --cpus-per-task=20 --mem-per-cpu=8000 --parsable --oversubscribe <<'__FASTQ__'
 #!/bin/bash
 set -x -e -o pipefail
@@ -726,7 +635,7 @@ cd "$illumina_dir"
 $unaligned_command
 __FASTQ__
 )
-# Wait for bcl2fastq to complete
+# Wait for bcl-convert to complete
 if [[ -n \$bcl_jobid ]]; then
    bcl_dependency=\$(echo \$bcl_jobid | sed -e 's/^/--dependency=afterok:/g')
 fi
@@ -738,7 +647,7 @@ cat > run_bcl2fastq.sh <<__BCL2FASTQ__
 #!/bin/bash
 
 [[ -s "$MODULELOAD" ]] && source "$MODULELOAD"
-module load bcl2fastq2/2.20.0.422
+module load bcl-convert/4.4.6
 [[ -s "$PYTHON3_ACTIVATE" ]] && source "$PYTHON3_ACTIVATE"
 source $STAMPIPES/scripts/lims/api_functions.sh
 
@@ -765,7 +674,7 @@ while [ ! -e "$illumina_dir/CopyComplete.txt" ] ; do sleep 60 ; done
 lims_patch "flowcell_run/$flowcell_id/" "status=https://lims.stamlab.org/api/flowcell_run_status/3/"
 lims_patch "flowcell_run/$flowcell_id/" "folder_name=${PWD##*/}"
 
-# Create output subdirectory with restricted permissions before bcl2fastq writes to it
+# Create output subdirectory with restricted permissions before bcl-convert writes to it
 mkdir -p "$analysis_dir/bcl_output"
 chmod 700 "$analysis_dir/bcl_output"
 
