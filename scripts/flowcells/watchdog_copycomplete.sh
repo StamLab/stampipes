@@ -1,26 +1,20 @@
 #!/bin/bash
-#SCRON --job-name=watchdog-copycomplete
-#SCRON --partition=hpcz-test,hpcy-test
-#SCRON --time=00:55:00
-#SCRON --nodes=1
-#SCRON --cpus-per-task=1
-#SCRON --mem=1G
-#SCRON --mail-type=FAIL
-#SCRON --mail-user=sequencing@altius.org
+#SBATCH --job-name=watchdog-copycomplete
+#SBATCH --partition=hpcz-test,hpcy-test
+#SBATCH --time=00:55:00
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=1G
 
-# Watchdog script to ensure flowcells are set up and bcl2fastq is launched
+# Watchdog script to ensure flowcells are set up and bcl-convert is launched
 # when CopyComplete.txt arrives.
-# This is designed to be run periodically via scrontab or a similar scheduler.
+# Intended to be run hourly via scrontab; can also be submitted directly with sbatch.
 
 # Default configuration
 SEQUENCER_MOUNT=${SEQUENCER_MOUNT:-/net/seq/data2/sequencers}
 DAYS_BACK=${DAYS_BACK:-10}
 
 set -e -u -o pipefail
-
-# Redirect all output to the log file
-_LOG_DIR="${STAMPIPES_DATA:-${STAMPIPES}/data}/logs"
-exec >> "$_LOG_DIR/watchdog_copycomplete.log" 2>&1
 
 if [ -z "$SEQUENCER_MOUNT" ] ; then
   echo "Sequencer mount not set; set \$SEQUENCER_MOUNT or supply an argument" >&2
