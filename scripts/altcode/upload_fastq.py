@@ -489,11 +489,8 @@ class UploadLIMS:
             "library_pool for lane %s must not be None" % lane_id
         )
         pool_info = self.api.get_single_result(url=lane_info["library_pool"])
-        lib_ids = []
+        lib_ids = [lib["id"] for lib in pool_info["libraries"]]
         flowcell_id = extract_id_from_url(lane_info["flowcell"])
-        for lib_url in pool_info["libraries"]:
-            lib_id = extract_id_from_url(lib_url)
-            lib_ids.append(lib_id)
 
         lanes_query = "flowcell_lane/?flowcell=%s&lane=%d&page_size=1000" % (
             flowcell_id,
