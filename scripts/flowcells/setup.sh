@@ -812,6 +812,10 @@ rsync -avP "$illumina_dir"/SampleSheet*.csv "$analysis_dir/"
         mkdir -p "\$destination"
         find "\$dir" -maxdepth 1 -mindepth 1 -exec mv -f '{}' "\$destination/" ';'
     done
+    # Open up permissions for logs & reports
+    # (If any fastq.gz or fq.gz files still remain, leave them as solexa-only)
+    find . -type d -exec chmod 755 {} +
+    find . -type f -not -name '*q.gz' -exec chmod 644 {} +
 )
 
 __COPY__
