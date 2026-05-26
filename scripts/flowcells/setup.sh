@@ -756,7 +756,7 @@ if [[ -n \$DEMUX_JOBIDS ]]; then
 fi
 
 # copy files and prep collation/fastqc
-copy_jobid=\$(sbatch --export=ALL -J "c-$flowcell" \$dmx_dependency -o "c-$flowcell.o%A" -e "c-$flowcell.e%A" --partition=$queue --cpus-per-task=1 --ntasks=1 --mem-per-cpu=1000 --parsable --oversubscribe <<'__COPY__'
+copy_jobid=\$(sbatch --export=ALL -J "c-$flowcell" \$dmx_dependency -o "c-$flowcell.o%A" -e "c-$flowcell.e%A" --partition=$queue --cpus-per-task=1 --ntasks=1 --mem-per-cpu=4000 --parsable --oversubscribe <<'__COPY__'
 #!/bin/bash
 source "$STAMPIPES/scripts/sentry/sentry-lib.bash"
 set -euo pipefail
