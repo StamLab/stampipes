@@ -266,8 +266,8 @@ read -d '' novaseq_submit_command <<_NOVA_SUBMIT_CMD_
 PROCESSING=
 for samplesheet in SampleSheet.withmask*csv ; do
   for lane in {1..8} ; do
-    # Skip submission if lane not in this samplesheet
-    if ! (cut -d, -f1 \$samplesheet | sort -u | grep -q \$lane) ; then
+    # Skip submission if lane not in this samplesheet's [Data] section
+    if ! awk -F, -v lane="\$lane" '/^\[Data\]/{f=1;next} f && \$1==lane{found=1;exit} END{exit !found}' "\$samplesheet"; then
       echo "Lane \$lane not in samplesheet \$samplesheet, skipping"
       continue
     fi
