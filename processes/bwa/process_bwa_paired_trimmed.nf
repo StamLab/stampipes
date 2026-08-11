@@ -3,6 +3,9 @@
  * This is our main DNase alignment pipeline
  */
 
+nextflow.enable.dsl = 2
+
+
 params.help = false
 params.threads = 1
 params.chunk_size = 16000000
@@ -17,11 +20,9 @@ params.readlength = 36
 
 params.cramthreads = 10
 
-nuclear_chroms = "${params.genome}.nuclear.txt"
-dataDir = "${baseDir}/../../data"
-
 def helpMessage() {
-  log.info"""
+  log.info(
+    """
     Usage: nextflow run process_bwa_paired_trimmed.nf \\
              --r1 r1.fastq.gz \\
              --r2 r2.fastq.gz \\
@@ -33,55 +34,38 @@ def helpMessage() {
     --UMI                 The reads contain UMI markers ('single-strand', 'thruplex')         (false)
     --trim_to [length]    Trim fastq reads to [length] bp (0 for no trimming)             (0)
     --outdir [dir]        Where to write results to                                       (output)
-    """.stripIndent();
+    """.stripIndent()
+  )
 }
 
-// Used for publishDir to avoid publishing bam files
-def exclude_bam =  { name -> name ==~ /.*ba[mi]$/ ? null : name }
 
-
-if (params.help || !params.r1 || !params.r2 || !params.genome){
-  helpMessage();
-  exit 0;
-}
-
-// Some renaming for easier usage later
-genome = params.genome
-genome_name = file(params.genome).baseName
-threads = params.threads
-
-/*
- * Step 0: Split Fastq into chunks
- */
-fastq_line_chunks = 4 * params.chunk_size
 process split_r1_fastq {
-
   input:
-  file(r1) from file(params.r1)
+  path r1
   val fastq_line_chunks
 
   output:
-  file('split_r1*gz') into split_r1 mode flatten
+  path 'split_r1*gz'
 
   script:
   """
-  zcat $r1 \
-  | split -l $fastq_line_chunks \
+  zcat ${r1} \
+  | split -l ${fastq_line_chunks} \
     --filter='gzip -1 > \$FILE.gz' - 'split_r1'
   """
 }
 process split_r2_fastq {
   input:
-  file(r2) from file(params.r2)
+  path r2
   val fastq_line_chunks
 
   output:
-  file('split_r2*gz') into split_r2 mode flatten
+  path 'split_r2*gz'
 
   script:
   """
-  zcat $r2 \
-  | split -l $fastq_line_chunks \
+  zcat ${r2} \
+  | split -l ${fastq_line_chunks} \
     --filter='gzip -1 > \$FILE.gz' - 'split_r2'
   """
 }
@@ -95,22 +79,22 @@ process trim_adapters {
   scratch false
 
   input:
-  file split_r1
-  file split_r2
-  file adapters from file(params.adapter_file)
+  path split_r1
+  path split_r2
+  path adapters
 
   output:
-  set file('trim.R1.fastq.gz'), file('trim.R2.fastq.gz') into trimmed
-  file('trim.counts.txt') into trim_counts
+  tuple path('trim.R1.fastq.gz'), path('trim.R2.fastq.gz')
+  path 'trim.counts.txt'
 
   script:
   """
   trim-adapters-illumina \
-    -f "$adapters" \
+    -f "${adapters}" \
     -1 P5 -2 P7 \
     --threads=${params.threads} \
-    "$split_r1" \
-    "$split_r2"  \
+    "${split_r1}" \
+    "${split_r2}"  \
     "trim.R1.fastq.gz" \
     "trim.R2.fastq.gz" \
   &> trimstats.txt
@@ -127,58 +111,64 @@ process trim_adapters {
 process trim_to_length {
 
   scratch false
+
   input:
-  set file(r1), file(r2) from trimmed
+  tuple path(r1), path(r2)
 
   output:
-  set file('r1.trim.fastq.gz'), file('r2.trim.fastq.gz') into trimmed_fastq
+  tuple path('r1.trim.fastq.gz'), path('r2.trim.fastq.gz')
 
   script:
-  if (params.trim_to != 0)
+  if (params.trim_to != 0) {
     // TODO: Add padding to length with N's
     """
-    zcat $r1 | awk 'NR%2==0 {print substr(\$0, 1, $params.trim_to)} NR%2!=0' | gzip -c -1 > r1.trim.fastq.gz
-    zcat $r2 | awk 'NR%2==0 {print substr(\$0, 1, $params.trim_to)} NR%2!=0' | gzip -c -1 > r2.trim.fastq.gz
+    zcat ${r1} | awk 'NR%2==0 {print substr(\$0, 1, ${params.trim_to})} NR%2!=0' | gzip -c -1 > r1.trim.fastq.gz
+    zcat ${r2} | awk 'NR%2==0 {print substr(\$0, 1, ${params.trim_to})} NR%2!=0' | gzip -c -1 > r2.trim.fastq.gz
     """
-  else
+  }
+  else {
     """
-    ln -s $r1 r1.trim.fastq.gz
-    ln -s $r2 r2.trim.fastq.gz
+    ln -s ${r1} r1.trim.fastq.gz
+    ln -s ${r2} r2.trim.fastq.gz
     """
-
+  }
 }
 
 process add_umi_info {
 
   scratch false
+
   input:
-  set file(r1), file(r2) from trimmed_fastq
+  tuple path(r1), path(r2)
 
   output:
-  set file('r1.fastq.umi.gz'), file('r2.fastq.umi.gz') into with_umi
+  tuple path('r1.fastq.umi.gz'), path('r2.fastq.umi.gz')
 
   script:
-  if (params.UMI == 'thruplex')
+  if (params.UMI == 'thruplex') {
     """
     python3 \$STAMPIPES/scripts/umi/extract_umt.py \
-      <(zcat $r1) \
-      <(zcat $r2) \
+      <(zcat ${r1}) \
+      <(zcat ${r2}) \
       >(gzip -c -1 > r1.fastq.umi.gz) \
       >(gzip -c -1 > r2.fastq.umi.gz)
     """
-  else if (params.UMI == 'single-strand')
+  }
+  else if (params.UMI == 'single-strand') {
     """
-    python3 \$STAMPIPES/scripts/umi/fastq_umi_add.py $r1 r1.fastq.umi.gz
-    python3 \$STAMPIPES/scripts/umi/fastq_umi_add.py $r2 r2.fastq.umi.gz
+    python3 \$STAMPIPES/scripts/umi/fastq_umi_add.py ${r1} r1.fastq.umi.gz
+    python3 \$STAMPIPES/scripts/umi/fastq_umi_add.py ${r2} r2.fastq.umi.gz
     """
-
-  else if (params.UMI == false || params.UMI == "")
+  }
+  else if (params.UMI == false || params.UMI == "") {
     """
-    ln -s $r1 r1.fastq.umi.gz
-    ln -s $r2 r2.fastq.umi.gz
+    ln -s ${r1} r1.fastq.umi.gz
+    ln -s ${r2} r2.fastq.umi.gz
     """
-  else
-    error "--UMI must be `thruplex`, `single-strand` (for single-strand preparation), or false, got: '" + params.UMI + "'"
+  }
+  else {
+    error("--UMI must be `thruplex`, `single-strand` (for single-strand preparation), or false, got: '" + params.UMI + "'")
+  }
 }
 
 /*
@@ -187,16 +177,17 @@ process add_umi_info {
 process fastq_counts {
 
   scratch false
+
   input:
-  file(r1) from file(params.r1)
-  file(r2) from file(params.r2)
+  path r1
+  path r2
 
   output:
-  file 'fastq.counts' into fastq_counts
+  path 'fastq.counts'
 
   script:
   """
-  zcat $r1 \
+  zcat ${r1} \
   | awk -v paired=1 -f \$STAMPIPES/awk/illumina_fastq_count.awk \
   > fastq.counts
   """
@@ -210,19 +201,17 @@ process align {
   cpus params.threads
 
   input:
-  set file(trimmed_r1), file(trimmed_r2) from with_umi
-
-  file genome from file(params.genome)
-  file '*' from file("${params.genome}.amb")
-  file '*' from file("${params.genome}.ann")
-  file '*' from file("${params.genome}.bwt")
-  file '*' from file("${params.genome}.fai")
-  file '*' from file("${params.genome}.pac")
-  file '*' from file("${params.genome}.sa")
-
+  tuple path(trimmed_r1), path(trimmed_r2)
+  path genome
+  path '*'
+  path '*'
+  path '*'
+  path '*'
+  path '*'
+  path '*'
 
   output:
-  file 'out.bam' into unfiltered_bam
+  path 'out.bam'
 
   script:
   """
@@ -230,26 +219,25 @@ process align {
   bwa aln \
     -Y -l 32 -n 0.04 \
     -t "${params.threads}" \
-    "$genome" \
-    "$trimmed_r1" \
+    "${genome}" \
+    "${trimmed_r1}" \
     > out1.sai
 
   bwa aln \
     -Y -l 32 -n 0.04 \
-    -t "$params.threads" \
-    "$genome" \
-    "$trimmed_r2" \
+    -t "${params.threads}" \
+    "${genome}" \
+    "${trimmed_r2}" \
     > out2.sai
 
   bwa sampe \
     -n 10 -a 750 \
-    "$genome" \
+    "${genome}" \
     out1.sai out2.sai \
-    "$trimmed_r1" "$trimmed_r2" \
-  | samtools view -b -t "$genome".fai - \
+    "${trimmed_r1}" "${trimmed_r2}" \
+  | samtools view -b -t "${genome}".fai - \
   > out.bam
   """
-
 }
 
 /*
@@ -260,18 +248,18 @@ process filter_bam {
   scratch false
 
   input:
-  file unfiltered_bam
-  file nuclear_chroms from file(nuclear_chroms)
+  path unfiltered_bam
+  path nuclear_chroms
 
   output:
-  file 'filtered.bam' into filtered_bam
+  path 'filtered.bam'
 
   script:
   """
   python3 \$STAMPIPES/scripts/bwa/filter_reads.py \
-  "$unfiltered_bam" \
+  "${unfiltered_bam}" \
   filtered.bam \
-  "$nuclear_chroms"
+  "${nuclear_chroms}"
   """
 }
 
@@ -284,15 +272,15 @@ process sort_bam {
   scratch false
 
   input:
-  file filtered_bam
+  path filtered_bam
 
   output:
-  file 'sorted.bam' into sorted_bam
+  path 'sorted.bam'
 
   script:
   """
   samtools sort \
-    -l 0 -m 2G -@ "${params.threads}" "$filtered_bam" \
+    -l 0 -m 2G -@ "${params.threads}" "${filtered_bam}" \
     > sorted.bam
   """
 }
@@ -304,10 +292,10 @@ process merge_bam {
   scratch false
 
   input:
-  file 'sorted_bam_*' from sorted_bam.collect()
+  path 'sorted_bam_*'
 
   output:
-  file 'merged.bam' into merged_bam
+  path 'merged.bam'
 
   script:
   """
@@ -323,33 +311,30 @@ process mark_duplicates {
 
   label "high_mem"
 
-  publishDir params.outdir, saveAs: exclude_bam
+  publishDir params.outdir
 
   input:
-  file(merged_bam) from merged_bam
+  path merged_bam
 
   output:
-  file 'marked.bam' into marked_bam
-  file 'marked.bam' into bams_to_cram
-  file 'marked.bam' into marked_bam_for_counts
-  file 'MarkDuplicates.picard'
-
+  path 'marked.bam'
+  path 'MarkDuplicates.picard'
 
   script:
-  if (params.UMI)
+  if (params.UMI) {
     """
     picard RevertOriginalBaseQualitiesAndAddMateCigar \
-      INPUT=$merged_bam OUTPUT=cigar.bam \
+      INPUT=${merged_bam} OUTPUT=cigar.bam \
       VALIDATION_STRINGENCY=SILENT RESTORE_ORIGINAL_QUALITIES=false SORT_ORDER=coordinate MAX_RECORDS_TO_EXAMINE=0
 
     picard UmiAwareMarkDuplicatesWithMateCigar INPUT=cigar.bam OUTPUT=marked.bam \
       METRICS_FILE=MarkDuplicates.picard UMI_TAG_NAME=XD ASSUME_SORTED=true VALIDATION_STRINGENCY=SILENT \
       READ_NAME_REGEX='[a-zA-Z0-9]+:[0-9]+:[a-zA-Z0-9]+:[0-9]+:([0-9]+):([0-9]+):([0-9]+).*'
     """
-  else
+  } else {
     """
     picard RevertOriginalBaseQualitiesAndAddMateCigar \
-      INPUT=$merged_bam OUTPUT=cigar.bam \
+      INPUT=${merged_bam} OUTPUT=cigar.bam \
       VALIDATION_STRINGENCY=SILENT RESTORE_ORIGINAL_QUALITIES=false SORT_ORDER=coordinate MAX_RECORDS_TO_EXAMINE=0
 
     picard MarkDuplicatesWithMateCigar INPUT=cigar.bam OUTPUT=marked.bam \
@@ -357,34 +342,31 @@ process mark_duplicates {
       READ_NAME_REGEX='[a-zA-Z0-9]+:[0-9]+:[a-zA-Z0-9]+:[0-9]+:([0-9]+):([0-9]+):([0-9]+).*' \
       MINIMUM_DISTANCE=300
     """
+  }
 }
 
 /*
  * Step 5: Filter bam file
  */
-filter_flag = 512
-if (params.UMI)
-  filter_flag = 1536
+
 
 process filter_bam_to_unique {
 
   scratch false
+
   input:
-  file marked_bam
+  path marked_bam
 
   output:
-  set file('filtered.bam'), file('filtered.bam.bai') into uniquely_mapping_bam
+  tuple path('filtered.bam'), path('filtered.bam.bai')
 
   script:
+  filter_flag = params.UMI ? 1536 : 512
   """
-  samtools view $marked_bam -b -F $filter_flag > filtered.bam
+  samtools view ${marked_bam} -b -F ${filter_flag} > filtered.bam
   samtools index filtered.bam
   """
-
 }
-
-// Marked bam file is used by several downstream results
-uniquely_mapping_bam.into { bam_for_insert; bam_for_spot; bam_for_density }
 
 /*
  * Metrics: bam counts
@@ -394,15 +376,15 @@ process bam_counts {
   scratch false
 
   input:
-  file(sorted_bam) from marked_bam_for_counts
+  path sorted_bam
 
   output:
-  file('bam.counts.txt') into bam_counts
+  path 'bam.counts.txt'
 
   script:
   """
   python3 \$STAMPIPES/scripts/bwa/bamcounts.py \
-    "$sorted_bam" \
+    "${sorted_bam}" \
     bam.counts.txt
   """
 }
@@ -415,19 +397,19 @@ process insert_size {
   publishDir params.outdir
 
   input:
-  set file(bam), file(bai) from bam_for_insert
+  tuple path(bam), path(bai)
 
   output:
-  file 'CollectInsertSizeMetrics.picard'
-  file 'CollectInsertSizeMetrics.picard.pdf'
+  path 'CollectInsertSizeMetrics.picard'
+  path 'CollectInsertSizeMetrics.picard.pdf'
 
   script:
   """
-  samtools idxstats "$bam" \
+  samtools idxstats "${bam}" \
   | cut -f 1 \
   | grep -v chrM \
   | grep -v chrC \
-  | xargs samtools view -b "$bam" \
+  | xargs samtools view -b "${bam}" \
   > nuclear.bam
 
   picard CollectInsertSizeMetrics \
@@ -448,18 +430,19 @@ process spot_score {
   publishDir params.outdir
 
   input:
-  set file(bam), file(bai) from bam_for_spot
-  file('*') from file("${dataDir}/annotations/${genome_name}.K${params.readlength}.mappable_only.bed")
-  file('*') from file("${dataDir}/annotations/${genome_name}.chromInfo.bed")
+  tuple path(bam), path(bai)
+  path '*'
+  path '*'
 
   output:
-  file 'subsample.r1.spot.out'
-  file 'spotdups.txt'
+  path 'subsample.r1.spot.out'
+  path 'spotdups.txt'
 
   script:
+  genome_name = file(params.genome).baseName
   """
   # random sample
-  samtools view -h -F 12 -f 3 "$bam" \
+  samtools view -h -F 12 -f 3 "${bam}" \
     | awk '{if( ! index(\$3, "chrM") && \$3 != "chrC" && \$3 != "random"){print}}' \
     | samtools view -1 - \
     -o paired.bam
@@ -496,30 +479,28 @@ process spot_score {
 /*
  * Density tracks (for browser)
  */
-win = 75
-bini = 20
 process density_files {
 
   label "high_mem"
   publishDir params.outdir
 
   input:
-  set file(bam), file(bai) from bam_for_density
-  file fai from file("${params.genome}.fai")
-  file density_buckets from file(
-    "$baseDir/../../data/densities/chrom-buckets.${genome_name}.${win}_${bini}.bed.starch"
-  )
+  tuple path(bam), path(bai)
+  path fai
+  path density_buckets
 
   output:
-  file 'density.bed.starch'
-  file 'density.bw'
-  file 'density.bed.bgz'
-
+  path 'density.bed.starch'
+  path 'density.bw'
+  path 'density.bed.bgz'
 
   script:
+  win = 75
+  bini = 20
   """
+  ls -l
   bam2bed -d \
-    < $bam \
+    < ${bam} \
     | cut -f1-6 \
     | awk '{ if( \$6=="+" ){ s=\$2; e=\$2+1 } else { s=\$3-1; e=\$3 } print \$1 "\t" s "\t" e "\tid\t" 1 }' \
     | sort-bed - \
@@ -527,13 +508,14 @@ process density_files {
 
   unstarch "${density_buckets}" \
     | bedmap --faster --echo --count --delim "\t" - sample.bed \
-    | awk -v binI=$bini -v win=$win \
+    | awk -v binI=${bini} -v win=${win} \
         'BEGIN{ halfBin=binI/2; shiftFactor=win-halfBin } { print \$1 "\t" \$2 + shiftFactor "\t" \$3-shiftFactor "\tid\t" i \$4}' \
     | starch - \
     > density.bed.starch
 
-  unstarch density.bed.starch | awk -v binI=$bini -f \$STAMPIPES/awk/bedToWig.awk > density.wig
-
+  unstarch density.bed.starch | awk -v binI=${bini} -f \$STAMPIPES/awk/bedToWig.awk > density.wig
+  echo "########"
+  ls -l
   wigToBigWig -clip density.wig "${fai}" density.bw
 
 
@@ -550,12 +532,12 @@ process total_counts {
   publishDir params.outdir
 
   input:
-  file 'fastqcounts*' from fastq_counts.collect()
-  file 'trimcounts*' from trim_counts.collect()
-  file 'bamcounts*' from bam_counts.collect()
+  path 'fastqcounts*'
+  path 'trimcounts*'
+  path 'bamcounts*'
 
   output:
-  file 'tagcounts.txt'
+  path 'tagcounts.txt'
 
   script:
   """
@@ -574,17 +556,14 @@ process cram {
   cpus params.cramthreads / 2
   scratch false
 
-  // TODO: put in config
-  module "samtools/1.12"
-
   input:
-  file bam from bams_to_cram
-  file ref from file("${genome}.fa")
-  file fai from file("${genome}.fai")
+  path bam
+  path ref
+  path fai
 
   output:
-  file cramfile
-  file "${cramfile}.crai"
+  path cramfile
+  path "${cramfile}.crai"
 
   script:
   cramfile = bam.name.replace("bam", "cram")
@@ -596,4 +575,109 @@ process cram {
     --write-index \
     -o "${cramfile}"
   """
+}
+
+workflow {
+  // Check for required parameters
+  if (params.help || !params.r1 || !params.r2 || !params.genome) {
+    helpMessage()
+    exit(0)
+  }
+
+  // Setup variables
+  nuclear_chroms = "${params.genome}.nuclear.txt"
+  dataDir = "${baseDir}/../../data"
+  genome_name = file(params.genome).baseName
+  fastq_line_chunks = 4 * params.chunk_size
+
+  // Input channels
+  r1_ch = Channel.fromPath(params.r1)
+  r2_ch = Channel.fromPath(params.r2)
+  adapter_file_ch = Channel.fromPath(params.adapter_file)
+
+  // Genome files channels
+  genome_ch = Channel.fromPath(params.genome)
+  genome_amb_ch = Channel.fromPath("${params.genome}.amb")
+  genome_ann_ch = Channel.fromPath("${params.genome}.ann")
+  genome_bwt_ch = Channel.fromPath("${params.genome}.bwt")
+  genome_fai_ch = Channel.fromPath("${params.genome}.fai")
+  genome_pac_ch = Channel.fromPath("${params.genome}.pac")
+  genome_sa_ch = Channel.fromPath("${params.genome}.sa")
+  genome_fa_ch = Channel.fromPath("${params.genome}.fa")
+  nuclear_chroms_ch = Channel.fromPath(nuclear_chroms)
+
+  // Annotation files
+  mappable_bed_ch = Channel.fromPath("${dataDir}/annotations/${genome_name}.K${params.readlength}.mappable_only.bed")
+  chrominfo_bed_ch = Channel.fromPath("${dataDir}/annotations/${genome_name}.chromInfo.bed")
+  density_buckets_ch = Channel.fromPath("${baseDir}/../../data/densities/chrom-buckets.${genome_name}.75_20.bed.starch")
+
+  // Step 0: Split fastq files
+  split_r1_fastq(r1_ch, fastq_line_chunks)
+  split_r2_fastq(r2_ch, fastq_line_chunks)
+
+  // Step 1: Trim adapters 
+  trimmed_reads = trim_adapters(
+    split_r1_fastq.out.flatten(),
+    split_r2_fastq.out.flatten(),
+    adapter_file_ch,
+  )
+
+  // Step 1.1: Trim to length
+  length_trimmed = trim_to_length(trimmed_reads[0])
+
+  // Step 1.2: Add UMI info
+  umi_reads = add_umi_info(length_trimmed)
+
+  // Metrics: Fastq counts
+  fastq_count_results = fastq_counts(r1_ch, r2_ch)
+
+  // Step 2a: Align reads
+  unfiltered_bams = align(
+    umi_reads,
+    genome_ch,
+    genome_amb_ch,
+    genome_ann_ch,
+    genome_bwt_ch,
+    genome_fai_ch,
+    genome_pac_ch,
+    genome_sa_ch,
+  )
+
+  // Step 2b: Filter bam files
+  filtered_bams = filter_bam(unfiltered_bams, nuclear_chroms_ch)
+
+  // Step 2c: Sort bam files
+  sorted_bams = sort_bam(filtered_bams)
+
+  // Step 3: Merge alignments
+  merged_bam = merge_bam(sorted_bams.collect())
+
+  // Step 4: Mark duplicates
+  mark_dup_results = mark_duplicates(merged_bam)
+  marked_bam = mark_dup_results[0]
+
+  // Step 5: Filter to unique reads
+  unique_bam = filter_bam_to_unique(marked_bam)
+
+  // Metrics: BAM counts
+  bam_count_results = bam_counts(marked_bam)
+
+  // Metrics: Insert size
+  insert_size(unique_bam)
+
+  // Metrics: SPOT score
+  spot_score(unique_bam, mappable_bed_ch, chrominfo_bed_ch)
+
+  // Density files
+  density_files(unique_bam, genome_fai_ch, density_buckets_ch)
+
+  // Total counts
+  total_counts(
+    fastq_count_results.collect(),
+    trimmed_reads[1].collect(),
+    bam_count_results.collect(),
+  )
+
+  // CRAM conversion
+  cram(marked_bam, genome_fa_ch, genome_fai_ch)
 }

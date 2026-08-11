@@ -1,0 +1,58 @@
+Bootstrap: docker
+From: ubuntu:16.04  # We use 16.04 to get libgfortran3 and readline4
+
+%post -c /bin/bash
+    # Install Environment Modules, sed, and findutils
+    apt-get update && apt-get install -y environment-modules sed findutils libncurses5 libgomp1 libgfortran3 tcl libreadline-dev
+    #curl http://archive.ubuntu.com/ubuntu/pool/main/r/readline6/libreadline6_6.3-8ubuntu2_amd64.deb -O libreadline6_6.3-8ubuntu2_amd64.deb
+    #dpkg -i libreadline6_6.3-8ubuntu2_amd64.deb
+
+    # Fix the hardcoded paths in all modulefiles
+    find /etc/modulefiles /opt/sw -type f -exec sed -i 's|/net/module/sw|/opt/sw|g' {} +
+
+    # Load modules
+    source /etc/profile.d/modules.sh
+    export MODULEPATH=/etc/modulefiles
+
+    # save current ENV to file
+    env > /tmp/env_before_modules.txt
+    module load jdk/1.8.0_92 picard/2.8.1 samtools/1.3 R/3.2.5
+
+    # diff env to store modified variables in APPTAINER_ENVIRONMENT
+    env > /tmp/env_after_modules.txt
+    diff /tmp/env_before_modules.txt /tmp/env_after_modules.txt | grep '^> ' | sed 's/^> //' | sed -e 's/\([^=]*\)=\(.*\)/\1="\2"/' >> "$APPTAINER_ENVIRONMENT"
+
+    # fix libreadline dependency for R
+    #ln -s /usr/lib/x86_64-linux-gnu/libreadline.so.7 /usr/lib/x86_64-linux-gnu/libreadline.so.6
+
+%files
+    # Copy only the modulefiles needed for this container
+    module_files/modulefiles/jdk /etc/modulefiles/jdk
+    module_files/modulefiles/picard /etc/modulefiles/picard
+    module_files/modulefiles/samtools /etc/modulefiles/samtools
+    module_files/modulefiles/R /etc/modulefiles/R
+
+    # Copy only the software needed for this container
+    module_files/sw/jdk /opt/sw/jdk
+    module_files/sw/picard /opt/sw/picard
+    module_files/sw/samtools/1.3 /opt/sw/samtools/1.3
+    module_files/sw/R/3.2.5 /opt/sw/R/3.2.5
+
+%environment
+    # Set the path to the custom modulefiles
+    export MODULEPATH=/etc/modulefiles
+
+%runscript
+    # This script runs when the container is executed
+    echo "insert_size container - modules: jdk/1.8.0_92, picard/2.8.1, samtools/1.3, R/3.2.5"
+    exec /bin/bash
+
+%test
+    # Test basic functionality
+    java -version 2>&1 | grep -q "java version"
+    samtools --version | grep -q "samtools"
+    R --version | grep -q "R version"
+    Rscript --version 2>&1 | grep -q "R scripting"
+    
+    # Test that picard is available
+    picard CollectInsertSizeMetrics --version 2>&1 | grep -q 2.8.1

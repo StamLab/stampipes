@@ -1,0 +1,67 @@
+Bootstrap: docker
+From: ubuntu:20.04
+
+%post -c /bin/bash
+    set -e
+    # Install Environment Modules, sed, and findutils
+    apt-get update && apt-get install -y environment-modules sed findutils libncurses5 libcurl4
+
+    # Fix the hardcoded paths in all modulefiles
+    find /etc/modulefiles -type f -exec sed -i 's|/net/module/sw|/opt/sw|g' {} +
+
+    # Load modules
+    source /etc/profile.d/modules.sh
+    export MODULEPATH=/etc/modulefiles
+
+    # save current ENV to file
+    env > /tmp/env_before_modules.txt
+    module load openssl-dev/1.0.1t libpng/1.6.21 git/2.3.3 mysql-connector/6.1.6 bedops/2.4.35-typical samtools/1.3 htslib/1.6.0 kentutil/302
+
+    # diff env to store modified variables in APPTAINER_ENVIRONMENT
+    env > /tmp/env_after_modules.txt
+    diff /tmp/env_before_modules.txt /tmp/env_after_modules.txt | grep '^> ' | sed 's/^> //' | sed -e 's/\([^=]*\)=\(.*\)/\1="\2"/' >> "$APPTAINER_ENVIRONMENT"
+
+
+%files
+    # Copy only the modulefiles needed for this container
+    module_files/modulefiles/openssl-dev /etc/modulefiles/openssl-dev
+    module_files/modulefiles/libpng /etc/modulefiles/libpng
+    module_files/modulefiles/git /etc/modulefiles/git
+    module_files/modulefiles/mysql-connector /etc/modulefiles/mysql-connector
+    module_files/modulefiles/bedops /etc/modulefiles/bedops
+    module_files/modulefiles/samtools /etc/modulefiles/samtools
+    module_files/modulefiles/htslib /etc/modulefiles/htslib
+    module_files/modulefiles/kentutil /etc/modulefiles/kentutil
+
+    # Copy only the software needed for this container
+    module_files/sw/openssl-dev /opt/sw/openssl-dev
+    module_files/sw/libpng /opt/sw/libpng
+    module_files/sw/git /opt/sw/git
+    module_files/sw/mysql-connector /opt/sw/mysql-connector
+    module_files/sw/bedops /opt/sw/bedops
+    module_files/sw/samtools /opt/sw/samtools
+    module_files/sw/htslib /opt/sw/htslib
+    module_files/sw/kentutil /opt/sw/kentutil
+
+%environment
+    # Set the path to the custom modulefiles
+    export MODULEPATH=/etc/modulefiles
+
+%runscript
+    # This script runs when the container is executed
+    echo "density_files container - modules: bedops/2.4.35-typical, samtools/1.3, htslib/1.6.0, kentutil/302"
+    exec /bin/bash
+
+%test
+    # Test basic functionality
+    samtools --version | grep -q "samtools"
+    git --version | grep -q "git version"
+    bgzip --version | grep -q "bgzip"
+    
+    # Test bedops tools
+    convert2bed --version
+    bedops --version
+    
+    # Test kentutil tools (common ones)
+    bigWigToBedGraph 2>&1 | grep -q usage
+    bedGraphToBigWig 2>&1 | grep -q usage

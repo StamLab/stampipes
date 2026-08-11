@@ -1,3 +1,5 @@
+nextflow.enable.dsl = 2
+
 params.help = false
 params.threads = 1
 
@@ -20,38 +22,28 @@ params.hotspot_index = "."
 params.cramthreads = 10
 
 def helpMessage() {
-  log.info"""
+  log.info(
+    """
     Usage: nextflow run basic.nf \\
              --genome /path/to/genome \\
              --bams '1.bam,2.bam...' \\
              --UMI true/false        \\
              --outdir /path/to/output
 
-  """.stripIndent();
+    """.stripIndent()
+  )
 }
 
-// Used for publishDir to avoid publishing bam files
-def exclude_bam = { name -> name ==~ /.*ba[mi]$/ ? null : name }
 
-dataDir = "$baseDir/../../../data"
-genome_name = file(params.genome).baseName
-
-bams = Channel.from(
-  params.bams.tokenize(',')
-).map {
-  file(it)
-}.collect()
-
-
-process merge {
+process merge_bams {
   label "modules"
 
   input:
   // Inputs may be cram file but that's fine
-  file 'in*.bam' from bams
+  path 'in*.bam'
 
   output:
-  file 'merged.bam' into merged
+  path 'merged.bam'
 
   script:
   """
@@ -63,49 +55,54 @@ process merge {
 process dups {
   label "modules"
   label 'high_mem'
-  publishDir params.outdir, saveAs: exclude_bam
+  publishDir params.outdir, saveAs: { name -> name ==~ /.*ba[mi]$/ ? null : name }
 
   input:
-  file(merged)
+  path merged
 
   output:
-  file 'marked.bam' into marked_bam
-  file 'marked.bam' into bams_to_cram_marked
-  file 'marked.bam.bai'
-  file 'MarkDuplicates.picard'
+  path 'marked.bam', emit: marked_bam
+  path 'marked.bam', emit: bams_to_cram_marked
+  path 'marked.bam.bai'
+  path 'MarkDuplicates.picard'
 
   script:
   if (params.UMI) {
     cmd = "UmiAwareMarkDuplicatesWithMateCigar"
     extra = "UMI_TAG_NAME=XD"
-  } else {
+  }
+  else {
     cmd = "MarkDuplicatesWithMateCigar"
     extra = "MINIMUM_DISTANCE=300"
   }
   """
+  env
+  ls -l
   picard RevertOriginalBaseQualitiesAndAddMateCigar \
     "INPUT=${merged}" OUTPUT=cigar.bam \
     VALIDATION_STRINGENCY=SILENT RESTORE_ORIGINAL_QUALITIES=false SORT_ORDER=coordinate MAX_RECORDS_TO_EXAMINE=0
-
+  echo "###"
+  ls -l
   picard "${cmd}" \
       INPUT=cigar.bam OUTPUT=marked.bam \
-      $extra \
+      ${extra} \
       METRICS_FILE=MarkDuplicates.picard ASSUME_SORTED=true VALIDATION_STRINGENCY=SILENT \
       READ_NAME_REGEX='[a-zA-Z0-9]+:[0-9]+:[a-zA-Z0-9]+:[0-9]+:([0-9]+):([0-9]+):([0-9]+).*'
+  echo "###"
+  ls -l
 
   samtools index marked.bam
   """
 }
-marked_bam.into { bam_for_counts; bam_for_adapter_counts; bam_for_filter; bam_for_diff_peaks; bam_for_multimapping_density }
 
-process filter {
+process filter_bam {
   label "modules"
 
   input:
-  file bam from bam_for_filter
+  path bam
 
   output:
-  file "filtered.bam" into filtered_bam
+  path "filtered.bam", emit: filtered_bam
 
   script:
   flag = params.UMI ? 1536 : 512
@@ -113,19 +110,16 @@ process filter {
   samtools view -b -F "${flag}" marked.bam > filtered.bam
   """
 }
-// TODO: Do we need to CRAM/publish this?
-filtered_bam.into { bam_for_spot_score; bam_for_cutcounts; bam_for_density; bam_for_inserts; bam_for_nuclear; bam_for_footprints; bams_to_cram }
 
 process filter_nuclear {
   label "modules"
+
   input:
-  file bam from bam_for_nuclear
-  file nuclear_chroms from file("${params.genome}.nuclear.txt")
+  path bam
+  path nuclear_chroms
 
   output:
-  file 'nuclear.bam' into nuclear_bam
-  file 'nuclear.bam' into bam_for_hotspot2
-  file 'nuclear.bam' into bam_for_macs2
+  path 'nuclear.bam', emit: nuclear_bam
 
   script:
   """
@@ -141,19 +135,19 @@ process macs2 {
   publishDir "${params.outdir}/peaks_macs2"
   scratch false
 
-  when:
-  params.peakcaller == "macs2"
-
   input:
-  file bam from bam_for_macs2
+  path bam
 
   output:
-  file 'NA_*'
+  path 'NA_*'
+
+  when:
+  params.peakcaller == "macs2"
 
   script:
   """
   macs2 callpeak \
-    -t "$bam" \
+    -t "${bam}" \
     -f BAMPE \
     -g hs \
     -B \
@@ -163,28 +157,25 @@ process macs2 {
 
 process hotspot2 {
   label "modules"
-
+  label 'high_mem'
   publishDir "${params.outdir}"
   container "fwip/hotspot2:latest"
 
-  label 'high_mem'
+  input:
+  val hotspotid
+  path nuclear
+  path mappable
+  path chrom_sizes
+  path centers
+
+  output:
+  path 'peaks/nuclear*'
+  path 'peaks/nuclear.hotspots.fdr0.05.starch', emit: hotspot_calls
+  path 'peaks/nuclear.hotspots.fdr0.05.starch', emit: hotspot_calls_for_bias
+  path 'peaks/nuclear.peaks.fdr0.001.starch', emit: onepercent_peaks
 
   when:
   params.peakcaller == "hotspot2"
-
-  input:
-  val(hotspotid) from params.hotspot_id
-  file(nuclear) from bam_for_hotspot2
-  file(mappable) from file(params.mappable)
-  file(chrom_sizes) from file(params.chrom_sizes)
-  file(centers) from file(params.centers)
-
-
-  output:
-  file('peaks/nuclear*')
-  file('peaks/nuclear.hotspots.fdr0.05.starch') into hotspot_calls
-  file('peaks/nuclear.hotspots.fdr0.05.starch') into hotspot_calls_for_bias
-  file('peaks/nuclear.peaks.fdr0.001.starch') into onepercent_peaks
 
   script:
   """
@@ -215,7 +206,6 @@ process hotspot2 {
 
   rm -rf "\$TMPDIR"
   """
-
 }
 
 process spot_score {
@@ -223,18 +213,19 @@ process spot_score {
   publishDir params.outdir
 
   input:
-  file(bam) from bam_for_spot_score
-  file(mappable) from file("${dataDir}/annotations/${genome_name}.K${params.readlength}.mappable_only.bed")
-  file(chromInfo) from file("${dataDir}/annotations/${genome_name}.chromInfo.bed")
+  path bam
+  path mappable
+  path chromInfo
+  val genome_name
 
   output:
-  file 'r1.spot.out'
-  file 'r1.hotspot.info'
+  path 'r1.spot.out'
+  path 'r1.hotspot.info'
 
   script:
   """
   # random sample
-	samtools view -h -F 12 -f 3 "$bam" \
+	samtools view -h -F 12 -f 3 "${bam}" \
 		| awk '{if( ! index(\$3, "chrM") && \$3 != "chrC" && \$3 != "random"){print}}' \
 		| samtools view -uS - \
 		> nuclear.bam
@@ -264,15 +255,15 @@ process bam_counts {
   publishDir params.outdir
 
   input:
-  file(bam) from bam_for_counts
+  path bam
 
   output:
-  file('tagcounts.txt')
+  path 'tagcounts.txt'
 
   script:
   """
   python3 \$STAMPIPES/scripts/bwa/bamcounts.py \
-    "$bam" \
+    "${bam}" \
     tagcounts.txt
   """
 }
@@ -282,10 +273,10 @@ process count_adapters {
   publishDir params.outdir
 
   input:
-  file(bam) from bam_for_adapter_counts
+  path bam
 
   output:
-  file('adapter.counts.txt')
+  path 'adapter.counts.txt'
 
   script:
   """
@@ -298,16 +289,17 @@ process count_adapters {
 process preseq {
   label "modules"
   publishDir params.outdir
+
   input:
-  file nuclear_bam
+  path nuclear_bam
+
+  output:
+  path 'preseq.txt'
+  path 'preseq_targets.txt'
+  path 'dups.hist'
 
   when:
   !params.UMI
-
-  output:
-  file 'preseq.txt'
-  file 'preseq_targets.txt'
-  file 'dups.hist'
 
   script:
   """
@@ -328,20 +320,20 @@ process cutcounts {
   label 'high_mem'
 
   input:
-  file(fai) from file("${params.genome}.fai")
-  file(filtered_bam) from bam_for_cutcounts
+  path fai
+  path filtered_bam
 
   output:
-  file('fragments.starch')
-  file('cutcounts.starch')
-  file('cutcounts.bw')
-  file('cutcounts.bed.bgz')
-  file('cutcounts.bed.bgz.tbi')
+  path 'fragments.starch'
+  path 'cutcounts.starch'
+  path 'cutcounts.bw'
+  path 'cutcounts.bed.bgz'
+  path 'cutcounts.bed.bgz.tbi'
 
   script:
   """
   bam2bed --do-not-sort \
-  < "$filtered_bam" \
+  < "${filtered_bam}" \
   | awk -v cutfile=cuts.bed -v fragmentfile=fragments.bed -f \$STAMPIPES/scripts/bwa/aggregate/basic/cutfragments.awk
 
   sort-bed fragments.bed | starch - > fragments.starch
@@ -359,7 +351,7 @@ process cutcounts {
   | starch - > cutcounts.starch
 
   # Bigwig
-  "$STAMPIPES/scripts/bwa/starch_to_bigwig.bash" \
+  "\$STAMPIPES/scripts/bwa/starch_to_bigwig.bash" \
     cutcounts.starch \
     cutcounts.bw \
     "${fai}"
@@ -377,51 +369,49 @@ process density {
   label 'high_mem'
 
   input:
-  file filtered_bam from bam_for_density
-  file chrom_bucket from file(params.chrom_bucket)
-  file fai from file("${params.genome}.fai")
+  path filtered_bam
+  path chrom_bucket
+  path fai
 
   output:
-  file 'density.starch'
-  file 'density.bw'
-  file 'density.bgz'
-  file 'density.bgz.tbi'
-  set(file(filtered_bam), file('density.starch')) into to_normalize
+  path 'density.starch'
+  path 'density.bw'
+  path 'density.bgz'
+  path 'density.bgz.tbi'
+  tuple path(filtered_bam), path('density.starch'), emit: to_normalize
 
-  shell:
-  window_size = 75
-  bin_size = 20
-  scale = 1_000_000
-  '''
+  script:
+  def window_size = 75
+  def bin_size = 20
+  """
   mkfifo density.bed
 
   bam2bed -d \
-  < "!{filtered_bam}" \
+  < "${filtered_bam}" \
   | cut -f1-6 \
-  | awk '{ if( $6=="+" ){ s=$2; e=$2+1 } else { s=$3-1; e=$3 } print $1 "\t" s "\t" e "\tid\t" 1 }' \
+  | awk '{ if( \$6=="+" ){ s=\$2; e=\$2+1 } else { s=\$3-1; e=\$3 } print \$1 "\t" s "\t" e "\tid\t" 1 }' \
   | sort-bed - \
   > density.bed \
   &
 
-  unstarch "!{chrom_bucket}" \
+  unstarch "${chrom_bucket}" \
   | bedmap --faster --echo --count --delim "\t" - density.bed \
-  | awk -v "binI=!{bin_size}" -v "win=!{window_size}" \
-        'BEGIN{ halfBin=binI/2; shiftFactor=win-halfBin } { print $1 "\t" $2 + shiftFactor "\t" $3-shiftFactor "\tid\t" i $4}' \
+  | awk -v "binI=${bin_size}" -v "win=${window_size}" \
+        'BEGIN{ halfBin=binI/2; shiftFactor=win-halfBin } { print \$1 "\t" \$2 + shiftFactor "\t" \$3-shiftFactor "\tid\t" i \$4}' \
   | starch - \
   > density.starch
 
   # Bigwig
-  "$STAMPIPES/scripts/bwa/starch_to_bigwig.bash" \
+  "\$STAMPIPES/scripts/bwa/starch_to_bigwig.bash" \
     density.starch \
     density.bw \
-    "!{fai}" \
-    "!{bin_size}"
+    "${fai}" \
+    "${bin_size}"
 
   # Tabix
   unstarch density.starch | bgzip > density.bgz
   tabix -p bed density.bgz
-  '''
-
+  """
 }
 
 process multimapping_density {
@@ -431,24 +421,24 @@ process multimapping_density {
   label 'high_mem'
 
   input:
-  file marked_bam from bam_for_multimapping_density
-  file chrom_bucket from file(params.chrom_bucket)
-  file fai from file("${params.genome}.fai")
+  path marked_bam
+  path chrom_bucket
+  path fai
 
   output:
-  file "mm_density.starch"
-  file "mm_density.bw"
-  file 'normalized.mm_density.starch'
-  file 'normalized.mm_density.bw'
+  path "mm_density.starch"
+  path "mm_density.bw"
+  path 'normalized.mm_density.starch'
+  path 'normalized.mm_density.bw'
 
-  shell:
-  window_size = 75
-  bin_size = 20
-  scale = 1_000_000
-  '''
+  script:
+  def window_size = 75
+  def bin_size = 20
+  def scale = 1_000_000
+  """
   # Mark multi-mapping reads as QC-pass!
-  samtools view -h "!{marked_bam}" |
-  awk 'BEGIN{OFS="\t"} /XA:Z/ {$2 = and(or($2, 2), compl(512))} 1' |
+  samtools view -h "${marked_bam}" |
+  awk 'BEGIN{OFS="\t"} /XA:Z/ {\$2 = and(or(\$2, 2), compl(512))} 1' |
   samtools view --threads 3 -F 512 -o filtered.bam
   samtools index filtered.bam
 
@@ -459,15 +449,15 @@ process multimapping_density {
   bam2bed -d \
   < filtered.bam \
   | cut -f1-6 \
-  | awk '{ if( $6=="+" ){ s=$2; e=$2+1 } else { s=$3-1; e=$3 } print $1 "\t" s "\t" e "\tid\t" 1 }' \
+  | awk '{ if( \$6=="+" ){ s=\$2; e=\$2+1 } else { s=\$3-1; e=\$3 } print \$1 "\t" s "\t" e "\tid\t" 1 }' \
   | sort-bed - \
   > density.bed \
   &
 
-  unstarch "!{chrom_bucket}" \
+  unstarch "${chrom_bucket}" \
   | bedmap --faster --echo --count --delim "\t" - density.bed \
-  | awk -v "binI=!{bin_size}" -v "win=!{window_size}" \
-        'BEGIN{ halfBin=binI/2; shiftFactor=win-halfBin } { print $1 "\t" $2 + shiftFactor "\t" $3-shiftFactor "\tid\t" i $4}' \
+  | awk -v "binI=${bin_size}" -v "win=${window_size}" \
+        'BEGIN{ halfBin=binI/2; shiftFactor=win-halfBin } { print \$1 "\t" \$2 + shiftFactor "\t" \$3-shiftFactor "\tid\t" i \$4}' \
   | starch - \
   > mm_density.starch
 
@@ -475,8 +465,8 @@ process multimapping_density {
   "\$STAMPIPES/scripts/bwa/starch_to_bigwig.bash" \
     mm_density.starch \
     mm_density.bw \
-    "!{fai}" \
-    "!{bin_size}"
+    "${fai}" \
+    "${bin_size}"
 
   # # Tabix
   # unstarch density.starch | bgzip > density.bgz
@@ -486,21 +476,21 @@ process multimapping_density {
 
   # Normalized density
   unstarch mm_density.starch \
-    | awk -v allcounts=$(samtools view -c filtered.bam) \
-          -v extranuclear_counts=$(samtools view -c "filtered.bam" chrM chrC) \
-          -v scale=!{scale} \
+    | awk -v allcounts=\$(samtools view -c filtered.bam) \
+          -v extranuclear_counts=\$(samtools view -c "filtered.bam" chrM chrC) \
+          -v scale=${scale} \
           'BEGIN{ tagcount=allcounts-extranuclear_counts }
-           { z=$5;
+           { z=\$5;
              n=(z/tagcount)*scale;
-             print $1 "\t" $2 "\t" $3 "\t" $4 "\t" n }' \
+             print \$1 "\t" \$2 "\t" \$3 "\t" \$4 "\t" n }' \
     | starch - > normalized.mm_density.starch
 
   "\$STAMPIPES/scripts/bwa/starch_to_bigwig.bash" \
     normalized.mm_density.starch \
     normalized.mm_density.bw \
-    "!{fai}" \
-    "!{bin_size}"
-  '''
+    "${fai}" \
+    "${bin_size}"
+  """
 }
 
 process normalize_density {
@@ -508,41 +498,40 @@ process normalize_density {
   publishDir params.outdir
 
   input:
-  set(file(filtered_bam), file(density)) from to_normalize
-  file(fai) from file("${params.genome}.fai")
+  tuple path(filtered_bam), path(density)
+  path fai
 
   output:
-  file 'normalized.density.starch'
-  file 'normalized.density.bw'
-  file 'normalized.density.bgz'
-  file 'normalized.density.bgz.tbi'
+  path 'normalized.density.starch'
+  path 'normalized.density.bw'
+  path 'normalized.density.bgz'
+  path 'normalized.density.bgz.tbi'
 
-  shell:
-  bin_size = 20
-  scale = 1_000_000
-  '''
-  samtools index "!{filtered_bam}"
+  script:
+  def bin_size = 20
+  def scale = 1_000_000
+  """
+  samtools index "${filtered_bam}"
   # Normalized density
   unstarch density.starch \
-    | awk -v allcounts=$(samtools view -c !{filtered_bam}) \
-          -v extranuclear_counts=$(samtools view -c "!{filtered_bam}" chrM chrC) \
-          -v scale=!{scale} \
+    | awk -v allcounts=\$(samtools view -c ${filtered_bam}) \
+          -v extranuclear_counts=\$(samtools view -c "${filtered_bam}" chrM chrC) \
+          -v scale=${scale} \
           'BEGIN{ tagcount=allcounts-extranuclear_counts }
-           { z=$5;
+           { z=\$5;
              n=(z/tagcount)*scale;
-             print $1 "\t" $2 "\t" $3 "\t" $4 "\t" n }' \
+             print \$1 "\t" \$2 "\t" \$3 "\t" \$4 "\t" n }' \
     | starch - > normalized.density.starch
 
-  "$STAMPIPES/scripts/bwa/starch_to_bigwig.bash" \
+  "\$STAMPIPES/scripts/bwa/starch_to_bigwig.bash" \
     normalized.density.starch \
     normalized.density.bw \
-    "!{fai}" \
-    "!{bin_size}"
+    "${fai}" \
+    "${bin_size}"
 
   unstarch normalized.density.starch | bgzip > normalized.density.bgz
   tabix -p bed normalized.density.bgz
-  '''
-
+  """
 }
 
 process insert_sizes {
@@ -550,15 +539,18 @@ process insert_sizes {
 
   publishDir params.outdir
 
+  scratch false
+
   input:
-  file nuclear_bam from bam_for_inserts
-  file nuclear_chroms from file("${params.genome}.nuclear.txt")
+  path nuclear_bam
+  path nuclear_chroms
 
   output:
-  file 'CollectInsertSizeMetrics.picard*'
+  path 'CollectInsertSizeMetrics.picard*'
 
   script:
   """
+  export JAVA_TOOL_OPTIONS="-Djdk.lang.Process.launchMechanism=vfork"
   picard CollectInsertSizeMetrics \
     "INPUT=${nuclear_bam}" \
     OUTPUT=CollectInsertSizeMetrics.picard \
@@ -581,12 +573,12 @@ process motif_matrix {
   publishDir params.outdir
 
   input:
-  file hotspot_calls
-  file fimo_transfac from file("${dataDir}/motifs/${genome_name}.fimo.starch")
-  file fimo_names from file("${dataDir}/motifs/${genome_name}.fimo.transfac.names.txt")
+  path hotspot_calls
+  path fimo_transfac
+  path fimo_names
 
   output:
-  file 'hs_motifs*.txt'
+  path 'hs_motifs*.txt'
 
   when:
   params.domotifs
@@ -605,15 +597,15 @@ process closest_features {
   publishDir params.outdir
 
   input:
-  file hotspot_calls
-  file transcript_starts from file("${dataDir}/features/${genome_name}.CombinedTxStarts.bed")
-  val thresholds from "0 1000 2500 5000 10000"
+  path hotspot_calls
+  path transcript_starts
+  val thresholds
+
+  output:
+  path 'prox_dist.info'
 
   when:
   params.dofeatures
-
-  output:
-  file 'prox_dist.info'
 
   script:
   """
@@ -630,7 +622,7 @@ process closest_features {
   | sed -e 's/-//g' \
   > closest.clean.txt
 
-  for t in $thresholds ; do
+  for t in ${thresholds} ; do
     awk \
       -v t=\$t \
       '\$1 > t {sum+=1} END {print "percent-proximal-" t "bp " sum/NR}' \
@@ -649,38 +641,38 @@ process differential_hotspots {
   publishDir params.outdir
 
   input:
-  file bam from bam_for_diff_peaks
-  file peaks from onepercent_peaks
-  file index from file(params.hotspot_index)
+  path bam
+  path peaks
+  path index
 
   output:
-  file 'differential_index_report.tsv'
+  path 'differential_index_report.tsv'
 
   when:
   params.hotspot_index != "."
 
-  shell:
-  version = (new File(params.hotspot_index)).getAbsoluteFile().getParentFile().getName()
-  diffName = "dhsindex_${version}_differential_peaks"
-  diffPerName = "dhsindex_${version}_differential_peaks_percent"
-  conName = "dhsindex_${version}_constitutive_peaks"
-  conPerName = "dhsindex_${version}_constitutive_peaks_percent"
+  script:
+  def version = (new File(params.hotspot_index)).getAbsoluteFile().getParentFile().getName()
+  def diffName = "dhsindex_${version}_differential_peaks"
+  def diffPerName = "dhsindex_${version}_differential_peaks_percent"
+  def conName = "dhsindex_${version}_constitutive_peaks"
+  def conPerName = "dhsindex_${version}_constitutive_peaks_percent"
 
-  '''
+  """
   set -e -o pipefail
-  statOverlap=$(bedops -e 1 "!{peaks}" "!{index}" | wc -l)
-  statNoOverlap=$(bedops -n 1 "!{peaks}" "!{index}" | wc -l)
-  total=$(unstarch "!{peaks}" | wc -l)
-  statPercOverlap=$(echo "scale=3; $statOverlap * 100.0/$total" | bc -q)
-  statPercNoOverlap=$(echo "scale=3; $statNoOverlap * 100.0/$total" | bc -q)
+  statOverlap=\$(bedops -e 1 "${peaks}" "${index}" | wc -l)
+  statNoOverlap=\$(bedops -n 1 "${peaks}" "${index}" | wc -l)
+  total=\$(unstarch "${peaks}" | wc -l)
+  statPercOverlap=\$(echo "scale=3; \$statOverlap * 100.0/\$total" | bc -q)
+  statPercNoOverlap=\$(echo "scale=3; \$statNoOverlap * 100.0/\$total" | bc -q)
 
   {
-    echo -e "!{diffName}\t$statNoOverlap"
-    echo -e "!{diffPerName}\t$statPercNoOverlap"
-    echo -e "!{conName}\t$statOverlap"
-    echo -e "!{conPerName}\t$statPercOverlap"
+    echo -e "${diffName}\t\$statNoOverlap"
+    echo -e "${diffPerName}\t\$statPercNoOverlap"
+    echo -e "${conName}\t\$statOverlap"
+    echo -e "${conPerName}\t\$statPercOverlap"
   } > differential_index_report.tsv
-  '''
+  """
 }
 
 
@@ -688,116 +680,111 @@ process differential_hotspots {
  * Footprint calling
  */
 process learn_dispersion {
-
   label "footprints"
   publishDir params.outdir
+  memory '8 GB'
+  cpus 8
 
-  memory = '8 GB'
-  cpus = 8
+  input:
+  path ref
+  path bam
+  //path bai
+  path spots
+  path bias
+
+  output:
+  tuple path('dm.json'), path(bam), path("${bam}.bai"), emit: dispersion
+  path 'dm.json', emit: to_plot
 
   when:
   params.bias != ""
 
-  input:
-  file ref from file("${params.genome}.fa")
-  file bam from bam_for_footprints
-  //file bai
-  file spots from hotspot_calls_for_bias
-  file bias from file(params.bias)
-
-  output:
-  set file('dm.json'), file(bam), file ("${bam}.bai") into dispersion
-  file 'dm.json' into to_plot
-
   script:
   """
-  samtools index "$bam"
+  samtools index "${bam}"
 
   # TODO: Use nuclear file
-  unstarch $spots \
+  unstarch ${spots} \
   | grep -v "_random" \
   | grep -v "chrUn" \
   | grep -v "chrM" \
   > intervals.bed
 
   ftd-learn-dispersion-model \
-    --bm $bias \
+    --bm ${bias} \
     --half-win-width 5 \
     --processors 8 \
-    $bam \
-    $ref \
+    ${bam} \
+    ${ref} \
     intervals.bed \
   > dm.json
   """.stripIndent()
-
 }
 
 process make_intervals {
 
   label "footprints"
+
   input:
-  file starch from hotspot_calls
+  path starch
 
   output:
-  file 'chunk_*' into intervals mode flatten
+  path 'chunk_*', emit: intervals
 
   script:
   """
-  unstarch "$starch" \
+  unstarch "${starch}" \
   | grep -v "_random" \
   | grep -v "chrUn" \
   | grep -v "chrM" \
-  | split -l "$params.chunksize" -a 4 -d - chunk_
+  | split -l "${params.chunksize}" -a 4 -d - chunk_
   """.stripIndent()
-
 }
 
 process compute_deviation {
-
   label "footprints"
-  memory = '8 GB'
-  cpus = 4
+  memory '8 GB'
+  cpus 4
 
   input:
-  set file(interval), file(dispersion), file(bam), file(bai) from intervals.combine(dispersion)
-  file(bias) from file(params.bias)
-  file(ref) from file("${params.genome}.fa")
+  tuple path(interval), path(dispersion), path(bam), path(bai)
+  path bias
+  path ref
 
   output:
-  file 'deviation.out' into deviations
+  path 'deviation.out', emit: deviations
 
   script:
   """
   ftd-compute-deviation \
-  --bm "$bias" \
+  --bm "${bias}" \
   --half-win-width 5 \
   --smooth-half-win-width 50 \
   --smooth-clip 0.01 \
-  --dm "$dispersion" \
+  --dm "${dispersion}" \
   --fdr-shuffle-n 50 \
   --processors 4 \
-  "$bam" \
-  "$ref" \
-  "$interval" \
+  "${bam}" \
+  "${ref}" \
+  "${interval}" \
   | sort --buffer-size=8G -k1,1 -k2,2n \
   > deviation.out
   """.stripIndent()
 }
 
 process merge_deviation {
-
   label "footprints"
-  memory = "32 GB"
-  cpus = 1
+  memory "32 GB"
+  cpus 1
+
+  input:
+  path 'chunk_*'
+
+  output:
+  path 'interval.all.bedgraph', emit: merged_interval
 
   when:
   params.bias != ""
-
-  input:
-  file 'chunk_*' from deviations.collect()
-
-  output:
-  file 'interval.all.bedgraph' into merged_interval
 
   script:
   """
@@ -807,47 +794,40 @@ process merge_deviation {
 }
 
 process working_tracks {
-
   label "footprints"
-  memory = '32 GB'
-  cpus = 1
-
+  memory '32 GB'
+  cpus 1
   publishDir params.outdir
 
   input:
-  file merged_interval
+  path merged_interval
 
   output:
-  file 'interval.all.bedgraph' into bedgraph
-  file 'interval.all.bedgraph.starch'
-  file 'interval.all.bedgraph.gz'
-  file 'interval.all.bedgraph.gz.tbi'
+  path 'interval.all.bedgraph', emit: bedgraph
+  path 'interval.all.bedgraph.starch'
+  path 'interval.all.bedgraph.gz'
+  path 'interval.all.bedgraph.gz.tbi'
 
   script:
   """
-  sort-bed "$merged_interval" | starch - > interval.all.bedgraph.starch
-  bgzip -c "$merged_interval" > interval.all.bedgraph.gz
+  sort-bed "${merged_interval}" | starch - > interval.all.bedgraph.starch
+  bgzip -c "${merged_interval}" > interval.all.bedgraph.gz
   tabix -0 -p bed interval.all.bedgraph.gz
   """.stripIndent()
-
 }
 
-thresholds = Channel.from(0.2, 0.1, 0.05, 0.01, 0.001, 0.0001)
-
 process compute_footprints {
-
   label "footprints"
-  memory = '8 GB'
-  cpus = 1
-
+  memory '8 GB'
+  cpus 1
   publishDir params.outdir
 
   input:
-  set file(merged_interval), val(threshold) from merged_interval.combine(thresholds)
+  tuple path(merged_interval), val(threshold)
 
   output:
-  file "interval.all.fps.${threshold}.bed.gz"
-  file "interval.all.fps.${threshold}.bed.gz.tbi"
+  path "interval.all.fps.${threshold}.bed.gz"
+  path "interval.all.fps.${threshold}.bed.gz.tbi"
 
   script:
   """
@@ -862,7 +842,6 @@ process compute_footprints {
   bgzip -c "\$output" > "\$output.gz"
   tabix -0 -p bed "\$output.gz"
   """.stripIndent()
-
 }
 
 process plot_footprints {
@@ -871,33 +850,31 @@ process plot_footprints {
   publishDir params.outdir
 
   input:
-  file model from to_plot
-  file plot from file("$baseDir/plot_footprints.py")
+  path model
+  path plot
 
   output:
-  file "dispersion.*pdf"
+  path "dispersion.*pdf"
 
   script:
   """
-  "./$plot" "$model"
+  "./${plot}" "${model}"
   """
 }
 
 process cram {
   publishDir params.outdir
   cpus params.cramthreads / 2
-
-  // TODO: put in config
-  module "samtools/1.12"
+  label 'samtools'
 
   input:
-  file bam from bams_to_cram.mix(bams_to_cram_marked)
-  file ref from file("${params.genome}.fa")
-  file fai from file("${params.genome}.fai")
+  path bam
+  path ref
+  path fai
 
   output:
-  file cramfile
-  file "${cramfile}.crai"
+  path cramfile
+  path "${cramfile}.crai"
 
   script:
   cramfile = bam.name.replace("bam", "cram")
@@ -916,19 +893,176 @@ process starch_to_bigbed {
   label "modules"
 
   input:
-  file starch_in from onepercent_peaks
-  file chrom_sizes_bed from file(params.chrom_sizes)
+  path starch_in
+  path chrom_sizes_bed
 
   output:
-  file('peaks/nuclear.peaks.fdr0.001.bb')
+  path 'peaks/nuclear.peaks.fdr0.001.bb'
 
   script:
   outfile = starch_in.name.replace("starch", "bb")
   """
-  cut -f1,3 "$chrom_sizes_bed" > chrom_sizes
+  cut -f1,3 "${chrom_sizes_bed}" > chrom_sizes
   mkdir -p peaks
   unstarch "${starch_in}" | cut -f1-4 > temp.bed
-  bedToBigBed temp.bed chrom_sizes "peaks/$outfile"
+  bedToBigBed temp.bed chrom_sizes "peaks/${outfile}"
   rm temp.bed
   """
+}
+
+workflow {
+  dataDir = "${baseDir}/../../../data"
+  genome_name = file(params.genome).baseName
+
+  // Create input channels
+  bams = Channel.from(
+      params.bams.tokenize(',')
+    )
+    .map {
+      file(it)
+    }
+    .collect()
+
+  // Main workflow execution
+  merge_bams(bams)
+  dups(merge_bams.out)
+  filter_bam(dups.out.marked_bam)
+  filter_nuclear(filter_bam.out.filtered_bam, file("${params.genome}.nuclear.txt"))
+
+  // Conditional processes
+  if (params.peakcaller == "macs2") {
+    macs2(filter_nuclear.out.nuclear_bam)
+  }
+
+  if (params.peakcaller == "hotspot2") {
+    hotspot2(
+      params.hotspot_id,
+      filter_nuclear.out.nuclear_bam,
+      file(params.mappable),
+      file(params.chrom_sizes),
+      file(params.centers),
+    )
+  }
+
+  // Analysis processes
+  spot_score(
+    filter_bam.out.filtered_bam,
+    file("${dataDir}/annotations/${genome_name}.K${params.readlength}.mappable_only.bed"),
+    file("${dataDir}/annotations/${genome_name}.chromInfo.bed"),
+    genome_name,
+  )
+
+  bam_counts(dups.out.marked_bam)
+  count_adapters(dups.out.marked_bam)
+
+  if (!params.UMI) {
+    preseq(filter_nuclear.out.nuclear_bam)
+  }
+
+  cutcounts(
+    file("${params.genome}.fai"),
+    filter_bam.out.filtered_bam,
+  )
+
+  density(
+    filter_bam.out.filtered_bam,
+    file(params.chrom_bucket),
+    file("${params.genome}.fai"),
+  )
+
+  multimapping_density(
+    dups.out.marked_bam,
+    file(params.chrom_bucket),
+    file("${params.genome}.fai"),
+  )
+
+  normalize_density(
+    density.out.to_normalize,
+    file("${params.genome}.fai"),
+  )
+
+  insert_sizes(
+    filter_bam.out.filtered_bam,
+    file("${params.genome}.nuclear.txt"),
+  )
+
+  // Conditional analysis processes
+  if (params.peakcaller == "hotspot2") {
+    if (params.domotifs) {
+      motif_matrix(
+        hotspot2.out.hotspot_calls,
+        file("${dataDir}/motifs/${genome_name}.fimo.starch"),
+        file("${dataDir}/motifs/${genome_name}.fimo.transfac.names.txt"),
+      )
+    }
+
+    if (params.dofeatures) {
+      closest_features(
+        hotspot2.out.hotspot_calls,
+        file("${dataDir}/features/${genome_name}.CombinedTxStarts.bed"),
+        "0 1000 2500 5000 10000",
+      )
+    }
+
+    if (params.hotspot_index != ".") {
+      differential_hotspots(
+        dups.out.marked_bam,
+        hotspot2.out.onepercent_peaks,
+        file(params.hotspot_index),
+      )
+    }
+
+    // Footprint analysis
+    if (params.bias != "") {
+      learn_dispersion(
+        file("${params.genome}.fa"),
+        filter_bam.out.filtered_bam,
+        hotspot2.out.hotspot_calls_for_bias,
+        file(params.bias),
+      )
+
+      make_intervals(hotspot2.out.hotspot_calls)
+
+      intervals_combined = make_intervals.out.intervals
+        .flatten()
+        .combine(learn_dispersion.out.dispersion)
+
+      compute_deviation(
+        intervals_combined,
+        file(params.bias),
+        file("${params.genome}.fa"),
+      )
+
+      merge_deviation(
+        compute_deviation.out.deviations.collect()
+      )
+
+      working_tracks(
+        merge_deviation.out.merged_interval
+      )
+
+      thresholds = Channel.from(0.2, 0.1, 0.05, 0.01, 0.001, 0.0001)
+      intervals_with_thresholds = merge_deviation.out.merged_interval.combine(thresholds)
+
+      compute_footprints(intervals_with_thresholds)
+
+      plot_footprints(
+        learn_dispersion.out.to_plot,
+        file("${baseDir}/plot_footprints.py"),
+      )
+    }
+
+    starch_to_bigbed(
+      hotspot2.out.onepercent_peaks,
+      file(params.chrom_sizes),
+    )
+  }
+
+  // CRAM conversion
+  bams_to_cram_combined = filter_bam.out.filtered_bam.mix(dups.out.bams_to_cram_marked)
+  cram(
+    bams_to_cram_combined,
+    file("${params.genome}.fa"),
+    file("${params.genome}.fai"),
+  )
 }
