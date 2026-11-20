@@ -25,6 +25,19 @@ SCRIPT_OPTIONS = {
     "reverse_barcode2": False,
     "filename": "SampleSheet.withmask.{mask}.csv",
     "mismatches": "1,1",
+    "index2_pad_first": False,
+}
+
+# LIMS barcode-category umi_method values whose UMI is read immediately after
+# the barcode in index read 1 (e.g. IDT xGen UDI-UMI: 8bp i7 + 9bp UMI).
+# Value is the UMI length in cycles.
+INDEX1_UMI_LENGTHS = {
+    "xgen-udi-umi": 9,
+}
+# Fallback keyed on LIMS barcode-category name, for categories that don't have
+# a umi_method set yet. Fragile (human-editable name); prefer umi_method.
+INDEX1_UMI_CATEGORY_LENGTHS = {
+    "IDT xGen UDI-UMI Adapters": 9,
 }
 
 
@@ -152,12 +165,24 @@ class BasesMask:
                     len2 = read_len
         return (len1, len2)
 
-    def adjust_for_barcode_lengths(self, bc1_len: int, bc2_len: int) -> "BasesMask":
+    def adjust_for_barcode_lengths(
+        self,
+        bc1_len: int,
+        bc2_len: int,
+        umi1_len: int = 0,
+        index2_pad_first: bool = False,
+    ) -> "BasesMask":
         """
         Create a new BasesMask adjusted for actual barcode lengths.
 
         If barcodes are shorter than the index read, pads with 'n'.
         If barcodes are longer than the index read, truncates.
+
+        umi1_len: mark this many cycles after barcode1 in index read 1 as UMI
+            (e.g. I8U9 for IDT xGen UDI-UMI adapters).
+        index2_pad_first: put index read 2 padding before the barcode (N2I8).
+            bcl-convert reverses OverrideCycles for reverse-complement index
+            reads (NovaSeq X), so trailing padding would mask the wrong cycles.
         """
         new_reads = []
         index_num = 0
@@ -176,9 +201,23 @@ class BasesMask:
                 index_num += 1
                 bc_len = bc1_len if index_num == 1 else bc2_len
 
-                if bc_len >= read_len:
+                if index_num == 1 and umi1_len:
+                    # Index read 1 = barcode, then UMI, then any leftover cycles
+                    pad = read_len - bc_len - umi1_len
+                    if pad < 0:
+                        raise ValueError(
+                            f"Index read 1 has {read_len} cycles, too short for a "
+                            f"{bc_len}bp barcode plus {umi1_len}bp UMI"
+                        )
+                    pieces = [("i", bc_len), ("u", umi1_len)]
+                    if pad:
+                        pieces.append(("n", pad))
+                    new_reads.append(pieces)
+                elif bc_len >= read_len:
                     # Barcode fills or exceeds the read
                     new_reads.append([("i", read_len)])
+                elif index_num == 2 and index2_pad_first:
+                    new_reads.append([("n", read_len - bc_len), ("i", bc_len)])
                 else:
                     # Barcode is shorter (or absent), pad with 'n'.
                     # Keep ('i', 0) as a zero-length marker so callers can
@@ -213,6 +252,15 @@ def parser_setup():
         help="Use reverse sequence for barcode2",
     )
     parser.add_argument(
+        "--index2_pad_first",
+        dest="index2_pad_first",
+        action="store_true",
+        help=(
+            "Pad short barcode2 at the start of index read 2 (N2I8), for "
+            "instruments that read index 2 reverse-complemented (NovaSeq X)"
+        ),
+    )
+    parser.add_argument(
         "--filename",
         help="The template to use for filename, with the {mask} formatting",
     )
@@ -235,6 +283,7 @@ def get_barcode_assignments(
             "sample": libdata.get("samplesheet_name"),
             "barcode1": "",
             "barcode2": "",
+            "umi1": 0,
         }
         if assignment["sample"] == "None":
             assignment["sample"] = "LANE%d" % libdata["id"]
@@ -243,6 +292,11 @@ def get_barcode_assignments(
                 libdata["barcode1"]["reverse_sequence"]
                 if reverse_barcode1
                 else libdata["barcode1"]["sequence"]
+            )
+            umi_method = libdata["barcode1"].get("umi_method")
+            category = libdata["barcode1"].get("category")
+            assignment["umi1"] = INDEX1_UMI_LENGTHS.get(
+                umi_method, INDEX1_UMI_CATEGORY_LENGTHS.get(category, 0)
             )
         if libdata.get("barcode2") is not None:
             assignment["barcode2"] = (
@@ -307,8 +361,10 @@ def make_samplesheet_header(
     )
 
 
-def group_assignments(assignments: "list[dict]") -> "dict[tuple[int, int], list[dict]]":
-    """Groups the barcode assignments by length"""
+def group_assignments(
+    assignments: "list[dict]",
+) -> "dict[tuple[int, int, int], list[dict]]":
+    """Groups the barcode assignments by (barcode1, barcode2, index1 UMI) length"""
     barcode_length_combinations = defaultdict(list)
 
     def get_len(d):
@@ -318,6 +374,7 @@ def group_assignments(assignments: "list[dict]") -> "dict[tuple[int, int], list[
         key = (
             get_len(assignment["barcode1"]),
             get_len(assignment["barcode2"]),
+            assignment.get("umi1", 0),
         )
         barcode_length_combinations[key].append(assignment)
     return barcode_length_combinations
@@ -330,6 +387,7 @@ def write_samplesheets(
     root_mask: str,
     assignments: list[dict],
     mismatches: str = "1,1",
+    index2_pad_first: bool = False,
 ) -> None:
     """Write out the sample sheets in bcl-convert v2 format."""
     mask = BasesMask.parse(root_mask)
@@ -342,8 +400,10 @@ def write_samplesheets(
 
     groups = group_assignments(assignments)
 
-    for barcode_lengths, assigns in groups.items():
-        adjusted_mask = mask.adjust_for_barcode_lengths(*barcode_lengths)
+    for (bc1_len, bc2_len, umi1_len), assigns in groups.items():
+        adjusted_mask = mask.adjust_for_barcode_lengths(
+            bc1_len, bc2_len, umi1_len=umi1_len, index2_pad_first=index2_pad_first
+        )
         header = make_samplesheet_header(name, date, adjusted_mask, mismatches)
         body = make_samplesheet_body(assigns)
         samplesheet_contents = header + body
@@ -393,6 +453,7 @@ def main(args=sys.argv):
         root_mask=mask,
         assignments=assignments,
         mismatches=poptions.mismatches,
+        index2_pad_first=poptions.index2_pad_first,
     )
 
 
