@@ -7,25 +7,55 @@ This script creates sample sheets with the bcl-convert v2 format, including:
 - BarcodeMismatchesIndex1/2 in [Settings] section
 - Proper [Data] section with Lane, Sample_ID, index, index2 columns
 
-Usage: $0 -p processing.json [--mismatches 1,1] [--reverse_barcode1] [--reverse_barcode2] [--filename SampleSheet.withmask.{mask}.csv]
+Barcode values come from a LIMS field policy (--barcode-source). That is
+separate from RunInfo.xml IsReverseComplement, which controls how bcl-convert
+interprets OverrideCycles for each physical index read (including padding
+order). Do not conflate the two.
+
+Usage:
+  $0 -p processing.json --runinfo RunInfo.xml [--barcode-source reverse_sequence]
+     [--mismatches 1,1] [--filename SampleSheet.withmask.{mask}.csv]
 """
 
 import argparse
 import datetime
 import json
 import re
-import sys
 import textwrap
+import xml.etree.ElementTree as ElementTree
 from collections import defaultdict
 from dataclasses import dataclass, field
+from pathlib import Path
 
 SCRIPT_OPTIONS = {
     "processing": "processing.json",
-    "reverse_barcode1": False,
-    "reverse_barcode2": False,
+    "runinfo": "RunInfo.xml",
+    "barcode_source": "sequence",
     "filename": "SampleSheet.withmask.{mask}.csv",
     "mismatches": "1,1",
 }
+
+BARCODE_SOURCES = ("sequence", "reverse_sequence")
+
+# LIMS barcode-category umi_method values whose UMI is read immediately after
+# the barcode in Index Read 1 (e.g. IDT xGen UDI-UMI: 8bp i7 + 9bp UMI).
+# Value is the UMI length in cycles.
+INDEX1_UMI_LENGTHS = {
+    "xgen-udi-umi": 9,
+}
+# Fallback keyed on LIMS barcode-category name, for categories that don't have
+# a umi_method set yet. Fragile (human-editable name); prefer umi_method.
+INDEX1_UMI_CATEGORY_LENGTHS = {
+    "IDT xGen UDI-UMI Adapters": 9,
+}
+
+
+@dataclass(frozen=True)
+class IndexReadInfo:
+    """Physical index-read metadata from RunInfo.xml, in read order."""
+
+    num_cycles: int
+    is_reverse_complement: bool
 
 
 @dataclass
@@ -152,13 +182,32 @@ class BasesMask:
                     len2 = read_len
         return (len1, len2)
 
-    def adjust_for_barcode_lengths(self, bc1_len: int, bc2_len: int) -> "BasesMask":
+    def adjust_for_barcode_lengths(
+        self,
+        bc1_len: int,
+        bc2_len: int,
+        index_reads: "list[IndexReadInfo] | None" = None,
+        umi1_len: int = 0,
+    ) -> "BasesMask":
         """
         Create a new BasesMask adjusted for actual barcode lengths.
 
         If barcodes are shorter than the index read, pads with 'n'.
         If barcodes are longer than the index read, truncates.
+
+        For index reads marked IsReverseComplement in RunInfo.xml, bcl-convert
+        reverses the OverrideCycles token before interpreting cycles. Padding
+        must therefore lead on those reads (N2I8) rather than trail (I8N2).
+
+        If umi1_len is set, the umi1_len cycles after barcode1 in Index Read 1
+        are marked as UMI (I8U9, or I8U9N2 if cycles remain).
         """
+        if index_reads is None:
+            raise ValueError(
+                "index_reads from RunInfo.xml is required to place OverrideCycles "
+                "padding correctly for reverse-complement index reads"
+            )
+
         new_reads = []
         index_num = 0
 
@@ -173,21 +222,122 @@ class BasesMask:
                         "don't know how to deal with this"
                     )
 
+                if index_num >= len(index_reads):
+                    raise ValueError(
+                        f"Bases mask '{self}' has more index reads than "
+                        f"RunInfo.xml ({len(index_reads)})"
+                    )
+
+                index_info = index_reads[index_num]
                 index_num += 1
                 bc_len = bc1_len if index_num == 1 else bc2_len
 
-                if bc_len >= read_len:
+                if index_num == 1 and umi1_len:
+                    if index_info.is_reverse_complement:
+                        raise ValueError(
+                            "UMI on a reverse-complement index read is not supported"
+                        )
+                    pad = read_len - bc_len - umi1_len
+                    if pad < 0:
+                        raise ValueError(
+                            f"Index read 1 has {read_len} cycles, too short for a "
+                            f"{bc_len}bp barcode plus {umi1_len}bp UMI"
+                        )
+                    pieces = [("i", bc_len), ("u", umi1_len)]
+                    if pad:
+                        pieces.append(("n", pad))
+                    new_reads.append(pieces)
+                elif bc_len >= read_len:
                     # Barcode fills or exceeds the read
                     new_reads.append([("i", read_len)])
                 else:
                     # Barcode is shorter (or absent), pad with 'n'.
                     # Keep ('i', 0) as a zero-length marker so callers can
                     # distinguish a masked physical index slot from a non-index read.
-                    new_reads.append([("i", bc_len), ("n", read_len - bc_len)])
+                    pad = read_len - bc_len
+                    if index_info.is_reverse_complement:
+                        new_reads.append([("n", pad), ("i", bc_len)])
+                    else:
+                        new_reads.append([("i", bc_len), ("n", pad)])
             else:
                 new_reads.append(read)
 
+        if index_num != len(index_reads):
+            raise ValueError(
+                f"Bases mask '{self}' has {index_num} index reads but "
+                f"RunInfo.xml has {len(index_reads)}"
+            )
+
         return BasesMask(reads=new_reads)
+
+
+def parse_runinfo(path: "str | Path") -> list[IndexReadInfo]:
+    """
+    Parse physical index-read metadata from RunInfo.xml.
+
+    Returns IndexReadInfo entries in RunInfo read order. Missing
+    IsReverseComplement attributes are treated as forward (False).
+    """
+    runinfo_path = Path(path)
+    if not runinfo_path.is_file():
+        raise FileNotFoundError(f"RunInfo.xml not found: {runinfo_path}")
+
+    try:
+        root = ElementTree.parse(runinfo_path).getroot()
+    except ElementTree.ParseError as exc:
+        raise ValueError(f"Malformed RunInfo.xml ({runinfo_path}): {exc}") from exc
+
+    reads = root.find("Run")
+    if reads is not None:
+        reads = reads.find("Reads")
+    if reads is None:
+        reads = root.find("Reads")
+    if reads is None:
+        raise ValueError(f"No <Reads> section in RunInfo.xml: {runinfo_path}")
+
+    index_reads: list[IndexReadInfo] = []
+    for read in reads.findall("Read"):
+        is_indexed = read.attrib.get("IsIndexedRead", "N").upper() == "Y"
+        if not is_indexed:
+            continue
+        try:
+            num_cycles = int(read.attrib["NumCycles"])
+        except (KeyError, ValueError) as exc:
+            raise ValueError(
+                f"Index read missing valid NumCycles in {runinfo_path}"
+            ) from exc
+        is_rc = read.attrib.get("IsReverseComplement", "N").upper() == "Y"
+        index_reads.append(
+            IndexReadInfo(num_cycles=num_cycles, is_reverse_complement=is_rc)
+        )
+
+    if not index_reads:
+        raise ValueError(f"No indexed reads found in RunInfo.xml: {runinfo_path}")
+
+    return index_reads
+
+
+def validate_runinfo_against_mask(
+    mask: BasesMask, index_reads: list[IndexReadInfo]
+) -> None:
+    """Ensure RunInfo index cycle counts match the bases mask."""
+    physical_lengths: list[int] = []
+    for read in mask.reads:
+        if any(piece[0] == "i" for piece in read):
+            physical_lengths.append(sum(piece[1] for piece in read))
+
+    if len(physical_lengths) != len(index_reads):
+        raise ValueError(
+            f"Bases mask has {len(physical_lengths)} index reads but "
+            f"RunInfo.xml has {len(index_reads)}"
+        )
+
+    for idx, (mask_len, info) in enumerate(zip(physical_lengths, index_reads), start=1):
+        if mask_len != info.num_cycles:
+            raise ValueError(
+                f"Index read {idx} length mismatch: bases mask has {mask_len} "
+                f"cycles but RunInfo.xml has {info.num_cycles}"
+            )
 
 
 def parser_setup():
@@ -201,16 +351,22 @@ def parser_setup():
         help="The JSON file to read barcodes from (default: processing.json)",
     )
     parser.add_argument(
-        "--reverse_barcode1",
-        dest="reverse_barcode1",
-        action="store_true",
-        help="Use reverse sequence for barcode1",
+        "--runinfo",
+        dest="runinfo",
+        help=(
+            "Path to RunInfo.xml (default: RunInfo.xml). Used for physical "
+            "index-read cycle counts and IsReverseComplement padding order."
+        ),
     )
     parser.add_argument(
-        "--reverse_barcode2",
-        dest="reverse_barcode2",
-        action="store_true",
-        help="Use reverse sequence for barcode2",
+        "--barcode-source",
+        dest="barcode_source",
+        choices=BARCODE_SOURCES,
+        help=(
+            "Which LIMS barcode field to write into the sample sheet "
+            f"({', '.join(BARCODE_SOURCES)}; default: sequence). This is a "
+            "LIMS representation policy, not bcl-convert read orientation."
+        ),
     )
     parser.add_argument(
         "--filename",
@@ -224,9 +380,20 @@ def parser_setup():
     return parser
 
 
-def get_barcode_assignments(
-    data: dict, reverse_barcode1: bool, reverse_barcode2: bool
-) -> "list[dict]":
+def get_barcode_assignments(data: dict, barcode_source: str) -> "list[dict]":
+    """
+    Select sample-sheet barcode strings from LIMS fields.
+
+    barcode_source chooses sequence vs reverse_sequence. That choice is
+    independent of RunInfo.xml IsReverseComplement / OverrideCycles padding.
+    barcode_check.py compares against raw BCL barcodes and intentionally uses
+    a different representation; do not unify the two.
+    """
+    if barcode_source not in BARCODE_SOURCES:
+        raise ValueError(
+            f"barcode_source must be one of {BARCODE_SOURCES}, got {barcode_source!r}"
+        )
+
     assignments = []
 
     for libdata in data["libraries"]:
@@ -235,21 +402,19 @@ def get_barcode_assignments(
             "sample": libdata.get("samplesheet_name"),
             "barcode1": "",
             "barcode2": "",
+            "umi1": 0,
         }
         if assignment["sample"] == "None":
             assignment["sample"] = "LANE%d" % libdata["id"]
         if libdata.get("barcode1") is not None:
-            assignment["barcode1"] = (
-                libdata["barcode1"]["reverse_sequence"]
-                if reverse_barcode1
-                else libdata["barcode1"]["sequence"]
+            assignment["barcode1"] = libdata["barcode1"][barcode_source]
+            umi_method = libdata["barcode1"].get("umi_method")
+            category = libdata["barcode1"].get("category")
+            assignment["umi1"] = INDEX1_UMI_LENGTHS.get(
+                umi_method, INDEX1_UMI_CATEGORY_LENGTHS.get(category, 0)
             )
         if libdata.get("barcode2") is not None:
-            assignment["barcode2"] = (
-                libdata["barcode2"]["reverse_sequence"]
-                if reverse_barcode2
-                else libdata["barcode2"]["sequence"]
-            )
+            assignment["barcode2"] = libdata["barcode2"][barcode_source]
 
         assignments.append(assignment)
 
@@ -307,8 +472,10 @@ def make_samplesheet_header(
     )
 
 
-def group_assignments(assignments: "list[dict]") -> "dict[tuple[int, int], list[dict]]":
-    """Groups the barcode assignments by length"""
+def group_assignments(
+    assignments: "list[dict]",
+) -> "dict[tuple[int, int, int], list[dict]]":
+    """Groups the barcode assignments by (barcode1, barcode2, index1 UMI) length"""
     barcode_length_combinations = defaultdict(list)
 
     def get_len(d):
@@ -318,6 +485,7 @@ def group_assignments(assignments: "list[dict]") -> "dict[tuple[int, int], list[
         key = (
             get_len(assignment["barcode1"]),
             get_len(assignment["barcode2"]),
+            assignment.get("umi1", 0),
         )
         barcode_length_combinations[key].append(assignment)
     return barcode_length_combinations
@@ -329,10 +497,12 @@ def write_samplesheets(
     date: str,
     root_mask: str,
     assignments: list[dict],
+    index_reads: list[IndexReadInfo],
     mismatches: str = "1,1",
 ) -> None:
     """Write out the sample sheets in bcl-convert v2 format."""
     mask = BasesMask.parse(root_mask)
+    validate_runinfo_against_mask(mask, index_reads)
     max_bclen1, max_bclen2 = mask.index_lengths
 
     # Trim barcodes to make sure they fit in the read
@@ -342,8 +512,10 @@ def write_samplesheets(
 
     groups = group_assignments(assignments)
 
-    for barcode_lengths, assigns in groups.items():
-        adjusted_mask = mask.adjust_for_barcode_lengths(*barcode_lengths)
+    for (bc1_len, bc2_len, umi1_len), assigns in groups.items():
+        adjusted_mask = mask.adjust_for_barcode_lengths(
+            bc1_len, bc2_len, index_reads=index_reads, umi1_len=umi1_len
+        )
         header = make_samplesheet_header(name, date, adjusted_mask, mismatches)
         body = make_samplesheet_body(assigns)
         samplesheet_contents = header + body
@@ -372,19 +544,15 @@ def make_samplesheet_body(barcode_assignments: "list[dict]") -> str:
     return "\n".join(sorted(lines))
 
 
-def main(args=sys.argv):
+def main(args=None):
     parser = parser_setup()
-    poptions = parser.parse_args()
+    poptions = parser.parse_args(args)
 
-    process_json = open(poptions.processing)
-    data = json.load(process_json)
-    process_json.close()
+    with open(poptions.processing) as process_json:
+        data = json.load(process_json)
 
-    assignments = get_barcode_assignments(
-        data,
-        poptions.reverse_barcode1,
-        poptions.reverse_barcode2,
-    )
+    index_reads = parse_runinfo(poptions.runinfo)
+    assignments = get_barcode_assignments(data, poptions.barcode_source)
     mask = data["alignment_group"]["bases_mask"]
     write_samplesheets(
         name="Altius",
@@ -392,6 +560,7 @@ def main(args=sys.argv):
         date=str(datetime.date.today()),
         root_mask=mask,
         assignments=assignments,
+        index_reads=index_reads,
         mismatches=poptions.mismatches,
     )
 

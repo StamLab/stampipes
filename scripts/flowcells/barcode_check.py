@@ -116,7 +116,10 @@ def main(argv):
         lengths = str(length1) + "-" + str(length2)
         index = barcode_lengths.index(lengths)
         if mask == masks[index]:
-            # check to see if the barcode is represent in the report
+            # Raw BCL barcode report orientation is independent of the
+            # bcl-convert sample-sheet barcode-source policy. NovaSeq sheets
+            # may use reverse_sequence for both indexes, but this check still
+            # compares against the raw index1/index2 bases as observed in BCL.
             bcs = ""
             if lib["barcode2"] is not None:
                 bc1 = lib["barcode1"]["reverse_sequence"]
